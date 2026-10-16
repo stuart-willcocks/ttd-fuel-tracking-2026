@@ -1,11 +1,12 @@
 {
   "name": "ttd-fuel-tracking",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.12",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "bump": "node scripts/bump_build.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },

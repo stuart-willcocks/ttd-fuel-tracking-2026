@@ -1167,3 +1167,39 @@ body {
   flex-direction: column;
   gap: 12px;
 }
+
+/* Discreet Version Footer */
+.app-version-footer {
+  text-align: center;
+  padding: 8px 16px 14px;
+  font-size: 11px;
+  font-family: "JetBrains Mono", monospace;
+  color: var(--text-dim);
+  opacity: 0.55;
+  user-select: none;
+  letter-spacing: 0.04em;
+  margin-top: auto;
+}
+
+.settings-version-block {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.settings-version-label {
+  font-size: 12px;
+  font-family: "JetBrains Mono", monospace;
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.settings-version-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+

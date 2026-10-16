@@ -11,6 +11,7 @@ import { ConfirmationModal } from './components/ConfirmationModal';
 import { EditAssetModal } from './components/EditAssetModal';
 import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
+import { APP_VERSION, BUILD_NUMBER } from './version';
 
 export const App: React.FC = () => {
   const [activeAssetId, setActiveAssetId] = useState<string | null>(null);
@@ -281,6 +282,11 @@ export const App: React.FC = () => {
         onResetData={handleResetData}
         onTriggerSync={() => syncEngine.syncWithRemote()}
       />
+
+      {/* Discreet Version Footer */}
+      <footer className="app-version-footer">
+        <span>v{APP_VERSION} (b{BUILD_NUMBER})</span>
+      </footer>
     </div>
   );
 };
