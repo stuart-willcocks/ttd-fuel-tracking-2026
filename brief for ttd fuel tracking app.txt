@@ -1,0 +1,115 @@
+Brief for TTD fuel tracking app 2026
+
+I have a project which helps to track fuel usage on a rental fleet of generators and other equipment (collectively referred to as assets). The technicians use up to five Zebra TC26 PDAs on site to track the status of the assets and record fuel transfers.
+
+Currently the system uses an app build using MIT App Maker, with Google Sheets and Apps Script as a back end. The sheet we use currently is here: https://docs.google.com/spreadsheets/d/1a5ocDuTAIwyLTNR94t2nCWzPAEQQNqwYsZj6NZ-YGY8
+
+The Apps Script in its current state is here:
+https://script.google.com/u/0/home/projects/1lo6L-pB2_IpPXUOdDGWw03azrVsh89scWllxVKWUrdzKlr2sS6HsA2_X/edit
+
+The sheet linked above contains live data. Do not modify it without explicit permission from me.
+
+I have had problems with the PDA apps locking up, as well as concurrency issues. I would like to explore alternative implementations to make the workflow more robust.  The solution must be low-cost and avoid the complexities of setting up multiple software frameworks, SDKs etc. as far as possible.
+
+This is a description of the existing Google sheet:
+
+The EquipmentList tab contains a pre-populated list of all the assets, including generators, fuel tanks and other equipment (plant). Each asset is identified by its EquipmentId (column A). This ID is printed on a QR code attached to the front of the asset.
+
+Columns B, C, D contain the area, location and what3words reference for the asset. Column E specifies the type of asset (GENERATOR, TANK or PLANT). Column F specifies the capacity of the asset as an integer (kVA for generators, litres for tanks, not applicable for plant). Column G contains the rental serial number for the asset. Column H contains a timestamp indicating when the generator was powered up (not used for other asset types). Column I contains a timestamp indicating when the generator was powered down (not used for other asset types).
+
+The remaining columns on the EquipmentList tab are autopopulated using formulas which reference the Transactions tab.
+
+The Transactions tab lists all the activities related to refuelling. These are:
+
+Column A: EquipmentId
+Uniquely identifies the asset. EquipmentId is a string in the format TTD-vvv-nnnn where vvv is a three-character event code such as MAT and nnnn is a unique, zero-padded, incremental serial number starting at 0001. The Equipment IDs are determined manually by the user.
+
+Column B: TransactionTimestamp
+A timestamp recorded by the PDA at the time the fuel transfer or other action was performed. This is a string in the format YYYY-MM-DD HH:mm:SS.
+
+Column C: UploadTimestamp
+A timestamp inserted by Apps Script when the transaction is written into the sheet. This is a string in the format YYYY-MM-DD HH:mm:SS.
+
+Column D: TransactionType
+Specifies the type of transaction. For generators, valid TransactionType strings are: CheckInGenerator, CheckOutGenerator, FuelTransferGenerator, PoweredUp, PoweredDown.
+
+For tanks, valid TransactionType strings are: CheckInTank, CheckOutTank, FuelTranferTank
+
+For plant, valid TransactionType strings are: FuelTransferPlant
+
+The remaining columns on the Transactions tab record the values for the transactions.
+
+Column E is CheckInFuelEighths. Where populated, this is an integer between 0 and 8 inclusive.
+
+Column F is CheckOutFuelEighths. Where populated, this is an integer between 0 and 8 inclusive.
+
+Column G is CheckInFuelPercentage. Where populated, this is an integer between 0 and 100 inclusive.
+
+Column H is CheckOutFuelPercentage. Where populated, this is an integer between 0 and 100 inclusive.
+
+Column I is CheckInDefPercentage. DEF refers to diesel exhaust fluid, such as AdBlue. Where populated, this is an integer between 0 and 100 inclusive.
+
+Column J is CheckOutDefPercentage.Where populated, this is an integer between 0 and 100 inclusive.
+
+Column K is FuelTransferLitres. Where populated, this is a positive integer.
+
+Column L is DefTransferLitres. Where populated, this is a positive integer.
+
+Column M is CheckInKWH. Where populated, this is a positive integer.
+
+Column N is CheckOutKWH. Where populated, this is a positive integer.
+
+When a generator is checked in, the technician records CheckInFuelPercentage, CheckInDefPercentage and CheckInKWH on the PDA.
+
+When a generator is checked out, the technician records CheckOutFuelPercentage, CheckOutDefPercentage and CheckOutKWH on the PDA.
+
+When a tank is checked in, the technician records CheckInFuelEights (the tank gauges are divided into eighths) on the PDA.
+
+When a tank is checked out, the technician records CheckOutFuelEights on the PDA.
+
+When plant is checked in, the technician records CheckInFuelPercentage on the PDA.
+
+When plant is checked out, the technician records CheckOutFuelPercentage on the PDA.
+
+When a generator is refuelled, the technician records FuelTransferLitres and DefTransferLitres on the PDA.
+
+When a tank is refuelled, the technician records FuelTransferLitres on the PDA.
+
+When plant is refuelled, the technician records FuelTransferLitres on the PDA.
+
+
+The PDA must store transactions locally in case there is no internet access. When connectivity is restored, the PDA must upload all pending transactions and synchronise with data uploaded by the other PDAs.
+
+User journeys
+
+The default screen on the app invites the user to scan a QR code. When a valid QR code is scanned (matching the valid format specified above), it appears at the top of the screen with the following information relating to the scanned asset:
+
+what3words, type, size, serial number, power-up timestamp, power-down timestamp, are, location. 
+
+Any transactions relating to the asset are then listed in timestamp order.
+
+Beneath this are a set of menu buttons to allow the technician to execute a particular transaction type. These buttons are labelled: Check In, Record Fuel Transfer, Check Out, Edit Equipment Details.
+
+When “Check In” is pressed and the scanned asset is a GENERATOR, the user sees a screen with text boxes for fuel level, DEF level and kWh.
+
+When “Check In” is pressed and the scanned asset is a TANK, the user sees a screen with a spinner control for fuel levels in eighths of a tank.
+
+When “Check In” is pressed and the scanned asset is PLANT, the user sees a screen with a text box for fuel level.
+
+When “Check Out” is pressed and the scanned asset is a GENERATOR, the user sees a screen with text boxes for fuel level, DEF level and kWh.
+
+When “Check Out” is pressed and the scanned asset is a TANK, the user sees a screen with a spinner control for fuel levels in eighths of a tank.
+
+When “Check Out” is pressed and the scanned asset is PLANT, the user sees a screen with a text box for fuel level.
+
+When “Record Fuel Transfer” is pressed and the scanned asset is a GENERATOR, the user sees a screen with text boxes for fuel volume and DEF volume.
+
+When “Record Fuel Transfer” is pressed and the scanned asset is a TANK or PLANT, the user sees a screen with a text box for fuel volume.
+
+Beneath the text boxes and spinner controls are two buttons labelled Submit and Cancel. Submit is greyed out and disabled by default. Cancel is red. If all displayed entry fields contain valid values, the submit button becomes clickable and turns green.
+
+If Submit is clicked, a dialog box is displayed showing the entered values and asking the user to confirm that they wish to submit them. A cancel button allows the user to abort the submission of the data and go back to the transaction recording screen. If the user confirms that the values should be submitted, the app stores the transaction locally and puts it in the queue to be uploaded at the next opportunity.
+
+
+
+

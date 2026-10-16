@@ -1,0 +1,66 @@
+import React from 'react';
+import { Wifi, WifiOff, RefreshCw, Settings } from 'lucide-react';
+import type { SyncState } from '../services/syncEngine';
+
+interface HeaderProps {
+  syncState: SyncState;
+  onToggleSimulatedOffline: () => void;
+  onTriggerSync: () => void;
+  onOpenOutbox: () => void;
+  onOpenSettings: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({
+  syncState,
+  onToggleSimulatedOffline,
+  onTriggerSync,
+  onOpenOutbox,
+  onOpenSettings,
+}) => {
+  return (
+    <header className="app-header">
+      <div className="header-title-box">
+        <h1 className="header-title">TTD Fuel Tracking</h1>
+      </div>
+
+      <div className="header-status-box">
+        {/* Network status pill */}
+        <button
+          className={`status-pill ${syncState.isOnline ? 'online' : 'offline'}`}
+          onClick={onToggleSimulatedOffline}
+          title={syncState.isOnline ? 'Tap to simulate offline' : 'Tap to reconnect'}
+        >
+          {syncState.isOnline ? <Wifi size={13} /> : <WifiOff size={13} />}
+          <span>{syncState.isOnline ? 'Online' : 'Offline'}</span>
+          {syncState.isSimulatedOffline && <span className="sim-label">SIM</span>}
+        </button>
+
+        {/* Pending outbox count pill */}
+        {syncState.pendingCount > 0 && (
+          <button className="pending-pill" onClick={onOpenOutbox} title="View offline queue">
+            <span>{syncState.pendingCount} pending</span>
+          </button>
+        )}
+
+        {/* Sync button */}
+        <button
+          className={`icon-btn ${syncState.isSyncing ? 'spinning' : ''}`}
+          onClick={onTriggerSync}
+          disabled={!syncState.isOnline || syncState.isSyncing}
+          title="Sync now"
+        >
+          <RefreshCw size={15} />
+        </button>
+
+        {/* Settings button */}
+        <button
+          className="icon-btn"
+          onClick={onOpenSettings}
+          title="Settings & Schema"
+        >
+          <Settings size={15} />
+        </button>
+      </div>
+    </header>
+  );
+};

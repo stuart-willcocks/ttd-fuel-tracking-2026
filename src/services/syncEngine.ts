@@ -1,0 +1,274 @@
+import { db } from '../db/indexedDB';
+import { uploadTransactionToCloud } from './supabase';
+import { fetchRemoteEquipment, fetchRemoteTransactions } from './api';
+import type { Transaction } from '../types';
+
+export interface SyncState {
+  isOnline: boolean;
+  isSimulatedOffline: boolean;
+  isSyncing: boolean;
+  pendingCount: number;
+  lastSyncTime: string | null;
+  lastError: string | null;
+}
+
+type SyncListener = (state: SyncState) => void;
+type RemoteDataListener = () => void;
+
+class SyncEngine {
+  private listeners: Set<SyncListener> = new Set();
+  private dataListeners: Set<RemoteDataListener> = new Set();
+  private isSimulatedOffline: boolean = false;
+  private isSyncing: boolean = false;
+  private lastSyncTime: string | null = null;
+  private lastError: string | null = null;
+  private syncTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => this.handleNetworkChange());
+      window.addEventListener('offline', () => this.handleNetworkChange());
+      window.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && this.isEffectivelyOnline()) {
+          this.syncWithRemote();
+        }
+      });
+
+      // Poll every 3 seconds to keep all PDAs and PCs synchronized
+      this.syncTimer = setInterval(() => {
+        if (this.isEffectivelyOnline() && !this.isSyncing) {
+          this.syncWithRemote();
+        }
+      }, 3000);
+    }
+  }
+
+  public destroy() {
+    if (this.syncTimer) {
+      clearInterval(this.syncTimer);
+      this.syncTimer = null;
+    }
+  }
+
+  public subscribe(listener: SyncListener): () => void {
+    this.listeners.add(listener);
+    this.notify();
+    return () => this.listeners.delete(listener);
+  }
+
+  public onRemoteDataUpdated(listener: RemoteDataListener): () => void {
+    this.dataListeners.add(listener);
+    return () => this.dataListeners.delete(listener);
+  }
+
+  public isEffectivelyOnline(): boolean {
+    if (this.isSimulatedOffline) return false;
+    return typeof navigator !== 'undefined' ? navigator.onLine : true;
+  }
+
+  public setSimulatedOffline(offline: boolean) {
+    this.isSimulatedOffline = offline;
+    this.notify();
+    if (!offline && this.isEffectivelyOnline()) {
+      this.syncWithRemote();
+    }
+  }
+
+  public toggleSimulatedOffline() {
+    this.setSimulatedOffline(!this.isSimulatedOffline);
+  }
+
+  private handleNetworkChange() {
+    this.notify();
+    if (this.isEffectivelyOnline()) {
+      this.syncWithRemote();
+    }
+  }
+
+  public async getPendingCount(): Promise<number> {
+    try {
+      return await db.outbox.count();
+    } catch {
+      return 0;
+    }
+  }
+
+  public async getState(): Promise<SyncState> {
+    const pendingCount = await this.getPendingCount();
+    return {
+      isOnline: this.isEffectivelyOnline(),
+      isSimulatedOffline: this.isSimulatedOffline,
+      isSyncing: this.isSyncing,
+      pendingCount,
+      lastSyncTime: this.lastSyncTime,
+      lastError: this.lastError,
+    };
+  }
+
+  private async notify() {
+    const state = await this.getState();
+    this.listeners.forEach((listener) => listener(state));
+  }
+
+  private notifyDataChange() {
+    this.dataListeners.forEach((listener) => listener());
+  }
+
+  /**
+   * Enqueues a newly created transaction into local IndexedDB and the outbox queue.
+   * Immediately attempts upload to the shared server.
+   */
+  public async queueTransaction(tx: Transaction): Promise<void> {
+    // 1. Write to local IndexedDB
+    await db.transactions.put(tx);
+
+    // 2. Put in outbox
+    await db.outbox.put({
+      id: tx.id,
+      equipmentId: tx.equipmentId,
+      createdAt: tx.createdAt,
+      attempts: 0,
+    });
+
+    // 3. Update local equipment state
+    if (tx.transactionType === 'PoweredUp') {
+      await db.equipments.update(tx.equipmentId, {
+        poweredUpTimestamp: tx.transactionTimestamp,
+        poweredDownTimestamp: undefined,
+      });
+    } else if (tx.transactionType === 'PoweredDown') {
+      await db.equipments.update(tx.equipmentId, {
+        poweredDownTimestamp: tx.transactionTimestamp,
+      });
+    }
+
+    await this.notify();
+    this.notifyDataChange();
+
+    // 4. Try upload if online
+    if (this.isEffectivelyOnline()) {
+      setTimeout(() => this.flushOutbox(), 20);
+    }
+  }
+
+  /**
+   * Full two-way sync:
+   * 1. Flush any pending outbox items from this device to the central server.
+   * 2. Pull remote transactions & equipment from the central server and update local IndexedDB.
+   */
+  public async syncWithRemote(): Promise<void> {
+    if (!this.isEffectivelyOnline() || this.isSyncing) return;
+
+    this.isSyncing = true;
+    await this.notify();
+
+    try {
+      // Step 1: Upload any pending outbox items from this device
+      await this.flushOutboxInternal();
+
+      // Step 2: Download latest transactions and equipment from central server
+      const [remoteEquipment, remoteTransactions] = await Promise.all([
+        fetchRemoteEquipment().catch((err) => {
+          console.warn('Could not fetch remote equipment:', err);
+          return null;
+        }),
+        fetchRemoteTransactions().catch((err) => {
+          console.warn('Could not fetch remote transactions:', err);
+          return null;
+        }),
+      ]);
+
+      let hadUpdates = false;
+
+      // Step 3: Reconcile all local transactions with remote transactions
+      if (remoteTransactions && Array.isArray(remoteTransactions)) {
+        const remoteIdSet = new Set(remoteTransactions.map((t) => t.id));
+        const allLocal = await db.transactions.toArray();
+        const unsharedLocals = allLocal.filter((t) => !remoteIdSet.has(t.id));
+
+        if (unsharedLocals.length > 0) {
+          // Push local unshared transactions to the central server so other devices see them
+          for (const localTx of unsharedLocals) {
+            await uploadTransactionToCloud(localTx);
+          }
+          // Fetch updated list from server now that it has all items
+          const refreshed = await fetchRemoteTransactions().catch(() => null);
+          if (refreshed && Array.isArray(refreshed)) {
+            await db.transactions.bulkPut(refreshed);
+          }
+        } else {
+          // Store all remote transactions in local IndexedDB
+          await db.transactions.bulkPut(remoteTransactions);
+        }
+        hadUpdates = true;
+      }
+
+      if (remoteEquipment && Array.isArray(remoteEquipment) && remoteEquipment.length > 0) {
+        await db.equipments.bulkPut(remoteEquipment);
+        hadUpdates = true;
+      }
+
+      this.lastSyncTime = new Date().toLocaleTimeString();
+      this.lastError = null;
+
+      if (hadUpdates) {
+        this.notifyDataChange();
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.lastError = msg;
+    } finally {
+      this.isSyncing = false;
+      await this.notify();
+    }
+  }
+
+  private async flushOutboxInternal(): Promise<{ processed: number; errors: number }> {
+    let processed = 0;
+    let errors = 0;
+
+    const items = await db.outbox.orderBy('createdAt').toArray();
+
+    for (const item of items) {
+      if (!this.isEffectivelyOnline()) break;
+
+      const tx = await db.transactions.get(item.id);
+      if (!tx) {
+        await db.outbox.delete(item.id);
+        continue;
+      }
+
+      const result = await uploadTransactionToCloud(tx);
+
+      if (result.success) {
+        await db.transactions.update(item.id, {
+          syncStatus: 'synced',
+          uploadTimestamp: result.uploadTimestamp,
+          syncError: undefined,
+        });
+        await db.outbox.delete(item.id);
+        processed++;
+      } else {
+        errors++;
+        this.lastError = result.error || 'Failed to upload transaction';
+        await db.outbox.update(item.id, {
+          attempts: item.attempts + 1,
+          lastAttempt: new Date().toISOString(),
+          error: result.error,
+        });
+        await db.transactions.update(item.id, {
+          syncStatus: 'failed',
+          syncError: result.error,
+        });
+      }
+    }
+
+    return { processed, errors };
+  }
+
+  public async flushOutbox(): Promise<{ processed: number; errors: number }> {
+    return this.flushOutboxInternal();
+  }
+}
+
+export const syncEngine = new SyncEngine();

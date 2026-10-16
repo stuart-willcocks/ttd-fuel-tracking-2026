@@ -1,0 +1,288 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { db, initializeDatabase } from './db/indexedDB';
+import { syncEngine, type SyncState } from './services/syncEngine';
+import { resetRemoteData } from './services/api';
+import { type Equipment, type Transaction, type ActionType, generateUUID } from './types';
+import { Header } from './components/Header';
+import { ScannerView } from './components/ScannerView';
+import { AssetDetailView } from './components/AssetDetailView';
+import { TransactionForm } from './components/TransactionForm';
+import { ConfirmationModal } from './components/ConfirmationModal';
+import { EditAssetModal } from './components/EditAssetModal';
+import { OutboxModal } from './components/OutboxModal';
+import { SettingsModal } from './components/SettingsModal';
+
+export const App: React.FC = () => {
+  const [activeAssetId, setActiveAssetId] = useState<string | null>(null);
+  const activeAssetIdRef = useRef<string | null>(null);
+  activeAssetIdRef.current = activeAssetId;
+
+  const [activeAction, setActiveAction] = useState<ActionType | null>(null);
+  const [isEditingAsset, setIsEditingAsset] = useState<boolean>(false);
+
+  const [pendingTxData, setPendingTxData] = useState<Partial<Transaction> | null>(null);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [isOutboxModalOpen, setIsOutboxModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
+  const [availableAssets, setAvailableAssets] = useState<Equipment[]>([]);
+  const [currentAsset, setCurrentAsset] = useState<Equipment | null>(null);
+  const [currentAssetTransactions, setCurrentAssetTransactions] = useState<Transaction[]>([]);
+
+  const [syncState, setSyncState] = useState<SyncState>({
+    isOnline: true,
+    isSimulatedOffline: false,
+    isSyncing: false,
+    pendingCount: 0,
+    lastSyncTime: null,
+    lastError: null,
+  });
+
+  const getLocalFormattedTimestamp = (): string => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  const refreshAssetsList = useCallback(async () => {
+    const all = await db.equipments.toArray();
+    setAvailableAssets(all);
+  }, []);
+
+  const loadAssetDetails = useCallback(async (equipmentId: string) => {
+    let asset = await db.equipments.get(equipmentId);
+
+    if (!asset) {
+      const isTank = equipmentId.includes('TNK') || equipmentId.includes('TANK');
+      const isPlant = equipmentId.includes('PLT') || equipmentId.includes('PLANT');
+      const inferredType = isTank ? 'TANK' : isPlant ? 'PLANT' : 'GENERATOR';
+
+      asset = {
+        equipmentId,
+        area: 'Site Area',
+        location: 'Field Grid',
+        what3words: '///field.power.setup',
+        type: inferredType,
+        capacity: inferredType === 'GENERATOR' ? 100 : inferredType === 'TANK' ? 2500 : undefined,
+        rentalSerialNumber: `RSN-${Math.floor(10000 + Math.random() * 90000)}`,
+      };
+      await db.equipments.put(asset);
+      await refreshAssetsList();
+    }
+
+    setCurrentAsset(asset);
+
+    const txs = await db.transactions
+      .where('equipmentId')
+      .equals(equipmentId)
+      .reverse()
+      .sortBy('transactionTimestamp');
+    setCurrentAssetTransactions(txs);
+  }, [refreshAssetsList]);
+
+  // Boot & synchronization listeners
+  useEffect(() => {
+    const init = async () => {
+      await initializeDatabase();
+      await refreshAssetsList();
+      // Perform immediate sync with central server
+      await syncEngine.syncWithRemote();
+    };
+    init();
+
+    const unsubState = syncEngine.subscribe((state) => {
+      setSyncState(state);
+    });
+
+    // Real-time remote data listener: update UI when PC or other PDAs post data
+    const unsubData = syncEngine.onRemoteDataUpdated(async () => {
+      await refreshAssetsList();
+      if (activeAssetIdRef.current) {
+        await loadAssetDetails(activeAssetIdRef.current);
+      }
+    });
+
+    return () => {
+      unsubState();
+      unsubData();
+    };
+  }, [refreshAssetsList, loadAssetDetails]);
+
+  useEffect(() => {
+    if (activeAssetId) {
+      loadAssetDetails(activeAssetId);
+    } else {
+      setCurrentAsset(null);
+      setCurrentAssetTransactions([]);
+    }
+  }, [activeAssetId, loadAssetDetails]);
+
+  const handleAssetSelected = (equipmentId: string) => {
+    setActiveAssetId(equipmentId);
+    setActiveAction(null);
+  };
+
+  const handleBackToScanner = () => {
+    setActiveAssetId(null);
+    setActiveAction(null);
+    setCurrentAsset(null);
+  };
+
+  const handleFormSubmitValues = (data: Partial<Transaction>) => {
+    setPendingTxData(data);
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleConfirmTransaction = async () => {
+    if (!currentAsset || !pendingTxData) return;
+
+    const newTx: Transaction = {
+      id: generateUUID(),
+      equipmentId: currentAsset.equipmentId,
+      transactionTimestamp: getLocalFormattedTimestamp(),
+      transactionType: pendingTxData.transactionType!,
+      checkInFuelEighths: pendingTxData.checkInFuelEighths,
+      checkOutFuelEighths: pendingTxData.checkOutFuelEighths,
+      checkInFuelPercentage: pendingTxData.checkInFuelPercentage,
+      checkOutFuelPercentage: pendingTxData.checkOutFuelPercentage,
+      checkInDefPercentage: pendingTxData.checkInDefPercentage,
+      checkOutDefPercentage: pendingTxData.checkOutDefPercentage,
+      fuelTransferLitres: pendingTxData.fuelTransferLitres,
+      defTransferLitres: pendingTxData.defTransferLitres,
+      checkInKWH: pendingTxData.checkInKWH,
+      checkOutKWH: pendingTxData.checkOutKWH,
+      syncStatus: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+
+    // Store in IndexedDB and upload to shared central server
+    await syncEngine.queueTransaction(newTx);
+
+    setIsConfirmModalOpen(false);
+    setPendingTxData(null);
+    setActiveAction(null);
+
+    await loadAssetDetails(currentAsset.equipmentId);
+  };
+
+  const handlePowerToggle = async (powerAction: 'PoweredUp' | 'PoweredDown') => {
+    if (!currentAsset) return;
+
+    const timestamp = getLocalFormattedTimestamp();
+    const newTx: Transaction = {
+      id: generateUUID(),
+      equipmentId: currentAsset.equipmentId,
+      transactionTimestamp: timestamp,
+      transactionType: powerAction,
+      syncStatus: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+
+    await syncEngine.queueTransaction(newTx);
+    await loadAssetDetails(currentAsset.equipmentId);
+  };
+
+  const handleSaveEditedAsset = async (updated: Equipment) => {
+    await db.equipments.put(updated);
+    setCurrentAsset(updated);
+    setIsEditingAsset(false);
+    await refreshAssetsList();
+    // Also push to central server
+    await syncEngine.syncWithRemote();
+  };
+
+  const handleResetData = async () => {
+    if (window.confirm('Reset all equipment and transactions back to factory defaults?')) {
+      await resetRemoteData();
+      await db.equipments.clear();
+      await db.transactions.clear();
+      await db.outbox.clear();
+      await initializeDatabase();
+      await syncEngine.syncWithRemote();
+      await refreshAssetsList();
+      if (activeAssetId) {
+        await loadAssetDetails(activeAssetId);
+      }
+      setIsSettingsModalOpen(false);
+    }
+  };
+
+  return (
+    <div className="app-root">
+      <Header
+        syncState={syncState}
+        onToggleSimulatedOffline={() => syncEngine.toggleSimulatedOffline()}
+        onTriggerSync={() => syncEngine.syncWithRemote()}
+        onOpenOutbox={() => setIsOutboxModalOpen(true)}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
+      />
+
+      <main className="app-main">
+        {!activeAssetId ? (
+          <ScannerView
+            onAssetSelected={handleAssetSelected}
+            availableAssets={availableAssets}
+          />
+        ) : activeAction ? (
+          currentAsset && (
+            <TransactionForm
+              asset={currentAsset}
+              action={activeAction}
+              onCancel={() => setActiveAction(null)}
+              onSubmitValues={handleFormSubmitValues}
+            />
+          )
+        ) : (
+          currentAsset && (
+            <AssetDetailView
+              asset={currentAsset}
+              transactions={currentAssetTransactions}
+              onBackToScanner={handleBackToScanner}
+              onSelectAction={(action) => setActiveAction(action)}
+              onEditEquipment={() => setIsEditingAsset(true)}
+              onPowerToggle={handlePowerToggle}
+            />
+          )
+        )}
+      </main>
+
+      {/* Confirmation Modal */}
+      {currentAsset && pendingTxData && (
+        <ConfirmationModal
+          asset={currentAsset}
+          transactionData={pendingTxData}
+          isOpen={isConfirmModalOpen}
+          onCancel={() => setIsConfirmModalOpen(false)}
+          onConfirm={handleConfirmTransaction}
+        />
+      )}
+
+      {/* Edit Equipment Modal */}
+      {currentAsset && (
+        <EditAssetModal
+          asset={currentAsset}
+          isOpen={isEditingAsset}
+          onClose={() => setIsEditingAsset(false)}
+          onSave={handleSaveEditedAsset}
+        />
+      )}
+
+      {/* Offline Outbox Modal */}
+      <OutboxModal
+        isOpen={isOutboxModalOpen}
+        onClose={() => setIsOutboxModalOpen(false)}
+        syncState={syncState}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        onResetData={handleResetData}
+        onTriggerSync={() => syncEngine.syncWithRemote()}
+      />
+    </div>
+  );
+};
+
+export default App;
