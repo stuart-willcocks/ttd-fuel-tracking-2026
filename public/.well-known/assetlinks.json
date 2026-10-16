@@ -3,9 +3,19 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
+      "package_name": "app.vercel.ttd_fuel_tracking_2026.twa",
+      "sha256_cert_fingerprints": [
+        "D0:C6:9A:6D:5A:55:31:3A:7E:57:88:8C:E1:5A:3A:79:5B:DC:DC:38:59:E1:6E:E7:A6:56:1E:D1:4C:5D:DF:C7"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
       "package_name": "com.ttd.fueltracking",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_SHA256_FINGERPRINT"
+        "D0:C6:9A:6D:5A:55:31:3A:7E:57:88:8C:E1:5A:3A:79:5B:DC:DC:38:59:E1:6E:E7:A6:56:1E:D1:4C:5D:DF:C7"
       ]
     }
   }
