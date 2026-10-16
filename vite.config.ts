@@ -9,7 +9,15 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'favicon-64x64.png'],
+      includeAssets: [
+        'favicon.svg',
+        'apple-touch-icon.png',
+        'pwa-192x192.png',
+        'pwa-512x512.png',
+        'favicon-64x64.png',
+        'screenshot-mobile.png',
+        'screenshot-desktop.png',
+      ],
       manifest: {
         id: 'com.ttd.fueltracking',
         name: 'TTD Fuel Tracking',
@@ -21,6 +29,10 @@ export default defineConfig({
         orientation: 'portrait-primary',
         scope: '/',
         start_url: '/',
+        lang: 'en',
+        dir: 'ltr',
+        categories: ['business', 'productivity', 'utilities'],
+        prefer_related_applications: false,
         icons: [
           {
             src: '/pwa-192x192.png',
@@ -37,6 +49,31 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
+          },
+        ],
+        screenshots: [
+          {
+            src: '/screenshot-mobile.png',
+            sizes: '540x960',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Asset details and status overview on Zebra handheld',
+          },
+          {
+            src: '/screenshot-desktop.png',
+            sizes: '1280x720',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Fleet tracking dashboard and transaction controls',
+          },
+        ],
+        shortcuts: [
+          {
+            name: 'Scan Asset QR',
+            short_name: 'Scan QR',
+            description: 'Launch QR scanner to scan asset barcode',
+            url: '/',
+            icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
           },
         ],
       },

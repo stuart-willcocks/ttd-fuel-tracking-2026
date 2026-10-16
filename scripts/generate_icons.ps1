@@ -15,7 +15,6 @@ public static class IconBuilder
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
-            // Background
             using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(255, 11, 15, 25)))
             {
                 g.FillRectangle(bgBrush, 0, 0, size, size);
@@ -25,7 +24,6 @@ public static class IconBuilder
             float margin = isMaskable ? (70f * scale) : (32f * scale);
             float innerSize = size - (margin * 2f);
 
-            // Rounded badge container
             float radius = 48f * scale;
             using (GraphicsPath path = new GraphicsPath())
             {
@@ -50,24 +48,20 @@ public static class IconBuilder
                 }
             }
 
-            // Colors
             Color amber = Color.FromArgb(255, 245, 158, 11);
             Color white = Color.FromArgb(255, 248, 250, 252);
             Color dark = Color.FromArgb(255, 15, 23, 42);
 
-            // Fuel pump body
             using (SolidBrush amberBrush = new SolidBrush(amber))
             {
                 g.FillRectangle(amberBrush, 185f * scale, 160f * scale, 110f * scale, 170f * scale);
             }
 
-            // Fuel pump screen
             using (SolidBrush darkBrush = new SolidBrush(dark))
             {
                 g.FillRectangle(darkBrush, 205f * scale, 185f * scale, 70f * scale, 45f * scale);
             }
 
-            // Hose & nozzle
             using (Pen hosePen = new Pen(amber, 12f * scale))
             {
                 hosePen.StartCap = LineCap.Round;
@@ -81,7 +75,6 @@ public static class IconBuilder
                 );
             }
 
-            // Lightning Bolt
             PointF[] bolt = new PointF[]
             {
                 new PointF(240f * scale + 5f * scale, 250f * scale - 5f * scale),
@@ -98,7 +91,6 @@ public static class IconBuilder
                 g.FillPath(whiteBrush, boltPath);
             }
 
-            // Text
             using (Font font = new Font("Arial", 32f * scale, FontStyle.Bold, GraphicsUnit.Pixel))
             using (Font subFont = new Font("Arial", 15f * scale, FontStyle.Bold, GraphicsUnit.Pixel))
             using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
@@ -116,6 +108,72 @@ public static class IconBuilder
             Console.WriteLine("Built: " + outFile + " (" + size + "x" + size + ")");
         }
     }
+
+    public static void GenerateScreenshot(int w, int h, string outFile)
+    {
+        using (Bitmap bmp = new Bitmap(w, h))
+        using (Graphics g = Graphics.FromImage(bmp))
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            // Background
+            using (SolidBrush bg = new SolidBrush(Color.FromArgb(255, 11, 15, 25)))
+            {
+                g.FillRectangle(bg, 0, 0, w, h);
+            }
+
+            // Top Header Bar
+            using (SolidBrush header = new SolidBrush(Color.FromArgb(255, 18, 24, 38)))
+            {
+                g.FillRectangle(header, 0, 0, w, 64);
+            }
+
+            // Amber Title
+            using (Font font = new Font("Arial", 18f, FontStyle.Bold, GraphicsUnit.Pixel))
+            using (SolidBrush amber = new SolidBrush(Color.FromArgb(255, 245, 158, 11)))
+            using (SolidBrush white = new SolidBrush(Color.FromArgb(255, 248, 250, 252)))
+            using (SolidBrush muted = new SolidBrush(Color.FromArgb(255, 148, 163, 184)))
+            {
+                g.DrawString("TTD FUEL TRACKING", font, amber, 24, 20);
+
+                // Asset Card
+                int cardY = 80;
+                using (SolidBrush cardBg = new SolidBrush(Color.FromArgb(255, 22, 31, 48)))
+                using (Pen border = new Pen(Color.FromArgb(255, 45, 60, 85), 2f))
+                {
+                    g.FillRectangle(cardBg, 20, cardY, w - 40, 220);
+                    g.DrawRectangle(border, 20, cardY, w - 40, 220);
+                }
+
+                using (Font idFont = new Font("Arial", 22f, FontStyle.Bold, GraphicsUnit.Pixel))
+                using (Font textFont = new Font("Arial", 14f, FontStyle.Regular, GraphicsUnit.Pixel))
+                {
+                    g.DrawString("TTD-MAT-0001", idFont, white, 36, cardY + 20);
+                    g.DrawString("GENERATOR • 100 kVA • North Zone", textFont, amber, 36, cardY + 54);
+                    g.DrawString("Stage Alpha Power Compound (///puzzle.stages.daring)", textFont, muted, 36, cardY + 80);
+                    g.DrawString("Status: POWERED UP • Fuel: 85% • DEF: 90%", textFont, white, 36, cardY + 110);
+                }
+
+                // Buttons
+                int btnY = cardY + 150;
+                int btnW = (w - 70) / 2;
+                using (SolidBrush btnGreen = new SolidBrush(Color.FromArgb(255, 34, 197, 94)))
+                using (SolidBrush btnBlue = new SolidBrush(Color.FromArgb(255, 59, 130, 246)))
+                using (Font btnFont = new Font("Arial", 13f, FontStyle.Bold, GraphicsUnit.Pixel))
+                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                {
+                    g.FillRectangle(btnGreen, 36, btnY, btnW, 44);
+                    g.DrawString("CHECK IN", btnFont, white, new RectangleF(36, btnY, btnW, 44), sf);
+
+                    g.FillRectangle(btnBlue, 36 + btnW + 10, btnY, btnW, 44);
+                    g.DrawString("FUEL TRANSFER", btnFont, white, new RectangleF(36 + btnW + 10, btnY, btnW, 44), sf);
+                }
+            }
+
+            bmp.Save(outFile, ImageFormat.Png);
+            Console.WriteLine("Built: " + outFile + " (" + w + "x" + h + ")");
+        }
+    }
 }
 "@
 
@@ -126,3 +184,6 @@ Add-Type -TypeDefinition $source -ReferencedAssemblies System.Drawing
 [IconBuilder]::Generate(192, "public/pwa-192x192.png", $false)
 [IconBuilder]::Generate(180, "public/apple-touch-icon.png", $false)
 [IconBuilder]::Generate(64, "public/favicon-64x64.png", $false)
+
+[IconBuilder]::GenerateScreenshot(540, 960, "public/screenshot-mobile.png")
+[IconBuilder]::GenerateScreenshot(1280, 720, "public/screenshot-desktop.png")
