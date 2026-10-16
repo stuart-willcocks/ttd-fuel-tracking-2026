@@ -180,27 +180,31 @@ class SyncEngine {
 
       let hadUpdates = false;
 
-      // Step 3: Reconcile all local transactions with remote transactions
+      // Step 3: Mirror server state & delete any records that were removed from the server
       if (remoteTransactions && Array.isArray(remoteTransactions)) {
         const remoteIdSet = new Set(remoteTransactions.map((t) => t.id));
-        const allLocal = await db.transactions.toArray();
-        const unsharedLocals = allLocal.filter((t) => !remoteIdSet.has(t.id));
+        const outboxItems = await db.outbox.toArray();
+        const pendingOutboxIdSet = new Set(outboxItems.map((o) => o.id));
 
-        if (unsharedLocals.length > 0) {
-          // Push local unshared transactions to the central server so other devices see them
-          for (const localTx of unsharedLocals) {
-            await uploadTransactionToCloud(localTx);
-          }
-          // Fetch updated list from server now that it has all items
-          const refreshed = await fetchRemoteTransactions().catch(() => null);
-          if (refreshed && Array.isArray(refreshed)) {
-            await db.transactions.bulkPut(refreshed);
-          }
-        } else {
-          // Store all remote transactions in local IndexedDB
-          await db.transactions.bulkPut(remoteTransactions);
+        // Delete local transactions that were removed from Supabase/server
+        // (unless they are new items currently waiting in the offline outbox)
+        const allLocal = await db.transactions.toArray();
+        const idsToDelete = allLocal
+          .filter((tx) => !remoteIdSet.has(tx.id) && !pendingOutboxIdSet.has(tx.id))
+          .map((tx) => tx.id);
+
+        if (idsToDelete.length > 0) {
+          await db.transactions.bulkDelete(idsToDelete);
+          hadUpdates = true;
         }
-        hadUpdates = true;
+
+        if (remoteTransactions.length > 0) {
+          await db.transactions.bulkPut(remoteTransactions);
+          hadUpdates = true;
+        } else if (allLocal.length > 0 && idsToDelete.length === allLocal.length) {
+          await db.transactions.clear();
+          hadUpdates = true;
+        }
       }
 
       if (remoteEquipment && Array.isArray(remoteEquipment) && remoteEquipment.length > 0) {

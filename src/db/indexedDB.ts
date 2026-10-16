@@ -140,10 +140,6 @@ export async function initializeDatabase() {
   if (count === 0) {
     await db.equipments.bulkAdd(INITIAL_EQUIPMENT);
   }
-  const txCount = await db.transactions.count();
-  if (txCount === 0) {
-    await db.transactions.bulkAdd(INITIAL_TRANSACTIONS);
-  }
 }
 
 export async function resetDatabaseToDemo() {
