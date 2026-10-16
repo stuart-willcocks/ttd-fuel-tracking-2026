@@ -33,16 +33,19 @@ export default defineConfig({
         dir: 'ltr',
         categories: ['business', 'productivity', 'utilities'],
         prefer_related_applications: false,
+        display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
         icons: [
           {
             src: '/pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png',
+            purpose: 'any',
           },
           {
             src: '/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
+            purpose: 'any',
           },
           {
             src: '/maskable-icon-512x512.png',
