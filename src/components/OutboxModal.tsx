@@ -66,10 +66,17 @@ export const OutboxModal: React.FC<OutboxModalProps> = ({
             {outboxItems.map((item) => (
               <div key={item.id} className="queue-row">
                 <div>
-                  <strong>{item.equipmentId}</strong> — {item.tx?.transactionType}
+                  <strong>{item.equipmentId}</strong> — {item.tx?.transactionType || 'Transaction'}
                   <div className="queue-time">{item.tx?.transactionTimestamp}</div>
+                  {item.error && (
+                    <div style={{ fontSize: '11px', color: '#f87171', marginTop: '2px' }}>
+                      {item.error}
+                    </div>
+                  )}
                 </div>
-                <span className="pending-tag">Pending</span>
+                <span className="pending-tag">
+                  {item.attempts > 0 ? `Retry (${item.attempts})` : 'Pending'}
+                </span>
               </div>
             ))}
           </div>

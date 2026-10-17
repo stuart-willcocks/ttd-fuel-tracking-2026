@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Equipment, Transaction } from '../types';
+import { db } from '../db/indexedDB';
 import { postRemoteTransaction } from './api';
 
 const STORAGE_KEY_URL = 'ttd_supabase_url';
@@ -159,6 +160,29 @@ export async function uploadTransactionToCloud(
   // Supabase cloud path
   const uploadTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
   try {
+    // Step 1: Ensure parent equipment exists in Supabase equipment_list to satisfy Foreign Key constraint
+    try {
+      const localEq = await db.equipments.get(tx.equipmentId);
+      if (localEq) {
+        const eqPayload = {
+          equipment_id: localEq.equipmentId,
+          area: localEq.area || 'Site Area',
+          location: localEq.location || 'Field Grid',
+          what3words: localEq.what3words || '///field.power.setup',
+          type: localEq.type || 'GENERATOR',
+          capacity: localEq.capacity ?? null,
+          rental_serial_number: localEq.rentalSerialNumber || 'RSN-UNKNOWN',
+          powered_up_timestamp: localEq.poweredUpTimestamp ?? null,
+          powered_down_timestamp: localEq.poweredDownTimestamp ?? null,
+          updated_at: new Date().toISOString(),
+        };
+        await client.from('equipment_list').upsert(eqPayload, { onConflict: 'equipment_id' });
+      }
+    } catch (eqErr) {
+      console.warn('Equipment pre-check warning before transaction upload:', eqErr);
+    }
+
+    // Step 2: Upsert the transaction
     const payload = {
       id: tx.id,
       equipment_id: tx.equipmentId,
@@ -177,12 +201,12 @@ export async function uploadTransactionToCloud(
       check_out_kwh: tx.checkOutKWH ?? null,
     };
 
-    const { error } = await client.from('transactions').upsert(payload, { onConflict: 'id' });
-    if (error) throw error;
+    const { error: txError } = await client.from('transactions').upsert(payload, { onConflict: 'id' });
+    if (txError) throw txError;
 
-    // Also update equipment state in Supabase if PoweredUp / PoweredDown
+    // Step 3: Update equipment power state in Supabase if PoweredUp / PoweredDown
     if (tx.transactionType === 'PoweredUp') {
-      await client
+      const { error: pwrErr } = await client
         .from('equipment_list')
         .update({
           powered_up_timestamp: tx.transactionTimestamp,
@@ -190,20 +214,42 @@ export async function uploadTransactionToCloud(
           updated_at: new Date().toISOString(),
         })
         .eq('equipment_id', tx.equipmentId);
+      if (pwrErr) console.warn('Supabase equipment PoweredUp update warning:', pwrErr);
     } else if (tx.transactionType === 'PoweredDown') {
-      await client
+      const { error: pwrErr } = await client
         .from('equipment_list')
         .update({
           powered_down_timestamp: tx.transactionTimestamp,
           updated_at: new Date().toISOString(),
         })
         .eq('equipment_id', tx.equipmentId);
+      if (pwrErr) console.warn('Supabase equipment PoweredDown update warning:', pwrErr);
     }
 
     return { success: true, uploadTimestamp };
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
+    let errorMsg = 'Unknown upload error';
+    if (err instanceof Error) {
+      errorMsg = err.message;
+    } else if (typeof err === 'object' && err !== null) {
+      const e = err as any;
+      errorMsg = e.message || e.details || e.hint || JSON.stringify(err);
+    } else {
+      errorMsg = String(err);
+    }
     console.error('Supabase upload error:', errorMsg);
+
+    // If Supabase upload fails, attempt fallback to local server API
+    try {
+      const fallbackRes = await postRemoteTransaction(tx);
+      if (fallbackRes.success) {
+        console.log('Successfully saved to local API as fallback for tx:', tx.id);
+        return { success: true, uploadTimestamp: fallbackRes.uploadTimestamp };
+      }
+    } catch {
+      // Ignore fallback error and report original Supabase error
+    }
+
     return { success: false, uploadTimestamp, error: errorMsg };
   }
 }

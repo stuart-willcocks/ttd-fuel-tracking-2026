@@ -20,6 +20,7 @@ class SyncEngine {
   private dataListeners: Set<RemoteDataListener> = new Set();
   private isSimulatedOffline: boolean = false;
   private isSyncing: boolean = false;
+  private isFlushing: boolean = false;
   private lastSyncTime: string | null = null;
   private lastError: string | null = null;
   private syncTimer: ReturnType<typeof setInterval> | null = null;
@@ -130,24 +131,27 @@ class SyncEngine {
       attempts: 0,
     });
 
-    // 3. Update local equipment state
-    if (tx.transactionType === 'PoweredUp') {
-      await db.equipments.update(tx.equipmentId, {
-        poweredUpTimestamp: tx.transactionTimestamp,
-        poweredDownTimestamp: undefined,
-      });
-    } else if (tx.transactionType === 'PoweredDown') {
-      await db.equipments.update(tx.equipmentId, {
-        poweredDownTimestamp: tx.transactionTimestamp,
-      });
+    // 3. Update local equipment state cleanly
+    const currentEq = await db.equipments.get(tx.equipmentId);
+    if (currentEq) {
+      if (tx.transactionType === 'PoweredUp') {
+        currentEq.poweredUpTimestamp = tx.transactionTimestamp;
+        delete currentEq.poweredDownTimestamp;
+      } else if (tx.transactionType === 'PoweredDown') {
+        currentEq.poweredDownTimestamp = tx.transactionTimestamp;
+      }
+      currentEq.updatedAt = new Date().toISOString();
+      await db.equipments.put(currentEq);
     }
 
     await this.notify();
     this.notifyDataChange();
 
-    // 4. Try upload if online
+    // 4. Immediately trigger flush in background if online
     if (this.isEffectivelyOnline()) {
-      setTimeout(() => this.flushOutbox(), 20);
+      this.flushOutbox().catch((err) => {
+        console.error('Immediate flush error after queueing transaction:', err);
+      });
     }
   }
 
@@ -164,7 +168,8 @@ class SyncEngine {
 
     try {
       // Step 1: Upload any pending outbox items from this device
-      await this.flushOutboxInternal();
+      const flushRes = await this.flushOutboxInternal();
+      let hadUpdates = flushRes.processed > 0;
 
       // Step 2: Download latest transactions and equipment from central server
       const [remoteEquipment, remoteTransactions] = await Promise.all([
@@ -177,8 +182,6 @@ class SyncEngine {
           return null;
         }),
       ]);
-
-      let hadUpdates = false;
 
       // Step 3: Mirror server state & delete any records that were removed from the server
       if (remoteTransactions && Array.isArray(remoteTransactions)) {
@@ -267,11 +270,29 @@ class SyncEngine {
       }
     }
 
+    if (processed > 0) {
+      this.lastSyncTime = new Date().toLocaleTimeString();
+      this.lastError = null;
+    }
+
     return { processed, errors };
   }
 
   public async flushOutbox(): Promise<{ processed: number; errors: number }> {
-    return this.flushOutboxInternal();
+    if (this.isFlushing) return { processed: 0, errors: 0 };
+    this.isFlushing = true;
+    try {
+      const res = await this.flushOutboxInternal();
+      if (res.processed > 0 || res.errors > 0) {
+        await this.notify();
+        if (res.processed > 0) {
+          this.notifyDataChange();
+        }
+      }
+      return res;
+    } finally {
+      this.isFlushing = false;
+    }
   }
 }
 

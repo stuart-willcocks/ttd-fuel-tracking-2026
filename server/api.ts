@@ -231,17 +231,27 @@ export function apiMiddleware(): Connect.NextHandleFunction {
         }
 
         // Also update equipment state if PoweredUp or PoweredDown
+        let eq: any = data.equipments.find((e: any) => e.equipmentId === newTx.equipmentId);
+        if (!eq) {
+          const isTank = newTx.equipmentId.includes('TNK') || newTx.equipmentId.includes('TANK');
+          const isPlant = newTx.equipmentId.includes('PLT') || newTx.equipmentId.includes('PLANT');
+          const type = isTank ? 'TANK' : isPlant ? 'PLANT' : 'GENERATOR';
+          eq = {
+            equipmentId: newTx.equipmentId,
+            area: 'Site Area',
+            location: 'Field Grid',
+            what3words: '///field.power.setup',
+            type,
+            rentalSerialNumber: 'RSN-UNKNOWN',
+          };
+          (data.equipments as any[]).push(eq);
+        }
+
         if (newTx.transactionType === 'PoweredUp') {
-          const eq = data.equipments.find((e) => e.equipmentId === newTx.equipmentId);
-          if (eq) {
-            eq.poweredUpTimestamp = newTx.transactionTimestamp;
-            eq.poweredDownTimestamp = undefined;
-          }
+          eq.poweredUpTimestamp = newTx.transactionTimestamp;
+          delete eq.poweredDownTimestamp;
         } else if (newTx.transactionType === 'PoweredDown') {
-          const eq = data.equipments.find((e) => e.equipmentId === newTx.equipmentId);
-          if (eq) {
-            eq.poweredDownTimestamp = newTx.transactionTimestamp;
-          }
+          eq.poweredDownTimestamp = newTx.transactionTimestamp;
         }
 
         writeData(data);

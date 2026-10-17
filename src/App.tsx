@@ -248,6 +248,9 @@ export const App: React.FC = () => {
 
     // Store in IndexedDB and upload to shared central server
     await syncEngine.queueTransaction(newTx);
+    if (syncEngine.isEffectivelyOnline()) {
+      await syncEngine.flushOutbox();
+    }
 
     setIsConfirmModalOpen(false);
     setPendingTxData(null);
@@ -270,6 +273,9 @@ export const App: React.FC = () => {
     };
 
     await syncEngine.queueTransaction(newTx);
+    if (syncEngine.isEffectivelyOnline()) {
+      await syncEngine.flushOutbox();
+    }
     await loadAssetDetails(currentAsset.equipmentId);
   };
 
