@@ -1,19 +1,23 @@
 import React from 'react';
-import { Wifi, WifiOff, RefreshCw, Settings } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, Settings, Maximize2, Minimize2 } from 'lucide-react';
 import type { SyncState } from '../services/syncEngine';
 
 interface HeaderProps {
   syncState: SyncState;
+  isFullscreen: boolean;
   onToggleSimulatedOffline: () => void;
   onTriggerSync: () => void;
+  onToggleFullscreen: () => void;
   onOpenOutbox: () => void;
   onOpenSettings: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   syncState,
+  isFullscreen,
   onToggleSimulatedOffline,
   onTriggerSync,
+  onToggleFullscreen,
   onOpenOutbox,
   onOpenSettings,
 }) => {
@@ -50,6 +54,15 @@ export const Header: React.FC<HeaderProps> = ({
           title="Sync now"
         >
           <RefreshCw size={15} />
+        </button>
+
+        {/* Fullscreen toggle button */}
+        <button
+          className="icon-btn"
+          onClick={onToggleFullscreen}
+          title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (hide address bar)'}
+        >
+          {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
         </button>
 
         {/* Settings button */}

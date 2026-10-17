@@ -11,10 +11,8 @@ const versionTsPath = path.join(rootDir, 'src', 'version.ts');
 const packageJsonPath = path.join(rootDir, 'package.json');
 
 let versionData = {
-  major: 1,
-  minor: 0,
-  build: 11,
-  version: '1.0.11',
+  build: 13,
+  version: '13',
   buildTime: new Date().toISOString().replace('T', ' ').substring(0, 16),
 };
 
@@ -22,7 +20,7 @@ if (fs.existsSync(versionJsonPath)) {
   try {
     versionData = JSON.parse(fs.readFileSync(versionJsonPath, 'utf-8'));
     versionData.build = (versionData.build || 0) + 1;
-    versionData.version = `${versionData.major}.${versionData.minor}.${versionData.build}`;
+    versionData.version = String(versionData.build);
     versionData.buildTime = new Date().toISOString().replace('T', ' ').substring(0, 16);
   } catch (err) {
     console.warn('Error reading version.json, resetting counter:', err);
@@ -49,4 +47,4 @@ try {
   console.warn('Could not update package.json version:', err);
 }
 
-console.log(`[Version Bumper] Updated to v${versionData.version} (build #${versionData.build})`);
+console.log(`[Version Bumper] Updated to version ${versionData.version}`);

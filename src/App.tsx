@@ -11,9 +11,89 @@ import { ConfirmationModal } from './components/ConfirmationModal';
 import { EditAssetModal } from './components/EditAssetModal';
 import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
-import { APP_VERSION, BUILD_NUMBER } from './version';
+import { APP_VERSION } from './version';
 
 export const App: React.FC = () => {
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
+    return Boolean(
+      document.fullscreenElement ||
+      (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement
+    );
+  });
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      const doc = document as unknown as {
+        fullscreenElement?: Element;
+        webkitFullscreenElement?: Element;
+        exitFullscreen?: () => Promise<void>;
+        webkitExitFullscreen?: () => Promise<void>;
+      };
+      const docEl = document.documentElement as unknown as {
+        requestFullscreen?: () => Promise<void>;
+        webkitRequestFullscreen?: () => Promise<void>;
+      };
+
+      const isFs = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
+
+      if (!isFs) {
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen();
+        } else if (docEl.webkitRequestFullscreen) {
+          await docEl.webkitRequestFullscreen();
+        }
+      } else {
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.warn('Fullscreen toggle failed:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      const doc = document as unknown as {
+        fullscreenElement?: Element;
+        webkitFullscreenElement?: Element;
+      };
+      setIsFullscreen(Boolean(doc.fullscreenElement || doc.webkitFullscreenElement));
+    };
+
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+
+    const handleFirstGesture = () => {
+      const doc = document as unknown as {
+        fullscreenElement?: Element;
+        webkitFullscreenElement?: Element;
+      };
+      if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
+        const docEl = document.documentElement as unknown as {
+          requestFullscreen?: () => Promise<void>;
+          webkitRequestFullscreen?: () => Promise<void>;
+        };
+        if (docEl.requestFullscreen) {
+          docEl.requestFullscreen().catch(() => {});
+        } else if (docEl.webkitRequestFullscreen) {
+          docEl.webkitRequestFullscreen().catch(() => {});
+        }
+      }
+    };
+
+    window.addEventListener('click', handleFirstGesture, { once: true });
+    window.addEventListener('touchend', handleFirstGesture, { once: true });
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+      window.removeEventListener('click', handleFirstGesture);
+      window.removeEventListener('touchend', handleFirstGesture);
+    };
+  }, []);
   const [activeAssetId, setActiveAssetId] = useState<string | null>(null);
   const activeAssetIdRef = useRef<string | null>(null);
   activeAssetIdRef.current = activeAssetId;
@@ -212,8 +292,10 @@ export const App: React.FC = () => {
     <div className="app-root">
       <Header
         syncState={syncState}
+        isFullscreen={isFullscreen}
         onToggleSimulatedOffline={() => syncEngine.toggleSimulatedOffline()}
         onTriggerSync={() => syncEngine.syncWithRemote()}
+        onToggleFullscreen={toggleFullscreen}
         onOpenOutbox={() => setIsOutboxModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
       />
@@ -285,7 +367,7 @@ export const App: React.FC = () => {
 
       {/* Discreet Version Footer */}
       <footer className="app-version-footer">
-        <span>v{APP_VERSION} (b{BUILD_NUMBER})</span>
+        <span>v{APP_VERSION}</span>
       </footer>
     </div>
   );

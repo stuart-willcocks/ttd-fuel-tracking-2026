@@ -6,7 +6,7 @@ import {
   isSupabaseConfigured,
   SUPABASE_SQL_SCHEMA,
 } from '../services/supabase';
-import { APP_VERSION, BUILD_NUMBER, BUILD_TIME } from '../version';
+import { APP_VERSION, BUILD_TIME } from '../version';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -136,8 +136,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="settings-version-block">
-          <div className="settings-version-label">TTD Fuel Tracking • v{APP_VERSION} (build #{BUILD_NUMBER})</div>
-          <div className="settings-version-sub">OTA Release Date: {BUILD_TIME}</div>
+          <div className="settings-version-label">TTD Fuel Tracking • Version {APP_VERSION}</div>
+          <div className="settings-version-sub">Build Time: {BUILD_TIME}</div>
         </div>
 
         <div className="modal-buttons-row">

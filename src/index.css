@@ -100,12 +100,16 @@ body {
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-status-box {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .status-pill {
@@ -115,11 +119,12 @@ body {
   background: transparent;
   border: 1px solid var(--border-color);
   border-radius: 20px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .status-pill.online {
@@ -148,6 +153,7 @@ body {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .icon-btn {
@@ -161,6 +167,7 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .icon-btn:hover:not(:disabled) {
@@ -218,10 +225,6 @@ body {
   flex-direction: column;
   gap: 8px;
   overflow: hidden;
-}
-
-.scanner-header {
-  flex-shrink: 0;
 }
 
 .scan-input-row {
@@ -303,13 +306,6 @@ body {
 .btn-secondary:hover:not(:disabled) {
   background: var(--bg-card-subtle);
   color: var(--text-main);
-}
-
-.camera-frame {
-  background: #000;
-  padding: 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-color);
 }
 
 /* Compact Asset Table */

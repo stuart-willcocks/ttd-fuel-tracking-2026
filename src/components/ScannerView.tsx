@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, AlertCircle, ArrowRight } from 'lucide-react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { AlertCircle, ArrowRight } from 'lucide-react';
 import type { Equipment } from '../types';
 
 interface ScannerViewProps {
@@ -14,8 +13,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 }) => {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -46,60 +43,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     }
   };
 
-  const startCamera = async () => {
-    try {
-      setErrorMessage(null);
-      const html5QrCode = new Html5Qrcode('qr-reader-container');
-      scannerRef.current = html5QrCode;
-
-      await html5QrCode.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
-        (decodedText) => {
-          stopCamera();
-          handleProcessScan(decodedText);
-        },
-        () => {}
-      );
-      setIsCameraActive(true);
-    } catch (err: unknown) {
-      console.error('Camera scan start error:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      setErrorMessage(`Camera error: ${msg}`);
-      setIsCameraActive(false);
-    }
-  };
-
-  const stopCamera = async () => {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
-      } catch (err) {
-        console.error('Camera stop error:', err);
-      }
-      scannerRef.current = null;
-    }
-    setIsCameraActive(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
-      }
-    };
-  }, []);
-
   return (
     <div className="scanner-view">
-      <div className="scanner-header">
-        <h2 className="section-title">Scan Asset QR Code</h2>
-        <p className="section-subtitle">
-          Pull the Zebra TC26 trigger or enter an Equipment ID below.
-        </p>
-      </div>
-
       {/* Barcode input for Zebra scanner */}
       <div className="scan-input-row">
         <input
@@ -134,23 +79,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         </div>
       )}
 
-      {/* Camera scanner toggle */}
-      <div className="camera-container">
-        {!isCameraActive ? (
-          <button className="btn-secondary" onClick={startCamera}>
-            <Camera size={15} />
-            <span>Use Camera Scanner</span>
-          </button>
-        ) : (
-          <div className="camera-frame">
-            <div id="qr-reader-container" style={{ width: '100%' }}></div>
-            <button className="btn-secondary mt-2" onClick={stopCamera}>
-              Close Camera
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Clean, compact asset list */}
       <div className="asset-list-section">
         <div className="list-heading-row">
@@ -180,3 +108,4 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     </div>
   );
 };
+

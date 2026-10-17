@@ -25,7 +25,7 @@ export default defineConfig({
         description: 'Industrial offline-first generator and fuel asset tracking system for Zebra handhelds',
         theme_color: '#0B0F19',
         background_color: '#0B0F19',
-        display: 'standalone',
+        display: 'fullscreen',
         orientation: 'portrait-primary',
         scope: '/',
         start_url: '/',
@@ -33,7 +33,7 @@ export default defineConfig({
         dir: 'ltr',
         categories: ['business', 'productivity', 'utilities'],
         prefer_related_applications: false,
-        display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
+        display_override: ['fullscreen', 'standalone'],
         icons: [
           {
             src: '/pwa-192x192.png',
