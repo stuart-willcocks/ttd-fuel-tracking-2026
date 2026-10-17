@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertCircle, List, Search, X } from 'lucide-react';
+import { AlertCircle, List } from 'lucide-react';
 import type { Equipment } from '../types';
 
 interface ScannerViewProps {
@@ -14,7 +14,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const [barcodeInput, setBarcodeInput] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
-  const [searchFilter, setSearchFilter] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -27,7 +26,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     const trimmed = value.trim().toUpperCase();
     if (EQUIPMENT_ID_REGEX.test(trimmed)) {
       setErrorMessage(null);
-      // Check if an existing asset matches either the exact ID or alternate separator
       const alt = trimmed.includes('-')
         ? trimmed.replace(/-/g, '_')
         : trimmed.replace(/_/g, '-');
@@ -62,7 +60,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   };
 
   const handleOpenModal = () => {
-    setSearchFilter('');
     setIsAssetModalOpen(true);
   };
 
@@ -77,17 +74,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     setIsAssetModalOpen(false);
     onAssetSelected(equipmentId);
   };
-
-  const filteredAssets = availableAssets.filter((asset) => {
-    if (!searchFilter.trim()) return true;
-    const q = searchFilter.toLowerCase();
-    return (
-      asset.equipmentId.toLowerCase().includes(q) ||
-      asset.type.toLowerCase().includes(q) ||
-      asset.location.toLowerCase().includes(q) ||
-      asset.area.toLowerCase().includes(q)
-    );
-  });
 
   return (
     <div className="scanner-view">
@@ -126,43 +112,21 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         <span>Select asset from list</span>
       </button>
 
-      {/* Modal Dialog with all assets listed */}
+      {/* Modal Dialog with all assets listed - no input box, no keyboard */}
       {isAssetModalOpen && (
         <div className="modal-backdrop" onClick={handleCloseModal}>
           <div className="modal-box asset-picker-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header-simple">
-              <h3 className="modal-title">Select Equipment</h3>
+              <h3 className="modal-title">Select Asset</h3>
               <span className="picker-asset-count">{availableAssets.length} assets</span>
-            </div>
-
-            {/* Quick search inside dialog */}
-            <div className="modal-search-row">
-              <Search size={15} className="modal-search-icon" />
-              <input
-                type="text"
-                className="modal-search-input"
-                placeholder="Search by ID, type, location..."
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                autoFocus
-              />
-              {searchFilter && (
-                <button
-                  type="button"
-                  className="btn-clear-search"
-                  onClick={() => setSearchFilter('')}
-                >
-                  <X size={14} />
-                </button>
-              )}
             </div>
 
             {/* Clean, concise asset list */}
             <div className="asset-picker-list">
-              {filteredAssets.length === 0 ? (
-                <div className="empty-picker-notice">No matching assets found</div>
+              {availableAssets.length === 0 ? (
+                <div className="empty-picker-notice">No assets available</div>
               ) : (
-                filteredAssets.map((asset) => (
+                availableAssets.map((asset) => (
                   <div
                     key={asset.equipmentId}
                     className="asset-compact-row picker-row"

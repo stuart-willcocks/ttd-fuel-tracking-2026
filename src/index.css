@@ -362,48 +362,6 @@ body {
   border: 1px solid var(--border-color);
 }
 
-.modal-search-row {
-  display: flex;
-  align-items: center;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.modal-search-icon {
-  position: absolute;
-  left: 10px;
-  color: var(--text-dim);
-  pointer-events: none;
-}
-
-.modal-search-input {
-  width: 100%;
-  height: 40px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  color: var(--text-main);
-  padding: 0 32px 0 32px;
-  font-size: 13px;
-}
-
-.modal-search-input:focus {
-  outline: none;
-  border-color: var(--accent-blue);
-}
-
-.btn-clear-search {
-  position: absolute;
-  right: 8px;
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-}
 
 .asset-picker-list {
   flex: 1;
