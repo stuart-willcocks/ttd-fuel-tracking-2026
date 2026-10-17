@@ -134,6 +134,16 @@ export const App: React.FC = () => {
     let asset = await db.equipments.get(equipmentId);
 
     if (!asset) {
+      const altId = equipmentId.includes('-')
+        ? equipmentId.replace(/-/g, '_')
+        : equipmentId.replace(/_/g, '-');
+      const altAsset = await db.equipments.get(altId);
+      if (altAsset) {
+        asset = altAsset;
+      }
+    }
+
+    if (!asset) {
       const isTank = equipmentId.includes('TNK') || equipmentId.includes('TANK');
       const isPlant = equipmentId.includes('PLT') || equipmentId.includes('PLANT');
       const inferredType = isTank ? 'TANK' : isPlant ? 'PLANT' : 'GENERATOR';
@@ -155,7 +165,7 @@ export const App: React.FC = () => {
 
     const txs = await db.transactions
       .where('equipmentId')
-      .equals(equipmentId)
+      .equals(asset.equipmentId)
       .reverse()
       .sortBy('transactionTimestamp');
     setCurrentAssetTransactions(txs);

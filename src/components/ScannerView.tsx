@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertCircle, ArrowRight, List, Search, X, QrCode, Keyboard } from 'lucide-react';
+import { AlertCircle, List, Search, X } from 'lucide-react';
 import type { Equipment } from '../types';
 
 interface ScannerViewProps {
@@ -15,34 +15,49 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  const EQUIPMENT_ID_REGEX = /^TTD-[A-Z0-9]{3}-\d{4}$/i;
+  const EQUIPMENT_ID_REGEX = /^TTD[-_][A-Z0-9]{3}[-_]\d{4}$/i;
 
-  const handleProcessScan = (scannedValue: string) => {
-    const trimmed = scannedValue.trim().toUpperCase();
-    if (!trimmed) return;
-
-    if (!EQUIPMENT_ID_REGEX.test(trimmed)) {
-      setErrorMessage(
-        `Invalid QR format "${trimmed}". Must match TTD-vvv-nnnn (e.g. TTD-MAT-0001).`
+  const checkAndSelectAsset = (value: string) => {
+    const trimmed = value.trim().toUpperCase();
+    if (EQUIPMENT_ID_REGEX.test(trimmed)) {
+      setErrorMessage(null);
+      // Check if an existing asset matches either the exact ID or alternate separator
+      const alt = trimmed.includes('-')
+        ? trimmed.replace(/-/g, '_')
+        : trimmed.replace(/_/g, '-');
+      const matched = availableAssets.find(
+        (a) => a.equipmentId.toUpperCase() === trimmed || a.equipmentId.toUpperCase() === alt
       );
-      return;
+      onAssetSelected(matched ? matched.equipmentId : trimmed);
+      return true;
     }
+    return false;
+  };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setBarcodeInput(val);
     setErrorMessage(null);
-    onAssetSelected(trimmed);
+
+    // If it matches TTD-xxx-nnnn or TTD_xxx_nnnn, immediately display asset without waiting for Enter
+    checkAndSelectAsset(val);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleProcessScan(barcodeInput);
+      const matched = checkAndSelectAsset(barcodeInput);
+      if (!matched && barcodeInput.trim()) {
+        setErrorMessage(
+          `Invalid QR format "${barcodeInput.trim()}". Must match TTD-xxx-nnnn or TTD_xxx_nnnn.`
+        );
+      }
     }
   };
 
@@ -76,47 +91,22 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
   return (
     <div className="scanner-view">
-      {/* Barcode input for Zebra scanner - virtual keyboard hidden on focus */}
-      <div className="scan-input-row">
+      {/* Barcode input for Zebra scanner - spans entire screen, text center justified, virtual keyboard hidden */}
+      <div className="scan-input-row-full">
         <input
           ref={inputRef}
           type="text"
-          inputMode={isKeyboardVisible ? 'text' : 'none'}
-          className="scan-input"
-          placeholder="TTD-vvv-nnnn (e.g. TTD-MAT-0001)"
+          inputMode="none"
+          className="scan-input-fullscreen"
+          placeholder="TTD-xxx-nnnn"
           value={barcodeInput}
-          onChange={(e) => {
-            setBarcodeInput(e.target.value);
-            setErrorMessage(null);
-          }}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="characters"
           spellCheck="false"
         />
-
-        <button
-          type="button"
-          className={`btn-keyboard-toggle ${isKeyboardVisible ? 'active' : ''}`}
-          onClick={() => {
-            setIsKeyboardVisible((prev) => !prev);
-            setTimeout(() => inputRef.current?.focus(), 50);
-          }}
-          title={isKeyboardVisible ? 'Virtual keyboard enabled (tap to hide)' : 'Virtual keyboard hidden (tap to show)'}
-        >
-          <Keyboard size={16} />
-        </button>
-
-        <button
-          type="button"
-          className="btn-primary-action"
-          onClick={() => handleProcessScan(barcodeInput)}
-          disabled={!barcodeInput.trim()}
-        >
-          <span>Find</span>
-          <ArrowRight size={16} />
-        </button>
       </div>
 
       {errorMessage && (
@@ -135,17 +125,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
         <List size={16} />
         <span>Select asset from list</span>
       </button>
-
-      {/* Hardware trigger status prompt */}
-      <div className="scanner-ready-card">
-        <div className="scanner-ready-icon-wrap">
-          <QrCode size={26} />
-        </div>
-        <div className="scanner-ready-title">Hardware Scanner Ready</div>
-        <div className="scanner-ready-desc">
-          Pull the Zebra TC26 trigger to scan an asset QR code, or tap "Select asset from list" above.
-        </div>
-      </div>
 
       {/* Modal Dialog with all assets listed */}
       {isAssetModalOpen && (
