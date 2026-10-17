@@ -12,6 +12,7 @@ import { EditAssetModal } from './components/EditAssetModal';
 import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
 import { APP_VERSION } from './version';
+import { getDeviceName } from './services/device';
 
 export const App: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
@@ -243,6 +244,7 @@ export const App: React.FC = () => {
       checkInKWH: pendingTxData.checkInKWH,
       checkOutKWH: pendingTxData.checkOutKWH,
       syncStatus: 'pending',
+      deviceId: getDeviceName(),
       createdAt: new Date().toISOString(),
     };
 
@@ -269,6 +271,7 @@ export const App: React.FC = () => {
       transactionTimestamp: timestamp,
       transactionType: powerAction,
       syncStatus: 'pending',
+      deviceId: getDeviceName(),
       createdAt: new Date().toISOString(),
     };
 

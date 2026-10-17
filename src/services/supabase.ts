@@ -128,6 +128,7 @@ export async function fetchTransactionsFromSupabase(): Promise<Transaction[]> {
     checkInKWH: row.check_in_kwh ?? undefined,
     checkOutKWH: row.check_out_kwh ?? undefined,
     syncStatus: 'synced' as const,
+    deviceId: row.device_id ?? undefined,
     createdAt: row.created_at,
   }));
 }
@@ -183,7 +184,7 @@ export async function uploadTransactionToCloud(
     }
 
     // Step 2: Upsert the transaction
-    const payload = {
+    const payload: Record<string, any> = {
       id: tx.id,
       equipment_id: tx.equipmentId,
       transaction_timestamp: tx.transactionTimestamp,
@@ -199,9 +200,19 @@ export async function uploadTransactionToCloud(
       def_transfer_litres: tx.defTransferLitres ?? null,
       check_in_kwh: tx.checkInKWH ?? null,
       check_out_kwh: tx.checkOutKWH ?? null,
+      device_id: tx.deviceId ?? null,
     };
 
-    const { error: txError } = await client.from('transactions').upsert(payload, { onConflict: 'id' });
+    let { error: txError } = await client.from('transactions').upsert(payload, { onConflict: 'id' });
+
+    // If device_id column does not exist yet on remote Supabase table, retry without device_id
+    if (txError && (txError as any).code === 'PGRST204' && (txError as any).message?.includes('device_id')) {
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.device_id;
+      const retryRes = await client.from('transactions').upsert(fallbackPayload, { onConflict: 'id' });
+      txError = retryRes.error;
+    }
+
     if (txError) throw txError;
 
     // Step 3: Update equipment power state in Supabase if PoweredUp / PoweredDown
@@ -270,13 +281,14 @@ create table if not exists public.equipment_list (
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 2. Create Transactions Table
+-- 2. Create Transactions Table (with PDA device_id)
 create table if not exists public.transactions (
   id uuid primary key default gen_random_uuid(),
   equipment_id text not null references public.equipment_list(equipment_id) on delete cascade,
   transaction_timestamp timestamp with time zone not null,
   upload_timestamp timestamp with time zone default timezone('utc'::text, now()) not null,
   transaction_type text not null,
+  device_id text,
   check_in_fuel_eighths smallint check (check_in_fuel_eighths between 0 and 8),
   check_out_fuel_eighths smallint check (check_out_fuel_eighths between 0 and 8),
   check_in_fuel_percentage smallint check (check_in_fuel_percentage between 0 and 100),
@@ -289,6 +301,9 @@ create table if not exists public.transactions (
   check_out_kwh integer check (check_out_kwh >= 0),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Migration for existing database:
+-- alter table public.transactions add column if not exists device_id text;
 
 -- 3. Indexes for fast query performance across multiple PDAs
 create index if not exists idx_tx_equipment_id on public.transactions(equipment_id);

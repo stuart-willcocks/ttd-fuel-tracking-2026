@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { X, Check, Copy, RefreshCw } from 'lucide-react';
+import { X, Check, Copy, RefreshCw, Smartphone } from 'lucide-react';
 import {
   getSupabaseConfig,
   saveSupabaseConfig,
   isSupabaseConfigured,
   SUPABASE_SQL_SCHEMA,
 } from '../services/supabase';
+import { getDeviceId, getDeviceName, setDeviceName } from '../services/device';
 import { APP_VERSION, BUILD_TIME } from '../version';
 
 interface SettingsModalProps {
@@ -28,7 +29,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showSql, setShowSql] = useState(false);
 
+  // PDA Device Identification
+  const [deviceName, setDeviceNameState] = useState(getDeviceName());
+  const [deviceSaved, setDeviceSaved] = useState(false);
+  const persistentId = getDeviceId();
+
   if (!isOpen) return null;
+
+  const handleSaveDeviceName = (name: string) => {
+    setDeviceNameState(name);
+    setDeviceName(name);
+    setDeviceSaved(true);
+    setTimeout(() => setDeviceSaved(false), 2000);
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +64,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button className="btn-close" onClick={onClose}>
             <X size={18} />
           </button>
+        </div>
+
+        {/* PDA / Device Identification Section */}
+        <div className="settings-section">
+          <h4 className="settings-heading" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Smartphone size={15} />
+            <span>PDA / Device Identifier</span>
+          </h4>
+          <p className="settings-desc">
+            Each transaction executed on this device is tagged with this PDA identifier:
+          </p>
+
+          <div className="form-field">
+            <label>PDA Label (e.g. PDA 1 - 5)</label>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input
+                type="text"
+                className="text-input"
+                value={deviceName}
+                onChange={(e) => handleSaveDeviceName(e.target.value)}
+                placeholder="PDA 1"
+                maxLength={20}
+              />
+              {deviceSaved && (
+                <span style={{ display: 'flex', alignItems: 'center', color: '#4ade80', fontSize: '11px', fontWeight: 600 }}>
+                  <Check size={14} /> Saved
+                </span>
+              )}
+            </div>
+
+            <div className="pda-presets-row">
+              {['PDA 1', 'PDA 2', 'PDA 3', 'PDA 4', 'PDA 5'].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={`btn-pda-preset ${deviceName === preset ? 'active' : ''}`}
+                  onClick={() => handleSaveDeviceName(preset)}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+
+            <div className="pda-hardware-note">
+              Unique Installation ID: <strong>{persistentId}</strong>
+              <br />
+              <span style={{ fontSize: '10px', opacity: 0.8 }}>
+                (Web security standards prevent browsers from reading physical SIM numbers or hardware IMEIs, so this persistent identifier reliably tracks each PDA.)
+              </span>
+            </div>
+          </div>
         </div>
 
         <div className="settings-section">

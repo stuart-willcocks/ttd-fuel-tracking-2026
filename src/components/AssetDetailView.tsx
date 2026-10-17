@@ -133,7 +133,14 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
             {transactions.map((tx) => (
               <div key={tx.id} className="tx-item">
                 <div className="tx-item-top">
-                  <span className="tx-type">{tx.transactionType}</span>
+                  <div className="tx-item-top-left">
+                    <span className="tx-type">{tx.transactionType}</span>
+                    {tx.deviceId && (
+                      <span className="tx-pda-tag" title={`Executed on ${tx.deviceId}`}>
+                        {tx.deviceId}
+                      </span>
+                    )}
+                  </div>
                   <span className="tx-timestamp">
                     <Clock size={11} /> {tx.transactionTimestamp}
                   </span>

@@ -48,9 +48,10 @@ export interface Transaction {
   checkInKWH?: number; // positive int
   checkOutKWH?: number; // positive int
 
-  // Sync state
+  // Sync state & device info
   syncStatus: 'pending' | 'synced' | 'failed';
   syncError?: string;
+  deviceId?: string; // Identifier of the PDA that executed the transaction
   createdAt: string;
 }
 
