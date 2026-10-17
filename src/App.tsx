@@ -315,6 +315,7 @@ export const App: React.FC = () => {
           <ScannerView
             onAssetSelected={handleAssetSelected}
             availableAssets={availableAssets}
+            isAnyModalOpen={isSettingsModalOpen || isOutboxModalOpen}
           />
         ) : activeAction ? (
           currentAsset && (

@@ -1,24 +1,113 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AlertCircle, List } from 'lucide-react';
 import type { Equipment } from '../types';
 
 interface ScannerViewProps {
   onAssetSelected: (equipmentId: string) => void;
   availableAssets: Equipment[];
+  isAnyModalOpen?: boolean;
 }
 
 export const ScannerView: React.FC<ScannerViewProps> = ({
   onAssetSelected,
   availableAssets,
+  isAnyModalOpen = false,
 }) => {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const isModalActive = isAssetModalOpen || isAnyModalOpen;
+
+  // Reliable focus handler that prevents scroll jumping
+  const focusInput = useCallback(() => {
+    if (isModalActive) return;
+    if (inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.focus({ preventScroll: true });
+    }
+  }, [isModalActive]);
+
+  // Initial focus on mount
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    focusInput();
+    const t = setTimeout(focusInput, 80);
+    return () => clearTimeout(t);
+  }, [focusInput]);
+
+  // Re-focus whenever any modal closes
+  useEffect(() => {
+    if (!isModalActive) {
+      focusInput();
+      const t1 = setTimeout(focusInput, 50);
+      const t2 = setTimeout(focusInput, 150);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [isModalActive, focusInput]);
+
+  // Global listeners: clicks on fullscreen, sync, header buttons, or background restore focus to input
+  useEffect(() => {
+    const handleGlobalInteraction = (e: Event) => {
+      if (isModalActive) return;
+
+      const target = e.target as HTMLElement | null;
+
+      // If user clicked inside an active modal, ignore
+      if (target?.closest('.modal-box')) return;
+
+      // If user clicked the button that opens the asset modal, allow modal to open
+      if (target?.closest('.btn-select-asset')) return;
+
+      // If user clicked the Settings button, allow Settings modal to open
+      if (target?.closest('button[title*="Settings"]')) return;
+
+      // For any other button (fullscreen, sync, status pill) or background tap:
+      // Allow button click to execute, but immediately return focus to the scan input!
+      setTimeout(focusInput, 50);
+      setTimeout(focusInput, 150);
+    };
+
+    const handleWindowFocus = () => {
+      if (!isModalActive) {
+        focusInput();
+      }
+    };
+
+    const handleFullscreenChange = () => {
+      setTimeout(focusInput, 80);
+      setTimeout(focusInput, 200);
+    };
+
+    window.addEventListener('pointerup', handleGlobalInteraction);
+    window.addEventListener('click', handleGlobalInteraction);
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalInteraction);
+      window.removeEventListener('click', handleGlobalInteraction);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, [isModalActive, focusInput]);
+
+  // Keep-alive focus heartbeat: ensures barcode text box never stays unfocused on MAIN SCREEN
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!isModalActive) {
+        if (document.activeElement !== inputRef.current) {
+          focusInput();
+        }
+      }
+    }, 400);
+
+    return () => clearInterval(interval);
+  }, [isModalActive, focusInput]);
 
   const EQUIPMENT_ID_REGEX = /^TTD[-_][A-Z0-9]{3}[-_]\d{4}$/i;
 
@@ -59,15 +148,21 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     }
   };
 
+  const handleBlur = () => {
+    setTimeout(() => {
+      if (!isModalActive) {
+        focusInput();
+      }
+    }, 60);
+  };
+
   const handleOpenModal = () => {
     setIsAssetModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsAssetModalOpen(false);
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
+    setTimeout(focusInput, 80);
   };
 
   const handleSelectAsset = (equipmentId: string) => {
@@ -88,6 +183,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           value={barcodeInput}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="characters"
