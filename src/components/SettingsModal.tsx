@@ -5,6 +5,7 @@ import {
   saveSupabaseConfig,
   isSupabaseConfigured,
   SUPABASE_SQL_SCHEMA,
+  SUPABASE_SQL_MIGRATION,
 } from '../services/supabase';
 import { getDeviceId, getDeviceName, setDeviceName } from '../services/device';
 import { APP_VERSION, BUILD_TIME } from '../version';
@@ -26,6 +27,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [url, setUrl] = useState(currentConfig.url);
   const [anonKey, setAnonKey] = useState(currentConfig.anonKey);
   const [copied, setCopied] = useState(false);
+  const [copiedMigration, setCopiedMigration] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showSql, setShowSql] = useState(false);
 
@@ -54,6 +56,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyMigration = () => {
+    navigator.clipboard.writeText(SUPABASE_SQL_MIGRATION);
+    setCopiedMigration(true);
+    setTimeout(() => setCopiedMigration(false), 2000);
   };
 
   return (
@@ -169,17 +177,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
           </form>
 
+          <div className="migration-card mt-3">
+            <div className="migration-card-header">
+              <span className="migration-title">Enable Device ID in Cloud:</span>
+              <button
+                type="button"
+                className="btn-copy-small"
+                onClick={handleCopyMigration}
+              >
+                {copiedMigration ? <Check size={12} /> : <Copy size={12} />}
+                <span>{copiedMigration ? 'Copied' : 'Copy Migration SQL'}</span>
+              </button>
+            </div>
+            <p className="migration-desc">
+              Run this 2-line SQL in your Supabase SQL Editor to add the <code>device_id</code> column:
+            </p>
+            <pre className="sql-snippet-box">{SUPABASE_SQL_MIGRATION}</pre>
+          </div>
+
           <div className="mt-2">
             <button
               className="btn-link"
               onClick={() => setShowSql(!showSql)}
             >
-              {showSql ? 'Hide PostgreSQL Schema' : 'View PostgreSQL Schema'}
+              {showSql ? 'Hide Full PostgreSQL Schema' : 'View Full PostgreSQL Schema'}
             </button>
             {showSql && (
               <div className="sql-box">
                 <div className="sql-box-header">
-                  <span>Supabase Schema</span>
+                  <span>Full Supabase Schema</span>
                   <button className="btn-copy-small" onClick={handleCopySql}>
                     {copied ? <Check size={12} /> : <Copy size={12} />}
                     <span>{copied ? 'Copied' : 'Copy'}</span>

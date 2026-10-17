@@ -265,8 +265,13 @@ export async function uploadTransactionToCloud(
   }
 }
 
+export const SUPABASE_SQL_MIGRATION = `-- TTD Fuel Tracking: Add device_id tracking to existing tables
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS device_id text;
+ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS device_id text;
+`;
+
 export const SUPABASE_SQL_SCHEMA = `-- TTD Fuel Tracking 2026 - Supabase PostgreSQL Schema
--- 1. Create Equipment List Table
+-- 1. Create Equipment List Table (with device_id tracking)
 create table if not exists public.equipment_list (
   equipment_id text primary key,
   area text not null,
@@ -275,6 +280,7 @@ create table if not exists public.equipment_list (
   type text not null check (type in ('GENERATOR', 'TANK', 'PLANT')),
   capacity integer,
   rental_serial_number text not null,
+  device_id text,
   powered_up_timestamp timestamp with time zone,
   powered_down_timestamp timestamp with time zone,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -302,8 +308,9 @@ create table if not exists public.transactions (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- Migration for existing database:
--- alter table public.transactions add column if not exists device_id text;
+-- Migration for existing databases:
+-- ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS device_id text;
+-- ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS device_id text;
 
 -- 3. Indexes for fast query performance across multiple PDAs
 create index if not exists idx_tx_equipment_id on public.transactions(equipment_id);
