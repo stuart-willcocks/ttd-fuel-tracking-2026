@@ -817,6 +817,8 @@ body {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .form-title {
@@ -854,6 +856,45 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
+}
+
+.input-group-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.input-group-row .input-group {
+  flex: 1;
+}
+
+.btn-keyboard-done {
+  height: 42px;
+  padding: 0 14px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-keyboard-done:hover {
+  background: #334155;
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+.btn-keyboard-done:active {
+  background: var(--accent-blue);
+  color: #000;
 }
 
 .input-group {

@@ -152,8 +152,28 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     onSubmitValues(txData);
   };
 
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  const dismissKeyboard = () => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
+
+  const handleContainerClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target && !target.closest('input') && !target.closest('button')) {
+      dismissKeyboard();
+    }
+  };
+
   return (
-    <div className="transaction-form-view">
+    <div className="transaction-form-view" onClick={handleContainerClick}>
       <div className="top-nav-bar">
         <button className="btn-back" onClick={onCancel}>
           <ArrowLeft size={16} />
@@ -162,7 +182,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         <span className="current-id-badge">{asset.equipmentId}</span>
       </div>
 
-      <div className="form-card">
+      <div className="form-card" onClick={handleContainerClick}>
         <h2 className="form-title">{actionTitle}</h2>
 
         <form onSubmit={handleSubmit} noValidate>
@@ -173,54 +193,87 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             <div className="fields-stack">
               <div className="form-field">
                 <label htmlFor="gen-fuel-pct">Fuel Level (%)</label>
-                <div className="input-group">
-                  <input
-                    id="gen-fuel-pct"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                    className="text-input"
-                    placeholder="0 - 100"
-                    value={fuelPercentage}
-                    onChange={(e) => setFuelPercentage(e.target.value)}
-                  />
-                  <span className="unit-label">%</span>
+                <div className="input-group-row">
+                  <div className="input-group">
+                    <input
+                      id="gen-fuel-pct"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      className="text-input"
+                      placeholder="0 - 100"
+                      value={fuelPercentage}
+                      onChange={(e) => setFuelPercentage(e.target.value)}
+                      onKeyDown={handleInputKeyDown}
+                    />
+                    <span className="unit-label">%</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-keyboard-done"
+                    onClick={dismissKeyboard}
+                    title="Close keyboard"
+                  >
+                    Done
+                  </button>
                 </div>
               </div>
 
               <div className="form-field">
                 <label htmlFor="gen-def-pct">DEF Level (%)</label>
-                <div className="input-group">
-                  <input
-                    id="gen-def-pct"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                    className="text-input"
-                    placeholder="0 - 100"
-                    value={defPercentage}
-                    onChange={(e) => setDefPercentage(e.target.value)}
-                  />
-                  <span className="unit-label">%</span>
+                <div className="input-group-row">
+                  <div className="input-group">
+                    <input
+                      id="gen-def-pct"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      className="text-input"
+                      placeholder="0 - 100"
+                      value={defPercentage}
+                      onChange={(e) => setDefPercentage(e.target.value)}
+                      onKeyDown={handleInputKeyDown}
+                    />
+                    <span className="unit-label">%</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-keyboard-done"
+                    onClick={dismissKeyboard}
+                    title="Close keyboard"
+                  >
+                    Done
+                  </button>
                 </div>
               </div>
 
               <div className="form-field">
                 <label htmlFor="gen-kwh">Meter Reading (kWh)</label>
-                <div className="input-group">
-                  <input
-                    id="gen-kwh"
-                    type="number"
-                    min="0"
-                    step="1"
-                    className="text-input"
-                    placeholder="e.g. 14250"
-                    value={kwh}
-                    onChange={(e) => setKwh(e.target.value)}
-                  />
-                  <span className="unit-label">kWh</span>
+                <div className="input-group-row">
+                  <div className="input-group">
+                    <input
+                      id="gen-kwh"
+                      type="number"
+                      min="0"
+                      step="1"
+                      className="text-input"
+                      placeholder="e.g. 14250"
+                      value={kwh}
+                      onChange={(e) => setKwh(e.target.value)}
+                      onKeyDown={handleInputKeyDown}
+                    />
+                    <span className="unit-label">kWh</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-keyboard-done"
+                    onClick={dismissKeyboard}
+                    title="Close keyboard"
+                  >
+                    Done
+                  </button>
                 </div>
               </div>
             </div>
@@ -296,19 +349,30 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             <div className="fields-stack">
               <div className="form-field">
                 <label htmlFor="plant-fuel-pct">Fuel Level (%)</label>
-                <div className="input-group">
-                  <input
-                    id="plant-fuel-pct"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                    className="text-input"
-                    placeholder="0 - 100"
-                    value={fuelPercentage}
-                    onChange={(e) => setFuelPercentage(e.target.value)}
-                  />
-                  <span className="unit-label">%</span>
+                <div className="input-group-row">
+                  <div className="input-group">
+                    <input
+                      id="plant-fuel-pct"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      className="text-input"
+                      placeholder="0 - 100"
+                      value={fuelPercentage}
+                      onChange={(e) => setFuelPercentage(e.target.value)}
+                      onKeyDown={handleInputKeyDown}
+                    />
+                    <span className="unit-label">%</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-keyboard-done"
+                    onClick={dismissKeyboard}
+                    title="Close keyboard"
+                  >
+                    Done
+                  </button>
                 </div>
               </div>
             </div>
@@ -321,36 +385,58 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             <div className="fields-stack">
               <div className="form-field">
                 <label htmlFor="fuel-vol">Fuel Transferred (Litres)</label>
-                <div className="input-group">
-                  <input
-                    id="fuel-vol"
-                    type="number"
-                    min="1"
-                    step="1"
-                    className="text-input"
-                    placeholder="Litres"
-                    value={fuelLitres}
-                    onChange={(e) => setFuelLitres(e.target.value)}
-                  />
-                  <span className="unit-label">L</span>
+                <div className="input-group-row">
+                  <div className="input-group">
+                    <input
+                      id="fuel-vol"
+                      type="number"
+                      min="1"
+                      step="1"
+                      className="text-input"
+                      placeholder="Litres"
+                      value={fuelLitres}
+                      onChange={(e) => setFuelLitres(e.target.value)}
+                      onKeyDown={handleInputKeyDown}
+                    />
+                    <span className="unit-label">L</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-keyboard-done"
+                    onClick={dismissKeyboard}
+                    title="Close keyboard"
+                  >
+                    Done
+                  </button>
                 </div>
               </div>
 
               {isGen && (
                 <div className="form-field">
                   <label htmlFor="def-vol">DEF Transferred (Litres)</label>
-                  <div className="input-group">
-                    <input
-                      id="def-vol"
-                      type="number"
-                      min="0"
-                      step="1"
-                      className="text-input"
-                      placeholder="Litres (or 0)"
-                      value={defLitres}
-                      onChange={(e) => setDefLitres(e.target.value)}
-                    />
-                    <span className="unit-label">L</span>
+                  <div className="input-group-row">
+                    <div className="input-group">
+                      <input
+                        id="def-vol"
+                        type="number"
+                        min="0"
+                        step="1"
+                        className="text-input"
+                        placeholder="Litres (or 0)"
+                        value={defLitres}
+                        onChange={(e) => setDefLitres(e.target.value)}
+                        onKeyDown={handleInputKeyDown}
+                      />
+                      <span className="unit-label">L</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-keyboard-done"
+                      onClick={dismissKeyboard}
+                      title="Close keyboard"
+                    >
+                      Done
+                    </button>
                   </div>
                 </div>
               )}
