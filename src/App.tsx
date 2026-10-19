@@ -5,7 +5,6 @@ import { resetRemoteData } from './services/api';
 import { type Equipment, type Transaction, type ActionType, generateUUID } from './types';
 import { Header } from './components/Header';
 import { ScannerView } from './components/ScannerView';
-import { TransactionView } from './components/TransactionView';
 import { SplashScreen } from './components/SplashScreen';
 import { TransactionForm } from './components/TransactionForm';
 import { ConfirmationModal } from './components/ConfirmationModal';
@@ -14,7 +13,7 @@ import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
 import { getDeviceName } from './services/device';
 
-export type AppView = 'SPLASH_SCREEN' | 'SCAN_VIEW' | 'TRANSACTION_VIEW';
+export type AppView = 'SPLASH_SCREEN' | 'SCAN_VIEW';
 
 export const App: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
@@ -212,17 +211,9 @@ export const App: React.FC = () => {
     }
   }, [activeAssetId, loadAssetDetails]);
 
-  const handleAssetSelected = (equipmentId: string) => {
+  const handleAssetSelected = (equipmentId: string | null) => {
     setActiveAssetId(equipmentId);
     setActiveAction(null);
-    setCurrentView('TRANSACTION_VIEW');
-  };
-
-  const handleBackToScanner = () => {
-    setActiveAssetId(null);
-    setActiveAction(null);
-    setCurrentAsset(null);
-    setCurrentView('SCAN_VIEW');
   };
 
   const handleFormSubmitValues = (data: Partial<Transaction>) => {
@@ -334,30 +325,30 @@ export const App: React.FC = () => {
       />
 
       <main className="app-main">
-        {currentView === 'SCAN_VIEW' || !activeAssetId ? (
+        {!activeAction ? (
           <ScannerView
-            onAssetSelected={handleAssetSelected}
+            activeAssetId={activeAssetId}
+            currentAsset={currentAsset}
+            transactions={currentAssetTransactions}
             availableAssets={availableAssets}
-            isAnyModalOpen={isSettingsModalOpen || isOutboxModalOpen}
+            onAssetSelected={handleAssetSelected}
+            onSelectAction={(action) => setActiveAction(action)}
+            onEditEquipment={() => setIsEditingAsset(true)}
+            onPowerToggle={handlePowerToggle}
+            isAnyModalOpen={
+              isSettingsModalOpen ||
+              isOutboxModalOpen ||
+              isConfirmModalOpen ||
+              isEditingAsset
+            }
           />
-        ) : activeAction ? (
+        ) : (
           currentAsset && (
             <TransactionForm
               asset={currentAsset}
               action={activeAction}
               onCancel={() => setActiveAction(null)}
               onSubmitValues={handleFormSubmitValues}
-            />
-          )
-        ) : (
-          currentAsset && (
-            <TransactionView
-              asset={currentAsset}
-              transactions={currentAssetTransactions}
-              onBackToScanner={handleBackToScanner}
-              onSelectAction={(action) => setActiveAction(action)}
-              onEditEquipment={() => setIsEditingAsset(true)}
-              onPowerToggle={handlePowerToggle}
             />
           )
         )}
