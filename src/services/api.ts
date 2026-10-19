@@ -5,6 +5,8 @@ import {
   saveEquipmentToSupabase,
   deleteEquipmentFromSupabase,
   fetchTransactionsFromSupabase,
+  clearAllCloudData,
+  bulkImportEquipmentToSupabase,
 } from './supabase';
 
 export async function fetchRemoteEquipment(): Promise<Equipment[]> {
@@ -83,4 +85,18 @@ export async function postRemoteTransaction(
 
 export async function resetRemoteData(): Promise<void> {
   await fetch('/api/reset', { method: 'POST' });
+}
+
+export async function wipeAndImportFleet(equipmentList: Equipment[]): Promise<number> {
+  if (isSupabaseConfigured()) {
+    await clearAllCloudData();
+    return await bulkImportEquipmentToSupabase(equipmentList);
+  }
+
+  // Fallback to local reset and post
+  await resetRemoteData();
+  for (const eq of equipmentList) {
+    await postRemoteEquipment(eq);
+  }
+  return equipmentList.length;
 }

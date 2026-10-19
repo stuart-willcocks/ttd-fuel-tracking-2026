@@ -9,6 +9,8 @@ import {
   RotateCcw,
   Smartphone,
   ExternalLink,
+  FileSpreadsheet,
+  Trash2,
 } from 'lucide-react';
 import {
   getSupabaseConfig,
@@ -17,6 +19,8 @@ import {
   getSupabaseClient,
   SUPABASE_SQL_SCHEMA,
 } from '../../services/supabase';
+import { parseCSV, mapRowToEquipment } from '../../utils/csvParser';
+import { wipeAndImportFleet } from '../../services/api';
 
 interface SettingsViewProps {
   onTriggerSync: () => Promise<void>;
@@ -34,6 +38,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // CSV Import State
+  const [csvText, setCsvText] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const handleSaveConfig = () => {
     saveSupabaseConfig(url.trim(), anonKey.trim());
@@ -96,6 +105,65 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setCsvText(text || '');
+      setImportResult(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExecuteImport = async () => {
+    if (!csvText.trim()) {
+      setImportResult({ success: false, message: 'Please provide CSV content first.' });
+      return;
+    }
+
+    const { rows } = parseCSV(csvText);
+    if (rows.length === 0) {
+      setImportResult({ success: false, message: 'Could not parse any data rows from the CSV.' });
+      return;
+    }
+
+    const equipmentList = rows.map((row, idx) => mapRowToEquipment(row, idx));
+
+    if (
+      !window.confirm(
+        `WARNING: This will permanently DELETE ALL existing records and transactions in Supabase, and import ${equipmentList.length} assets. Proceed?`
+      )
+    ) {
+      return;
+    }
+
+    setIsImporting(true);
+    setImportResult(null);
+
+    try {
+      const count = await wipeAndImportFleet(equipmentList);
+      await onTriggerSync();
+      setImportResult({
+        success: true,
+        message: `Success! Wiped old database and imported ${count} assets from CSV.`,
+      });
+      setCsvText('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setImportResult({
+        success: false,
+        message: `Import failed: ${msg}`,
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const parsedPreview = csvText.trim() ? parseCSV(csvText) : null;
+  const parsedCount = parsedPreview ? parsedPreview.rows.length : 0;
+
   return (
     <div className="admin-page-container">
       <div style={{ marginBottom: '24px' }}>
@@ -103,8 +171,117 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           System Configuration &amp; Cloud Database
         </h1>
         <p style={{ fontSize: '0.86rem', color: 'var(--adm-text-secondary)', marginTop: '2px' }}>
-          Supabase PostgreSQL integration, replication status, and administrative controls
+          Supabase PostgreSQL integration, real-world data import, and database administration
         </p>
+      </div>
+
+      {/* Bulk Import / Wipe Database Card */}
+      <div className="admin-card" style={{ marginBottom: '24px', borderColor: 'var(--adm-border)' }}>
+        <div className="admin-card-header">
+          <div>
+            <h2 className="admin-card-title">
+              <FileSpreadsheet size={18} color="#eab308" />
+              <span>Import Real-World Fleet (Wipe &amp; Replace)</span>
+            </h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--adm-text-secondary)', marginTop: '2px' }}>
+              Upload or paste CSV exported from Google Sheets or Excel to wipe existing records and populate the fleet.
+            </p>
+          </div>
+          <span className="admin-badge" style={{ background: '#1e293b', color: '#94a3b8' }}>
+            RFC 4180 CSV
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '10px' }}>
+          <div>
+            <label className="admin-label">1. Upload CSV File</label>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={handleFileUpload}
+              className="admin-input"
+              style={{ padding: '8px 12px' }}
+            />
+            <p style={{ fontSize: '0.78rem', color: 'var(--adm-text-muted)', marginTop: '6px' }}>
+              From Google Sheets: File &rarr; Download &rarr; Comma Separated Values (.csv)
+            </p>
+          </div>
+
+          <div>
+            <label className="admin-label">Or Paste CSV Text</label>
+            <textarea
+              className="admin-input admin-mono"
+              rows={4}
+              placeholder="Asset ID, Type, Capacity, Area, Location, What3Words, Serial..."
+              value={csvText}
+              onChange={(e) => {
+                setCsvText(e.target.value);
+                setImportResult(null);
+              }}
+              style={{ fontSize: '0.78rem', resize: 'vertical' }}
+            />
+          </div>
+        </div>
+
+        {parsedCount > 0 && (
+          <div
+            style={{
+              marginTop: '16px',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              background: 'rgba(59, 130, 246, 0.1)',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
+              color: '#93c5fd',
+              fontSize: '0.84rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <strong>CSV Ready:</strong> Found <strong>{parsedCount}</strong> equipment records ready to import.
+              <span style={{ marginLeft: '10px', opacity: 0.8 }}>
+                Detected columns: {parsedPreview?.headers.slice(0, 6).join(', ')}
+              </span>
+            </div>
+            <button
+              onClick={handleExecuteImport}
+              disabled={isImporting}
+              className="admin-btn"
+              style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <Trash2 size={16} />
+              <span>{isImporting ? 'Wiping & Importing...' : `Wipe & Import ${parsedCount} Assets`}</span>
+            </button>
+          </div>
+        )}
+
+        {importResult && (
+          <div
+            style={{
+              marginTop: '16px',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              background: importResult.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+              border: `1px solid ${importResult.success ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+              color: importResult.success ? '#34d399' : '#fca5a5',
+              fontSize: '0.86rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+            }}
+          >
+            {importResult.success ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+            <span>{importResult.message}</span>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '24px' }}>

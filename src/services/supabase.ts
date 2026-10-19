@@ -109,6 +109,56 @@ export async function deleteEquipmentFromSupabase(equipmentId: string): Promise<
 }
 
 /**
+ * Wipe all transactions and equipment from Supabase
+ */
+export async function clearAllCloudData(): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const { error: txErr } = await client
+    .from('transactions')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+  if (txErr) throw txErr;
+
+  const { error: eqErr } = await client
+    .from('equipment_list')
+    .delete()
+    .neq('equipment_id', '__DUMMY_NEQ_ALL__');
+  if (eqErr) throw eqErr;
+}
+
+/**
+ * Bulk import equipment records into Supabase in chunks
+ */
+export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]): Promise<number> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const rows = equipmentList.map((eq) => ({
+    equipment_id: eq.equipmentId,
+    area: eq.area,
+    location: eq.location,
+    what3words: eq.what3words,
+    type: eq.type,
+    capacity: eq.capacity ?? null,
+    rental_serial_number: eq.rentalSerialNumber,
+    powered_up_timestamp: eq.poweredUpTimestamp ?? null,
+    powered_down_timestamp: eq.poweredDownTimestamp ?? null,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const chunkSize = 50;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error } = await client.from('equipment_list').upsert(chunk, { onConflict: 'equipment_id' });
+    if (error) throw error;
+  }
+
+  return equipmentList.length;
+}
+
+/**
  * Fetch transactions from Supabase
  */
 export async function fetchTransactionsFromSupabase(): Promise<Transaction[]> {
