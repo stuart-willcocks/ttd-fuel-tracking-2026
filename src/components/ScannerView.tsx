@@ -60,13 +60,11 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       if (target?.closest('.modal-box')) return;
 
       // If user clicked the button that opens the asset modal, allow modal to open
-      if (target?.closest('.btn-select-asset')) return;
+      if (target?.closest('.btn-select-asset') || target?.closest('.old-btn-black-action')) return;
 
       // If user clicked the Settings button, allow Settings modal to open
       if (target?.closest('button[title*="Settings"]')) return;
 
-      // For any other button (fullscreen, sync, status pill) or background tap:
-      // Allow button click to execute, but immediately return focus to the scan input!
       setTimeout(focusInput, 50);
       setTimeout(focusInput, 150);
     };
@@ -77,23 +75,14 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       }
     };
 
-    const handleFullscreenChange = () => {
-      setTimeout(focusInput, 80);
-      setTimeout(focusInput, 200);
-    };
-
     window.addEventListener('pointerup', handleGlobalInteraction);
     window.addEventListener('click', handleGlobalInteraction);
     window.addEventListener('focus', handleWindowFocus);
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
 
     return () => {
       window.removeEventListener('pointerup', handleGlobalInteraction);
       window.removeEventListener('click', handleGlobalInteraction);
       window.removeEventListener('focus', handleWindowFocus);
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
     };
   }, [isModalActive, focusInput]);
 
@@ -143,7 +132,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       const matched = checkAndSelectAsset(barcodeInput);
       if (!matched && barcodeInput.trim()) {
         setErrorMessage(
-          `Invalid QR format "${barcodeInput.trim()}". Must match TTD-xxx-nnnn or TTD_xxx_nnnn.`
+          `Invalid barcode "${barcodeInput.trim()}". Format must be TTD-xxx-nnnn.`
         );
       }
     }
@@ -172,53 +161,110 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   };
 
   return (
-    <div className="scanner-view">
-      {/* Barcode input for Zebra scanner - spans entire screen, text center justified, virtual keyboard hidden */}
-      <div className="scan-input-row-full">
-        <input
-          ref={inputRef}
-          type="text"
-          inputMode="none"
-          className="scan-input-fullscreen"
-          placeholder="TTD-xxx-nnnn"
-          value={barcodeInput}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="characters"
-          spellCheck="false"
-        />
+    <div className="old-screen-container">
+      {/* 1. TOP BANNER: Matches Screenshot_20261019-112914.png */}
+      <div className="old-top-banner">
+        <span className="old-banner-title">Scan equipment barcode...</span>
       </div>
 
-      {errorMessage && (
-        <div className="error-message">
-          <AlertCircle size={15} />
-          <span>{errorMessage}</span>
+      {/* 2. PLACEHOLDER METADATA HEADER */}
+      <div className="old-meta-header" onClick={handleOpenModal} style={{ cursor: 'pointer' }}>
+        <div className="old-meta-w3w-row">
+          <span className="old-meta-w3w">what3words</span>
         </div>
-      )}
+        <div className="old-meta-spec">TYPE &amp; SIZE &amp; S/N</div>
+        <div className="old-meta-power-row">
+          <span className="old-btn-power-chip on">ON</span>
+          <span className="old-power-label">PoweredUp</span>
+          <span className="old-btn-power-chip off">OFF</span>
+          <span className="old-power-label">PoweredDown</span>
+        </div>
+        <div className="old-meta-area">AREA &amp; LOCATION</div>
+      </div>
 
-      {/* Button beneath the text box */}
-      <button
-        type="button"
-        className="btn-select-asset"
-        onClick={handleOpenModal}
-      >
-        <List size={16} />
-        <span>Select asset from list</span>
-      </button>
+      {/* 3. SCAN INPUT & ASSET PICKER SECTION */}
+      <div className="old-scanner-middle-area">
+        {/* Full width scan input box */}
+        <div className="scan-input-wrapper">
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="none"
+            className="old-scan-input"
+            placeholder="[ Ready to scan barcode ]"
+            value={barcodeInput}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="characters"
+            spellCheck="false"
+          />
+        </div>
 
-      {/* Modal Dialog with all assets listed - no input box, no keyboard */}
+        {errorMessage && (
+          <div className="old-error-message">
+            <AlertCircle size={15} />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {/* Quick picker trigger button */}
+        <button
+          type="button"
+          className="old-btn-select-fleet"
+          onClick={handleOpenModal}
+        >
+          <List size={16} />
+          <span>Select asset from list</span>
+        </button>
+      </div>
+
+      {/* 4. BOTTOM 4 STACKED BLACK BUTTONS */}
+      <div className="old-bottom-actions-stack">
+        <button
+          type="button"
+          className="old-btn-black-action"
+          onClick={handleOpenModal}
+        >
+          Check In
+        </button>
+
+        <button
+          type="button"
+          className="old-btn-black-action"
+          onClick={handleOpenModal}
+        >
+          Record fuel transfer
+        </button>
+
+        <button
+          type="button"
+          className="old-btn-black-action"
+          onClick={handleOpenModal}
+        >
+          Check Out
+        </button>
+
+        <button
+          type="button"
+          className="old-btn-black-action"
+          onClick={handleOpenModal}
+        >
+          Edit equipment details
+        </button>
+      </div>
+
+      {/* Asset Picker Modal */}
       {isAssetModalOpen && (
         <div className="modal-backdrop" onClick={handleCloseModal}>
           <div className="modal-box asset-picker-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header-simple">
-              <h3 className="modal-title">Select Asset</h3>
+              <h3 className="modal-title">Select Equipment</h3>
               <span className="picker-asset-count">{availableAssets.length} assets</span>
             </div>
 
-            {/* Clean, concise asset list */}
             <div className="asset-picker-list">
               {availableAssets.length === 0 ? (
                 <div className="empty-picker-notice">No assets available</div>
@@ -242,7 +288,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
               )}
             </div>
 
-            {/* Red Cancel Button */}
             <div className="modal-single-button-row">
               <button
                 type="button"
@@ -260,4 +305,3 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 };
 
 export { ScannerView as ScanView };
-export type { ScannerViewProps as ScanViewProps };

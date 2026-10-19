@@ -1,7 +1,6 @@
 import React from 'react';
 import { Wifi, WifiOff, RefreshCw, Settings, Maximize2, Minimize2 } from 'lucide-react';
 import type { SyncState } from '../services/syncEngine';
-
 import { APP_VERSION } from '../version';
 
 interface HeaderProps {
@@ -33,10 +32,17 @@ export const Header: React.FC<HeaderProps> = ({
         style={{ cursor: onShowSplash ? 'pointer' : 'default' }}
         title={onShowSplash ? 'Click to view Splash Screen' : undefined}
       >
-        <div className="header-company-name">The Technical Department Ltd</div>
-        <div className="header-sub-row">
-          <span className="header-app-title">Fuel Tracking App</span>
-          <span className="header-version-pill">v{APP_VERSION}</span>
+        <img
+          src="/assets/logo-01.png"
+          alt="TTD Logo"
+          className="header-brand-logo"
+        />
+        <div className="header-text-col">
+          <div className="header-company-name">The Technical Department</div>
+          <div className="header-sub-row">
+            <span className="header-app-title">Fuel Tracking</span>
+            <span className="header-version-pill">v{APP_VERSION}</span>
+          </div>
         </div>
       </div>
 
@@ -54,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Pending outbox count pill */}
         {syncState.pendingCount > 0 && (
           <button className="pending-pill" onClick={onOpenOutbox} title="View offline queue">
-            <span>{syncState.pendingCount} pending</span>
+            <span>{syncState.pendingCount}</span>
           </button>
         )}
 
@@ -65,7 +71,7 @@ export const Header: React.FC<HeaderProps> = ({
           disabled={!syncState.isOnline || syncState.isSyncing}
           title="Sync now"
         >
-          <RefreshCw size={15} />
+          <RefreshCw size={14} />
         </button>
 
         {/* Fullscreen toggle button */}
@@ -74,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={onToggleFullscreen}
           title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (hide address bar)'}
         >
-          {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+          {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
 
         {/* Settings button */}
@@ -83,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={onOpenSettings}
           title="Settings & Schema"
         >
-          <Settings size={15} />
+          <Settings size={14} />
         </button>
       </div>
     </header>

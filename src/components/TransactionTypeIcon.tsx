@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogIn, LogOut, Power, PowerOff, Fuel, Clock } from 'lucide-react';
+import { Power, PowerOff, Clock } from 'lucide-react';
 import type { TransactionType } from '../types';
 
 interface TransactionTypeIconProps {
@@ -11,7 +11,7 @@ interface TransactionTypeIconProps {
 
 export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({
   type = '',
-  size = 15,
+  size = 24,
   className = '',
   title,
 }) => {
@@ -19,17 +19,27 @@ export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({
 
   if (t.includes('CheckIn') || t === 'check-in') {
     return (
-      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Check In'}>
-        <LogIn size={size} className="tx-type-icon icon-checkin" />
-      </span>
+      <img
+        src="/assets/checkin-6.png"
+        alt="Check In"
+        width={size}
+        height={size}
+        className={`tx-png-icon ${className}`}
+        title={title || 'Check In'}
+      />
     );
   }
 
   if (t.includes('CheckOut') || t === 'check-out') {
     return (
-      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Check Out'}>
-        <LogOut size={size} className="tx-type-icon icon-checkout" />
-      </span>
+      <img
+        src="/assets/checkout-6.png"
+        alt="Check Out"
+        width={size}
+        height={size}
+        className={`tx-png-icon ${className}`}
+        title={title || 'Check Out'}
+      />
     );
   }
 
@@ -51,9 +61,14 @@ export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({
 
   if (t.includes('FuelTransfer') || t.includes('Fuel') || t === 'record-fuel') {
     return (
-      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Fuel Transfer'}>
-        <Fuel size={size} className="tx-type-icon icon-fueltransfer" />
-      </span>
+      <img
+        src="/assets/refuel-6.png"
+        alt="Fuel Transfer"
+        width={size}
+        height={size}
+        className={`tx-png-icon ${className}`}
+        title={title || 'Fuel Transfer'}
+      />
     );
   }
 

@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Plus, Minus } from 'lucide-react';
+import { Minus, Plus } from 'lucide-react';
 import type { Equipment, ActionType, Transaction, TransactionType } from '../types';
-import { EquipmentTypeIcon } from './EquipmentTypeIcon';
-import { TransactionTypeIcon } from './TransactionTypeIcon';
 
 interface TransactionFormProps {
   asset: Equipment;
@@ -30,18 +28,19 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [fuelLitres, setFuelLitres] = useState<string>('');
   const [defLitres, setDefLitres] = useState<string>('');
 
+  // Title matching Screenshot_20250324-201605.png & Screenshot_20261019-112955.png
   const actionTitle = useMemo(() => {
     switch (action) {
       case 'check-in':
-        return 'Check In';
+        return `CHECK IN ${asset.type}`;
       case 'check-out':
-        return 'Check Out';
+        return `CHECK OUT ${asset.type}`;
       case 'record-fuel':
-        return 'Fuel Transfer';
+        return `TRANSFER FUEL TO ${asset.type}`;
       default:
-        return 'Transaction';
+        return 'RECORD TRANSACTION';
     }
-  }, [action]);
+  }, [action, asset.type]);
 
   const isPercentageValid = (val: string): boolean => {
     if (val.trim() === '') return false;
@@ -175,304 +174,205 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   };
 
   return (
-    <div className="transaction-form-view" onClick={handleContainerClick}>
-      <div className="top-nav-bar">
-        <button className="btn-back" onClick={onCancel}>
-          <ArrowLeft size={16} />
-          <span>Cancel & Back</span>
-        </button>
-        <span className="current-id-badge">{asset.equipmentId}</span>
+    <div className="old-screen-container" onClick={handleContainerClick}>
+      {/* 1. TOP BANNER: Solid Black Banner with Asset ID */}
+      <div className="old-top-banner">
+        <span className="old-banner-title">{asset.equipmentId}</span>
       </div>
 
-      <div className="form-card" onClick={handleContainerClick}>
-        <div className="form-title-row">
-          <div className="form-title-left">
-            <TransactionTypeIcon type={action} size={18} />
-            <h2 className="form-title">{actionTitle}</h2>
-          </div>
-          <EquipmentTypeIcon type={asset.type} size={20} />
-        </div>
+      {/* 2. FORM BODY */}
+      <div className="old-form-body" onClick={handleContainerClick}>
+        {/* Blue Bold Uppercase Title */}
+        <h2 className="old-form-title">{actionTitle}</h2>
 
-        <form onSubmit={handleSubmit} noValidate>
+        <form onSubmit={handleSubmit} noValidate className="old-form-content">
           {/* ======================================================= */}
-          {/* Generator Check In / Check Out (Lines 93, 99)           */}
+          {/* Generator Check In / Check Out (Screenshot 20250324-201605) */}
           {/* ======================================================= */}
           {(action === 'check-in' || action === 'check-out') && isGen && (
-            <div className="fields-stack">
-              <div className="form-field">
-                <label htmlFor="gen-fuel-pct">Fuel Level (%)</label>
-                <div className="input-group-row">
-                  <div className="input-group">
-                    <input
-                      id="gen-fuel-pct"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="1"
-                      className="text-input"
-                      placeholder="0 - 100"
-                      value={fuelPercentage}
-                      onChange={(e) => setFuelPercentage(e.target.value)}
-                      onKeyDown={handleInputKeyDown}
-                    />
-                    <span className="unit-label">%</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-keyboard-done"
-                    onClick={dismissKeyboard}
-                    title="Close keyboard"
-                  >
-                    Done
-                  </button>
-                </div>
+            <div className="old-form-grid">
+              <div className="old-form-row">
+                <span className="old-form-lbl">Fuel level</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  className="old-form-input"
+                  placeholder="100"
+                  value={fuelPercentage}
+                  onChange={(e) => setFuelPercentage(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                />
+                <span className="old-form-unit">%</span>
               </div>
 
-              <div className="form-field">
-                <label htmlFor="gen-def-pct">DEF Level (%)</label>
-                <div className="input-group-row">
-                  <div className="input-group">
-                    <input
-                      id="gen-def-pct"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="1"
-                      className="text-input"
-                      placeholder="0 - 100"
-                      value={defPercentage}
-                      onChange={(e) => setDefPercentage(e.target.value)}
-                      onKeyDown={handleInputKeyDown}
-                    />
-                    <span className="unit-label">%</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-keyboard-done"
-                    onClick={dismissKeyboard}
-                    title="Close keyboard"
-                  >
-                    Done
-                  </button>
-                </div>
+              <div className="old-form-row">
+                <span className="old-form-lbl">DEF level</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  className="old-form-input"
+                  placeholder="100"
+                  value={defPercentage}
+                  onChange={(e) => setDefPercentage(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                />
+                <span className="old-form-unit">%</span>
               </div>
 
-              <div className="form-field">
-                <label htmlFor="gen-kwh">Meter Reading (kWh)</label>
-                <div className="input-group-row">
-                  <div className="input-group">
-                    <input
-                      id="gen-kwh"
-                      type="number"
-                      min="0"
-                      step="1"
-                      className="text-input"
-                      placeholder="e.g. 14250"
-                      value={kwh}
-                      onChange={(e) => setKwh(e.target.value)}
-                      onKeyDown={handleInputKeyDown}
-                    />
-                    <span className="unit-label">kWh</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-keyboard-done"
-                    onClick={dismissKeyboard}
-                    title="Close keyboard"
-                  >
-                    Done
-                  </button>
-                </div>
+              <div className="old-form-row">
+                <span className="old-form-lbl">Meter</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="old-form-input"
+                  placeholder="1752"
+                  value={kwh}
+                  onChange={(e) => setKwh(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                />
+                <span className="old-form-unit">kWh</span>
               </div>
             </div>
           )}
 
           {/* ======================================================= */}
-          {/* Tank Check In / Check Out: Spinner Control (Lines 95, 101)*/}
+          {/* Tank Check In / Check Out (Eighths Spinner Control)     */}
           {/* ======================================================= */}
           {(action === 'check-in' || action === 'check-out') && isTank && (
-            <div className="fields-stack">
-              <div className="form-field">
-                <label>Fuel Level in Eighths (0 to 8)</label>
-
-                <div className="spinner-widget">
-                  <div className="spinner-controls">
-                    <button
-                      type="button"
-                      className="btn-spinner"
-                      disabled={fuelEighths <= 0}
-                      onClick={() => {
-                        setFuelEighths((p) => Math.max(0, p - 1));
-                        setTankSpinnerInteracted(true);
-                      }}
-                    >
-                      <Minus size={20} />
-                    </button>
-
-                    <div className="spinner-value-box">
-                      <span className="spinner-value">{fuelEighths} / 8</span>
-                      <span className="spinner-fraction">
-                        {Math.round((fuelEighths / 8) * 100)}% Full
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="btn-spinner"
-                      disabled={fuelEighths >= 8}
-                      onClick={() => {
-                        setFuelEighths((p) => Math.min(8, p + 1));
-                        setTankSpinnerInteracted(true);
-                      }}
-                    >
-                      <Plus size={20} />
-                    </button>
-                  </div>
-
-                  {/* Fast selection row */}
-                  <div className="eighths-selector-row">
-                    {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((val) => (
-                      <button
-                        type="button"
-                        key={val}
-                        className={`btn-eighth ${fuelEighths === val && tankSpinnerInteracted ? 'selected' : ''}`}
-                        onClick={() => {
-                          setFuelEighths(val);
-                          setTankSpinnerInteracted(true);
-                        }}
-                      >
-                        {val}/8
-                      </button>
-                    ))}
-                  </div>
+            <div className="old-form-grid">
+              <div className="old-form-row">
+                <span className="old-form-lbl">Fuel level</span>
+                <div className="old-tank-spinner">
+                  <button
+                    type="button"
+                    className="old-btn-step"
+                    disabled={fuelEighths <= 0}
+                    onClick={() => {
+                      setFuelEighths((p) => Math.max(0, p - 1));
+                      setTankSpinnerInteracted(true);
+                    }}
+                  >
+                    <Minus size={18} />
+                  </button>
+                  <span className="old-tank-val">{fuelEighths} / 8</span>
+                  <button
+                    type="button"
+                    className="old-btn-step"
+                    disabled={fuelEighths >= 8}
+                    onClick={() => {
+                      setFuelEighths((p) => Math.min(8, p + 1));
+                      setTankSpinnerInteracted(true);
+                    }}
+                  >
+                    <Plus size={18} />
+                  </button>
                 </div>
+                <span className="old-form-unit">eighths</span>
+              </div>
+
+              <div className="old-tank-chips-row">
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`old-tank-chip ${fuelEighths === v && tankSpinnerInteracted ? 'active' : ''}`}
+                    onClick={() => {
+                      setFuelEighths(v);
+                      setTankSpinnerInteracted(true);
+                    }}
+                  >
+                    {v}/8
+                  </button>
+                ))}
               </div>
             </div>
           )}
 
           {/* ======================================================= */}
-          {/* Plant Check In / Check Out (Lines 97, 103)              */}
+          {/* Plant Check In / Check Out                             */}
           {/* ======================================================= */}
           {(action === 'check-in' || action === 'check-out') && isPlant && (
-            <div className="fields-stack">
-              <div className="form-field">
-                <label htmlFor="plant-fuel-pct">Fuel Level (%)</label>
-                <div className="input-group-row">
-                  <div className="input-group">
-                    <input
-                      id="plant-fuel-pct"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="1"
-                      className="text-input"
-                      placeholder="0 - 100"
-                      value={fuelPercentage}
-                      onChange={(e) => setFuelPercentage(e.target.value)}
-                      onKeyDown={handleInputKeyDown}
-                    />
-                    <span className="unit-label">%</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-keyboard-done"
-                    onClick={dismissKeyboard}
-                    title="Close keyboard"
-                  >
-                    Done
-                  </button>
-                </div>
+            <div className="old-form-grid">
+              <div className="old-form-row">
+                <span className="old-form-lbl">Fuel level</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  className="old-form-input"
+                  placeholder="100"
+                  value={fuelPercentage}
+                  onChange={(e) => setFuelPercentage(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                />
+                <span className="old-form-unit">%</span>
               </div>
             </div>
           )}
 
           {/* ======================================================= */}
-          {/* Record Fuel Transfer (Lines 105, 107)                   */}
+          {/* Fuel Transfer (Screenshot 20261019-112955)              */}
           {/* ======================================================= */}
           {action === 'record-fuel' && (
-            <div className="fields-stack">
-              <div className="form-field">
-                <label htmlFor="fuel-vol">Fuel Transferred (Litres)</label>
-                <div className="input-group-row">
-                  <div className="input-group">
-                    <input
-                      id="fuel-vol"
-                      type="number"
-                      min="1"
-                      step="1"
-                      className="text-input"
-                      placeholder="Litres"
-                      value={fuelLitres}
-                      onChange={(e) => setFuelLitres(e.target.value)}
-                      onKeyDown={handleInputKeyDown}
-                    />
-                    <span className="unit-label">L</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-keyboard-done"
-                    onClick={dismissKeyboard}
-                    title="Close keyboard"
-                  >
-                    Done
-                  </button>
-                </div>
+            <div className="old-form-grid">
+              <div className="old-form-row">
+                <span className="old-form-lbl">Fuel transferred</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  className="old-form-input"
+                  placeholder="500"
+                  value={fuelLitres}
+                  onChange={(e) => setFuelLitres(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                />
+                <span className="old-form-unit">litres</span>
               </div>
 
               {isGen && (
-                <div className="form-field">
-                  <label htmlFor="def-vol">DEF Transferred (Litres)</label>
-                  <div className="input-group-row">
-                    <div className="input-group">
-                      <input
-                        id="def-vol"
-                        type="number"
-                        min="0"
-                        step="1"
-                        className="text-input"
-                        placeholder="Litres (or 0)"
-                        value={defLitres}
-                        onChange={(e) => setDefLitres(e.target.value)}
-                        onKeyDown={handleInputKeyDown}
-                      />
-                      <span className="unit-label">L</span>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn-keyboard-done"
-                      onClick={dismissKeyboard}
-                      title="Close keyboard"
-                    >
-                      Done
-                    </button>
-                  </div>
+                <div className="old-form-row">
+                  <span className="old-form-lbl">DEF transferred</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="old-form-input"
+                    placeholder="100"
+                    value={defLitres}
+                    onChange={(e) => setDefLitres(e.target.value)}
+                    onKeyDown={handleInputKeyDown}
+                  />
+                  <span className="old-form-unit">litres</span>
                 </div>
               )}
             </div>
           )}
 
           {/* ======================================================= */}
-          {/* Mandatory Brief Button Rules (Line 109):                */}
-          {/* "Submit is greyed out and disabled by default.          */}
-          {/*  Cancel is red. If all displayed entry fields contain   */}
-          {/*  valid values, the submit button becomes clickable      */}
-          {/*  and turns green."                                      */}
+          {/* Form Action Buttons: Green Submit & Red Cancel          */}
           {/* ======================================================= */}
-          <div className="form-buttons-row">
-            <button
-              type="button"
-              className="btn-cancel-red"
-              onClick={onCancel}
-            >
-              Cancel
-            </button>
-
+          <div className="old-form-btn-row">
             <button
               type="submit"
               disabled={!isValid}
-              className={`btn-submit ${isValid ? 'btn-submit-green' : 'btn-submit-disabled'}`}
+              className={`old-btn-submit ${isValid ? 'valid' : 'disabled'}`}
             >
               Submit
+            </button>
+
+            <button
+              type="button"
+              className="old-btn-cancel"
+              onClick={onCancel}
+            >
+              Cancel
             </button>
           </div>
         </form>

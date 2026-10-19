@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Smartphone, ArrowRight, ShieldCheck, Fuel } from 'lucide-react';
 import { getDeviceId, getDeviceName, setDeviceName } from '../services/device';
-import { APP_VERSION } from '../version';
+import { BUILD_NUMBER, BUILD_TIME } from '../version';
 
 interface SplashScreenProps {
   onContinue: () => void;
@@ -19,67 +18,64 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
   };
 
   return (
-    <div className="splash-screen">
-      <div className="splash-card">
-        {/* Brand Icon */}
-        <div className="splash-icon-wrapper">
-          <div className="splash-icon-square">
-            <Fuel size={36} className="splash-brand-icon" />
+    <div className="old-splash-screen">
+      <div className="old-splash-content">
+        {/* Top Build Number */}
+        <div className="old-splash-build-top">{BUILD_NUMBER}</div>
+
+        {/* Title: The Technical Department <newline> Fuel Tracking */}
+        <div className="old-splash-title-block">
+          <h1 className="old-splash-main-title">The Technical Department</h1>
+          <h2 className="old-splash-sub-title">Fuel Tracking</h2>
+        </div>
+
+        {/* Event & Version Tag */}
+        <div className="old-splash-event-block">
+          <h3 className="old-splash-event-name">Silverstone 2026</h3>
+          <div className="old-splash-event-code">{BUILD_TIME?.replace(/[- :]/g, '').slice(0, 9) || '20261019E'}</div>
+        </div>
+
+        {/* Diagnostics & Initialization Log */}
+        <div className="old-splash-log-box">
+          <div className="log-line">Starting...</div>
+          <div className="log-line">Checking tables...</div>
+          <div className="log-line">Equipment table exists.</div>
+          <div className="log-line">Transaction table exists.</div>
+          <div className="log-line">Downloaded transaction table exists.</div>
+          <div className="log-line">Equipment upload table exists.</div>
+          <div className="log-line">device_id table exists.</div>
+          <div className="log-line device-id-line">
+            device_id is <strong>{deviceName}</strong>
           </div>
         </div>
 
-        {/* App Title: The Technical Department Ltd <newline> Fuel Tracking App */}
-        <div className="splash-title-block">
-          <h1 className="splash-company-name">The Technical Department Ltd</h1>
-          <h2 className="splash-app-name">Fuel Tracking App</h2>
+        {/* Device Switcher Chips */}
+        <div className="old-splash-pda-row">
+          {PRESET_PDAS.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              className={`old-splash-pda-chip ${deviceName === preset ? 'active' : ''}`}
+              onClick={() => handleSelectPreset(preset)}
+            >
+              {preset}
+            </button>
+          ))}
         </div>
 
-        {/* Version */}
-        <div className="splash-version-row">
-          <span className="splash-version-box">Version {APP_VERSION}</span>
+        <div className="old-splash-hw-id">
+          <span>Token: <code>{persistentId.slice(0, 18)}...</code></span>
         </div>
 
-        {/* Device ID Display & Switcher */}
-        <div className="splash-device-card">
-          <div className="splash-device-header">
-            <Smartphone size={15} className="splash-device-icon" />
-            <span className="splash-device-title">Device ID:</span>
-            <span className="splash-device-active-box">{deviceName}</span>
-          </div>
-
-          <div className="splash-device-pills">
-            {PRESET_PDAS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                className={`splash-pda-chip ${deviceName === preset ? 'active' : ''}`}
-                onClick={() => handleSelectPreset(preset)}
-              >
-                {preset}
-              </button>
-            ))}
-          </div>
-
-          <div className="splash-device-sub">
-            <span>Hardware Token: </span>
-            <code>{persistentId}</code>
-          </div>
-        </div>
-
-        {/* Continue Button - Simple Rectangular, no corner radii, center justified */}
-        <button
-          type="button"
-          className="splash-btn-continue"
-          onClick={onContinue}
-        >
-          <span>Continue</span>
-          <ArrowRight size={18} />
-        </button>
-
-        {/* Footer verification note */}
-        <div className="splash-footer-note">
-          <ShieldCheck size={13} />
-          <span>Industrial Zebra Handheld Edition</span>
+        {/* Continue Button: Light Grey, Rectangular, Center-Justified */}
+        <div className="old-splash-btn-row">
+          <button
+            type="button"
+            className="old-splash-btn-continue"
+            onClick={onContinue}
+          >
+            Continue
+          </button>
         </div>
       </div>
     </div>
