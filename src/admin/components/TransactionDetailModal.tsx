@@ -29,17 +29,17 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '10px',
-                background: 'rgba(6, 182, 212, 0.15)',
+                width: '40px',
+                height: '40px',
+                borderRadius: 'var(--adm-radius-sm)',
+                background: 'rgba(250, 204, 21, 0.12)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#06b6d4',
+                color: 'var(--adm-accent-yellow)',
               }}
             >
-              <ReceiptText size={22} />
+              <ReceiptText size={20} />
             </div>
             <div>
               <h3 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>
@@ -144,7 +144,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             {transaction.fuelTransferLitres !== undefined && (
               <div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Fuel Transfer</span>
-                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#06b6d4' }}>
+                <p style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--adm-accent-yellow)' }}>
                   {transaction.fuelTransferLitres} L
                 </p>
               </div>
@@ -153,7 +153,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             {transaction.defTransferLitres !== undefined && (
               <div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>DEF Transfer</span>
-                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#3b82f6' }}>
+                <p style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--adm-text-primary)' }}>
                   {transaction.defTransferLitres} L
                 </p>
               </div>

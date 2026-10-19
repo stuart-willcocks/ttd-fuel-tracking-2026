@@ -275,9 +275,9 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                     style={{
                       padding: '3px 8px',
                       fontSize: '0.74rem',
-                      background: capacity === String(cap) ? 'rgba(245, 158, 11, 0.2)' : undefined,
-                      borderColor: capacity === String(cap) ? 'var(--adm-accent-amber)' : undefined,
-                      color: capacity === String(cap) ? '#fbbf24' : undefined,
+                      background: capacity === String(cap) ? 'rgba(250, 204, 21, 0.15)' : undefined,
+                      borderColor: capacity === String(cap) ? 'var(--adm-accent-yellow)' : undefined,
+                      color: capacity === String(cap) ? 'var(--adm-accent-yellow)' : undefined,
                     }}
                   >
                     {cap} {type === 'GENERATOR' ? 'kVA' : 'L'}
@@ -351,7 +351,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                     href={`https://what3words.com/${what3words.replace(/^\/\/\//, '')}`}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ fontSize: '0.72rem', color: '#06b6d4', textDecoration: 'none' }}
+                    style={{ fontSize: '0.72rem', color: 'var(--adm-accent-yellow)', textDecoration: 'none' }}
                   >
                     View Map ↗
                   </a>

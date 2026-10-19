@@ -250,7 +250,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             onClick={() => setActiveFilter(tab.key as FilterType)}
             className={`admin-btn ${activeFilter === tab.key ? 'admin-btn-secondary' : 'admin-btn-outline'} admin-btn-sm`}
             style={{
-              borderColor: activeFilter === tab.key ? 'var(--adm-accent-amber)' : undefined,
+              borderColor: activeFilter === tab.key ? 'var(--adm-accent-yellow)' : undefined,
               color: activeFilter === tab.key ? '#ffffff' : undefined,
             }}
           >
@@ -260,8 +260,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                 fontSize: '0.72rem',
                 padding: '1px 6px',
                 borderRadius: '999px',
-                background: activeFilter === tab.key ? 'rgba(245, 158, 11, 0.25)' : 'var(--adm-surface-3)',
-                color: activeFilter === tab.key ? '#fbbf24' : 'var(--adm-text-secondary)',
+                background: activeFilter === tab.key ? 'rgba(250, 204, 21, 0.15)' : 'var(--adm-surface-3)',
+                color: activeFilter === tab.key ? 'var(--adm-accent-yellow)' : 'var(--adm-text-secondary)',
                 fontFamily: 'var(--adm-font-mono)',
               }}
             >
@@ -329,9 +329,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                           background: 'none',
                           border: 'none',
                           fontFamily: 'var(--adm-font-mono)',
-                          fontWeight: 800,
+                          fontWeight: 700,
                           fontSize: '0.92rem',
-                          color: '#fbbf24',
+                          color: 'var(--adm-accent-yellow)',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
@@ -371,7 +371,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                         style={{
                           fontFamily: 'var(--adm-font-mono)',
                           fontSize: '0.8rem',
-                          color: '#ef4444',
+                          color: 'var(--adm-accent-yellow)',
                           textDecoration: 'none',
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -408,9 +408,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                           onClick={() => onSelectAsset(asset.equipmentId)}
                           className="admin-btn admin-btn-secondary admin-btn-sm"
                           title={`View transactions for ${asset.equipmentId}`}
-                          style={{ padding: '5px 10px', gap: '5px', color: '#06b6d4' }}
+                          style={{ padding: '5px 10px', gap: '5px' }}
                         >
-                          <ReceiptText size={13} />
+                          <ReceiptText size={13} color="var(--adm-accent-yellow)" />
                           <span>Transactions ({txCounts[asset.equipmentId] || 0})</span>
                         </button>
 
@@ -421,7 +421,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                           title="Generate & Print Physical QR Tag"
                           style={{ padding: '5px 8px' }}
                         >
-                          <QrCode size={14} color="#f59e0b" />
+                          <QrCode size={14} />
                         </button>
 
                         {/* Power Toggle for Generator */}
@@ -430,7 +430,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                             onClick={() => onTogglePower(asset)}
                             className="admin-btn admin-btn-outline admin-btn-sm"
                             title={isRunning ? 'De-energize (Power Down)' : 'Energize (Power Up)'}
-                            style={{ padding: '5px 8px', color: isRunning ? '#ef4444' : '#10b981' }}
+                            style={{ padding: '5px 8px', color: isRunning ? '#F87171' : '#4ADE80' }}
                           >
                             <Zap size={14} />
                           </button>
@@ -451,7 +451,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                           onClick={() => onOpenDeleteModal(asset)}
                           className="admin-btn admin-btn-outline admin-btn-sm"
                           title="Decommission & Delete Asset"
-                          style={{ padding: '5px 8px', color: '#ef4444' }}
+                          style={{ padding: '5px 8px', color: '#F87171' }}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -477,8 +477,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  borderTop: `3px solid ${
-                    asset.type === 'GENERATOR' ? '#f59e0b' : asset.type === 'TANK' ? '#06b6d4' : '#10b981'
+                  borderTop: `2px solid ${
+                    asset.type === 'GENERATOR' ? 'var(--adm-accent-yellow)' : 'var(--adm-border-subtle)'
                   }`,
                 }}
               >
@@ -499,9 +499,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     onClick={() => onSelectAsset(asset.equipmentId)}
                     style={{
                       fontFamily: 'var(--adm-font-mono)',
-                      fontSize: '1.25rem',
-                      fontWeight: 800,
-                      color: '#ffffff',
+                      fontSize: '1.2rem',
+                      fontWeight: 700,
+                      color: 'var(--adm-text-primary)',
                       cursor: 'pointer',
                       marginBottom: '8px',
                     }}
@@ -513,7 +513,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     <strong>{asset.area}</strong> • {asset.location}
                   </div>
 
-                  <div style={{ fontSize: '0.8rem', color: '#ef4444', fontFamily: 'var(--adm-font-mono)', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--adm-accent-yellow)', fontFamily: 'var(--adm-font-mono)', marginBottom: '12px' }}>
                     <MapPin size={12} style={{ display: 'inline', marginRight: '4px' }} />
                     {asset.what3words}
                   </div>
@@ -524,13 +524,13 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                       justifyContent: 'space-between',
                       padding: '8px 12px',
                       background: 'var(--adm-surface-1)',
-                      borderRadius: '8px',
+                      borderRadius: 'var(--adm-radius-sm)',
                       fontSize: '0.8rem',
                       marginBottom: '14px',
                     }}
                   >
                     <span style={{ color: 'var(--adm-text-muted)' }}>Rating / Cap:</span>
-                    <span style={{ fontWeight: 700, color: '#ffffff' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--adm-text-primary)' }}>
                       {asset.type === 'GENERATOR' && asset.capacity ? `${asset.capacity} kVA` : null}
                       {asset.type === 'TANK' && asset.capacity ? `${asset.capacity.toLocaleString()} Litres` : null}
                       {asset.type === 'PLANT' ? 'Unrated' : null}
@@ -561,9 +561,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                       onClick={() => onSelectAsset(asset.equipmentId)}
                       className="admin-btn admin-btn-secondary admin-btn-sm"
                       title="View Transactions for this asset"
-                      style={{ color: '#06b6d4', padding: '5px 8px' }}
+                      style={{ padding: '5px 8px' }}
                     >
-                      <ReceiptText size={14} />
+                      <ReceiptText size={14} color="var(--adm-accent-yellow)" />
                       <span>{txCounts[asset.equipmentId] || 0} Txs</span>
                     </button>
 
@@ -578,7 +578,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     <button
                       onClick={() => onOpenDeleteModal(asset)}
                       className="admin-btn admin-btn-outline admin-btn-sm"
-                      style={{ color: '#ef4444' }}
+                      style={{ color: '#F87171' }}
                     >
                       <Trash2 size={14} />
                     </button>

@@ -227,7 +227,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                   padding: '2px 8px',
                   borderRadius: '999px',
                   background: 'var(--adm-surface-3)',
-                  color: 'var(--adm-accent-amber)',
+                  color: 'var(--adm-accent-yellow)',
                   border: '1px solid var(--adm-border-subtle)',
                 }}
               >
@@ -268,8 +268,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           style={{
             marginBottom: '22px',
             padding: '20px 24px',
-            borderTop: `3px solid ${
-              currentAsset.type === 'GENERATOR' ? '#f59e0b' : currentAsset.type === 'TANK' ? '#06b6d4' : '#10b981'
+            borderTop: `2px solid ${
+              currentAsset.type === 'GENERATOR' ? 'var(--adm-accent-yellow)' : 'var(--adm-border-subtle)'
             }`,
           }}
         >
@@ -291,8 +291,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 style={{
                   fontFamily: 'var(--adm-font-mono)',
                   fontSize: '1.25rem',
-                  fontWeight: 800,
-                  color: '#ffffff',
+                  fontWeight: 700,
+                  color: 'var(--adm-text-primary)',
                 }}
               >
                 {currentAsset.equipmentId}
@@ -318,7 +318,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                   className="admin-btn admin-btn-outline admin-btn-sm"
                   title="Generate & print physical QR label tag"
                 >
-                  <QrCode size={14} color="#f59e0b" />
+                  <QrCode size={14} />
                   <span>Print QR Tag</span>
                 </button>
               )}
@@ -328,7 +328,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                   onClick={() => onTogglePower(currentAsset)}
                   className="admin-btn admin-btn-outline admin-btn-sm"
                   title={isCurrentAssetRunning ? 'Power Down (Standby)' : 'Power Up (Energize)'}
-                  style={{ color: isCurrentAssetRunning ? '#ef4444' : '#10b981' }}
+                  style={{ color: isCurrentAssetRunning ? '#F87171' : '#4ADE80' }}
                 >
                   <Zap size={14} />
                   <span>{isCurrentAssetRunning ? 'Power Down' : 'Power Up'}</span>
@@ -340,7 +340,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                   onClick={() => onOpenDeleteModal(currentAsset)}
                   className="admin-btn admin-btn-outline admin-btn-sm"
                   title="Decommission & delete asset"
-                  style={{ color: '#ef4444' }}
+                  style={{ color: '#F87171' }}
                 >
                   <Trash2 size={14} />
                   <span>Decommission</span>
@@ -393,7 +393,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                   href={`https://what3words.com/${currentAsset.what3words.replace(/^\/\/\//, '')}`}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ color: '#ef4444', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                  style={{ color: 'var(--adm-accent-yellow)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
                 >
                   <MapPin size={11} />
                   <span>{currentAsset.what3words}</span>
@@ -405,7 +405,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
                 Rental Serial #
               </span>
-              <p style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.82rem', color: '#f59e0b', margin: '3px 0 0' }}>
+              <p style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.82rem', color: 'var(--adm-text-primary)', margin: '3px 0 0' }}>
                 {currentAsset.rentalSerialNumber || '—'}
               </p>
             </div>
@@ -414,7 +414,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
                 Transferred Telemetry
               </span>
-              <p style={{ fontSize: '0.85rem', fontWeight: 700, margin: '3px 0 0', color: '#06b6d4' }}>
+              <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '3px 0 0', color: 'var(--adm-text-primary)' }}>
                 {summaryFuelLitres > 0 ? `${summaryFuelLitres.toLocaleString()} L Diesel` : '0 L Diesel'}
                 {summaryDefLitres > 0 && ` • ${summaryDefLitres.toLocaleString()} L DEF`}
               </p>
@@ -582,8 +582,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             <tbody>
               {filteredTransactions.map((tx) => {
                 const eq = assetMap.get(tx.equipmentId);
-                const isPower = tx.transactionType.includes('Power');
-                const isFuel = tx.transactionType.includes('Fuel');
 
                 return (
                   <tr key={tx.id}>
@@ -601,8 +599,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                           background: 'none',
                           border: 'none',
                           fontFamily: 'var(--adm-font-mono)',
-                          fontWeight: 800,
-                          color: '#fbbf24',
+                          fontWeight: 700,
+                          color: 'var(--adm-accent-yellow)',
                           cursor: 'pointer',
                           fontSize: '0.88rem',
                           padding: 0,
@@ -633,7 +631,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                         style={{
                           fontWeight: 600,
                           fontSize: '0.84rem',
-                          color: isFuel ? '#06b6d4' : isPower ? '#10b981' : '#f59e0b',
+                          color: 'var(--adm-text-primary)',
                         }}
                       >
                         {tx.transactionType}
@@ -643,12 +641,12 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     {/* Telemetry Readout */}
                     <td style={{ fontSize: '0.82rem' }}>
                       {tx.fuelTransferLitres && (
-                        <span style={{ color: '#06b6d4', fontWeight: 700 }}>
+                        <span style={{ color: 'var(--adm-accent-yellow)', fontWeight: 600 }}>
                           +{tx.fuelTransferLitres} L Fuel{' '}
                         </span>
                       )}
                       {tx.defTransferLitres && (
-                        <span style={{ color: '#3b82f6', fontWeight: 600 }}>
+                        <span style={{ color: 'var(--adm-text-secondary)', fontWeight: 500 }}>
                           +{tx.defTransferLitres} L DEF{' '}
                         </span>
                       )}
@@ -665,7 +663,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                         <span>{tx.checkOutFuelEighths}/8 out </span>
                       )}
                       {tx.checkInKWH !== undefined && (
-                        <span style={{ color: '#10b981' }}>{tx.checkInKWH.toLocaleString()} kWh </span>
+                        <span style={{ color: '#4ADE80' }}>{tx.checkInKWH.toLocaleString()} kWh </span>
                       )}
                       {!tx.fuelTransferLitres &&
                         tx.checkInFuelPercentage === undefined &&
