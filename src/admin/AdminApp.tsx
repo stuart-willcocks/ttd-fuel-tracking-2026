@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './admin.css';
 import { LaptopOnlyGuard } from './components/LaptopOnlyGuard';
 import { AdminSidebar, type AdminViewType } from './components/AdminSidebar';
@@ -7,7 +7,6 @@ import { AssetsView } from './views/AssetsView';
 import { TransactionsView } from './views/TransactionsView';
 import { SettingsView } from './views/SettingsView';
 import { AssetFormModal } from './components/AssetFormModal';
-import { AssetDetailDrawer } from './components/AssetDetailDrawer';
 import { DeleteAssetModal } from './components/DeleteAssetModal';
 import { AssetQRLabelModal } from './components/AssetQRLabelModal';
 import { TransactionDetailModal } from './components/TransactionDetailModal';
@@ -90,11 +89,6 @@ export const AdminApp: React.FC = () => {
       clearInterval(interval);
     };
   }, [loadFleetData, isCreateModalOpen, editingAsset]);
-
-  // Selected asset object
-  const selectedAsset = useMemo(() => {
-    return assets.find((a) => a.equipmentId === selectedAssetId) || null;
-  }, [assets, selectedAssetId]);
 
   // Create / Update Asset Handler
   const handleSaveAsset = async (savedAsset: Equipment) => {
@@ -188,7 +182,7 @@ export const AdminApp: React.FC = () => {
       case 'ASSETS':
         return 'Fleet Assets';
       case 'TRANSACTIONS':
-        return 'All Transactions';
+        return selectedAssetId ? `Transactions: ${selectedAssetId}` : 'All Transactions';
       case 'SETTINGS':
         return 'Cloud & Settings';
       default:
@@ -203,6 +197,9 @@ export const AdminApp: React.FC = () => {
         <AdminSidebar
           currentView={currentView}
           onSelectView={(view) => {
+            if (view === 'TRANSACTIONS') {
+              setSelectedAssetId(null);
+            }
             setCurrentView(view);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
@@ -231,7 +228,11 @@ export const AdminApp: React.FC = () => {
                 onOpenEditModal={(asset) => setEditingAsset(asset)}
                 onOpenDeleteModal={(asset) => setAssetPendingDelete(asset)}
                 onOpenQRModal={(asset) => setQrAsset(asset)}
-                onSelectAsset={(id) => setSelectedAssetId(id)}
+                onSelectAsset={(id) => {
+                  setSelectedAssetId(id);
+                  setCurrentView('TRANSACTIONS');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 onTogglePower={handleTogglePower}
               />
             )}
@@ -240,8 +241,21 @@ export const AdminApp: React.FC = () => {
               <TransactionsView
                 transactions={transactions}
                 assets={assets}
+                selectedAssetId={selectedAssetId}
+                onSelectAsset={(id) => {
+                  setSelectedAssetId(id);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onBackToAssets={() => {
+                  setSelectedAssetId(null);
+                  setCurrentView('ASSETS');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 onInspectTransaction={(tx) => setInspectingTransaction(tx)}
-                onSelectAsset={(id) => setSelectedAssetId(id)}
+                onOpenEditModal={(asset) => setEditingAsset(asset)}
+                onOpenDeleteModal={(asset) => setAssetPendingDelete(asset)}
+                onOpenQRModal={(asset) => setQrAsset(asset)}
+                onTogglePower={handleTogglePower}
               />
             )}
 
@@ -254,7 +268,7 @@ export const AdminApp: React.FC = () => {
           </main>
         </div>
 
-        {/* Modals & Drawers */}
+        {/* Modals & Dialogs */}
 
         {/* Create / Edit Asset Modal */}
         {(isCreateModalOpen || editingAsset) && (
@@ -268,27 +282,6 @@ export const AdminApp: React.FC = () => {
               setEditingAsset(null);
             }}
             onSave={handleSaveAsset}
-          />
-        )}
-
-        {/* Asset Details & Transactions Drawer */}
-        {selectedAssetId && (
-          <AssetDetailDrawer
-            asset={selectedAsset}
-            transactions={transactions}
-            isOpen={Boolean(selectedAssetId)}
-            onClose={() => setSelectedAssetId(null)}
-            onEdit={(asset) => {
-              setSelectedAssetId(null);
-              setEditingAsset(asset);
-            }}
-            onDelete={(asset) => {
-              setSelectedAssetId(null);
-              setAssetPendingDelete(asset);
-            }}
-            onOpenQR={(asset) => setQrAsset(asset)}
-            onTogglePower={handleTogglePower}
-            onInspectTransaction={(tx) => setInspectingTransaction(tx)}
           />
         )}
 
@@ -319,7 +312,12 @@ export const AdminApp: React.FC = () => {
             asset={assets.find((a) => a.equipmentId === inspectingTransaction.equipmentId)}
             isOpen={Boolean(inspectingTransaction)}
             onClose={() => setInspectingTransaction(null)}
-            onSelectAsset={(id) => setSelectedAssetId(id)}
+            onSelectAsset={(id) => {
+              setSelectedAssetId(id);
+              setCurrentView('TRANSACTIONS');
+              setInspectingTransaction(null);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
 
