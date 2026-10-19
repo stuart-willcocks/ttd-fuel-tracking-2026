@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AlertCircle, List } from 'lucide-react';
 import type { Equipment } from '../types';
+import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 
 interface ScannerViewProps {
   onAssetSelected: (equipmentId: string) => void;
@@ -230,7 +231,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                   >
                     <div className="row-left">
                       <span className="row-id">{asset.equipmentId}</span>
-                      <span className="row-type">{asset.type}</span>
+                      <EquipmentTypeIcon type={asset.type} size={15} />
                     </div>
                     <div className="row-right">
                       <span className="row-location">{asset.location}</span>

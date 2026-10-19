@@ -3,6 +3,7 @@ import { X, RefreshCw } from 'lucide-react';
 import { db, type OutboxItem } from '../db/indexedDB';
 import type { Transaction } from '../types';
 import { syncEngine, type SyncState } from '../services/syncEngine';
+import { TransactionTypeIcon } from './TransactionTypeIcon';
 
 interface OutboxModalProps {
   isOpen: boolean;
@@ -66,7 +67,10 @@ export const OutboxModal: React.FC<OutboxModalProps> = ({
             {outboxItems.map((item) => (
               <div key={item.id} className="queue-row">
                 <div>
-                  <strong>{item.equipmentId}</strong> — {item.tx?.transactionType || 'Transaction'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <strong>{item.equipmentId}</strong>
+                    <TransactionTypeIcon type={item.tx?.transactionType} size={15} />
+                  </div>
                   <div className="queue-time">{item.tx?.transactionTimestamp}</div>
                   {item.error && (
                     <div style={{ fontSize: '11px', color: '#f87171', marginTop: '2px' }}>

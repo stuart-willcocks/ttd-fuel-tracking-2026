@@ -13,9 +13,12 @@ import {
   Droplets,
   Zap,
   Gauge,
+  QrCode,
 } from 'lucide-react';
 import type { Equipment, Transaction, ActionType } from '../types';
 import { formatHumanTimestamp } from '../utils/dateFormat';
+import { EquipmentTypeIcon } from './EquipmentTypeIcon';
+import { TransactionTypeIcon } from './TransactionTypeIcon';
 
 export interface TransactionViewProps {
   asset: Equipment;
@@ -37,51 +40,41 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
   const isGenerator = asset.type === 'GENERATOR';
   const isPoweredOn = Boolean(asset.poweredUpTimestamp && !asset.poweredDownTimestamp);
 
-  // Helper for Transaction Type icon
-  const renderTxTypeIcon = (type: string) => {
-    if (type.includes('CheckIn')) {
-      return <LogIn size={13} className="tx-type-icon icon-checkin" />;
-    }
-    if (type.includes('CheckOut')) {
-      return <LogOut size={13} className="tx-type-icon icon-checkout" />;
-    }
-    if (type === 'PoweredUp') {
-      return <Power size={13} className="tx-type-icon icon-powerup" />;
-    }
-    if (type === 'PoweredDown') {
-      return <PowerOff size={13} className="tx-type-icon icon-powerdown" />;
-    }
-    if (type.includes('FuelTransfer') || type.includes('Fuel')) {
-      return <Fuel size={13} className="tx-type-icon icon-fueltransfer" />;
-    }
-    return <Clock size={13} className="tx-type-icon" />;
-  };
-
   return (
     <div className="transaction-view asset-detail-view">
-      {/* Top Navigation: Scan Another Asset Button */}
+      {/* Top Navigation: "BACK" button (white text on green, no corner radii) */}
       <div className="top-nav-bar">
-        <button className="btn-back" onClick={onBackToScanner}>
+        <button className="btn-back-green" onClick={onBackToScanner}>
           <ArrowLeft size={16} />
-          <span>Scan Another Asset</span>
+          <span>BACK</span>
         </button>
       </div>
 
-      {/* 1. ASSET_DETAIL_VIEW (Fields: ID, what3words, type, serial number, area, location) */}
+      {/* 1. ASSET_DETAIL_VIEW (QR icon for ID, /// for location, Equipment Type Icon instead of text) */}
       <div className="asset-detail-card">
         <div className="card-title-row">
-          <h2 className="equipment-id">{asset.equipmentId}</h2>
-          <span className="type-tag">{asset.type}</span>
+          <div className="card-title-left">
+            <QrCode size={18} className="qr-title-icon" />
+            <h2 className="equipment-id">{asset.equipmentId}</h2>
+          </div>
+          {/* Equipment Type Icon instead of the words GENERATOR, TANK, PLANT */}
+          <span className="type-icon-box">
+            <EquipmentTypeIcon type={asset.type} size={18} />
+          </span>
         </div>
 
         <table className="info-table">
           <tbody>
             <tr>
-              <td className="info-label">Asset ID</td>
-              <td className="info-value">{asset.equipmentId}</td>
+              <td className="info-label">
+                <span className="info-label-icon-wrap" title="Asset ID">
+                  <QrCode size={15} className="info-label-icon" />
+                </span>
+              </td>
+              <td className="info-value font-mono">{asset.equipmentId}</td>
             </tr>
             <tr>
-              <td className="info-label">what3words</td>
+              <td className="info-label font-bold text-w3w">///</td>
               <td className="info-value">
                 <a
                   href={`https://what3words.com/${asset.what3words.replace('///', '')}`}
@@ -94,12 +87,16 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
               </td>
             </tr>
             <tr>
-              <td className="info-label">Asset Type</td>
-              <td className="info-value">{asset.type}</td>
+              <td className="info-label">Type</td>
+              <td className="info-value">
+                <span className="type-icon-inline">
+                  <EquipmentTypeIcon type={asset.type} size={16} />
+                </span>
+              </td>
             </tr>
             <tr>
               <td className="info-label">Serial Number</td>
-              <td className="info-value">{asset.rentalSerialNumber}</td>
+              <td className="info-value font-mono">{asset.rentalSerialNumber}</td>
             </tr>
             <tr>
               <td className="info-label">Area</td>
@@ -151,7 +148,7 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
         )}
       </div>
 
-      {/* 2. TRANSACTION_LIST_VIEW (Directly beneath ASSET_DETAIL_VIEW, most recent at top) */}
+      {/* 2. TRANSACTION_LIST_VIEW (Transaction Type: icon only, no words) */}
       <div className="transaction-list-card">
         <div className="history-header">
           <h3 className="sub-title">Transaction List</h3>
@@ -165,9 +162,11 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
             {transactions.map((tx) => (
               <div key={tx.id} className="tx-item">
                 <div className="tx-item-top">
+                  {/* Transaction Type: Icon only (no words) */}
                   <div className="tx-item-top-left">
-                    {renderTxTypeIcon(tx.transactionType)}
-                    <span className="tx-type">{tx.transactionType}</span>
+                    <span className="tx-type-icon-box">
+                      <TransactionTypeIcon type={tx.transactionType} size={15} />
+                    </span>
                     {tx.deviceId && (
                       <span className="tx-pda-tag" title={`Executed on ${tx.deviceId}`}>
                         {tx.deviceId}
@@ -197,25 +196,25 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
                   {tx.checkInFuelPercentage !== undefined && (
                     <span className="val-badge">
                       <Fuel size={12} className="data-icon icon-fuel" />
-                      <span>Fuel In: {tx.checkInFuelPercentage}%</span>
+                      <span>In: {tx.checkInFuelPercentage}%</span>
                     </span>
                   )}
                   {tx.checkOutFuelPercentage !== undefined && (
                     <span className="val-badge">
                       <Fuel size={12} className="data-icon icon-fuel" />
-                      <span>Fuel Out: {tx.checkOutFuelPercentage}%</span>
+                      <span>Out: {tx.checkOutFuelPercentage}%</span>
                     </span>
                   )}
                   {tx.checkInFuelEighths !== undefined && (
                     <span className="val-badge">
                       <Gauge size={12} className="data-icon icon-gauge" />
-                      <span>Tank In: {tx.checkInFuelEighths}/8</span>
+                      <span>In: {tx.checkInFuelEighths}/8</span>
                     </span>
                   )}
                   {tx.checkOutFuelEighths !== undefined && (
                     <span className="val-badge">
                       <Gauge size={12} className="data-icon icon-gauge" />
-                      <span>Tank Out: {tx.checkOutFuelEighths}/8</span>
+                      <span>Out: {tx.checkOutFuelEighths}/8</span>
                     </span>
                   )}
                   {tx.checkInDefPercentage !== undefined && (
@@ -233,25 +232,25 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
                   {tx.fuelTransferLitres !== undefined && (
                     <span className="val-badge highlight">
                       <Fuel size={12} className="data-icon icon-fuel" />
-                      <span>Fuel Added: {tx.fuelTransferLitres} L</span>
+                      <span>+{tx.fuelTransferLitres} L</span>
                     </span>
                   )}
                   {tx.defTransferLitres !== undefined && (
                     <span className="val-badge highlight">
                       <Droplets size={12} className="data-icon icon-def" />
-                      <span>DEF Added: {tx.defTransferLitres} L</span>
+                      <span>+{tx.defTransferLitres} L</span>
                     </span>
                   )}
                   {tx.checkInKWH !== undefined && (
                     <span className="val-badge">
                       <Zap size={12} className="data-icon icon-kwh" />
-                      <span>Meter In: {tx.checkInKWH} kWh</span>
+                      <span>In: {tx.checkInKWH} kWh</span>
                     </span>
                   )}
                   {tx.checkOutKWH !== undefined && (
                     <span className="val-badge">
                       <Zap size={12} className="data-icon icon-kwh" />
-                      <span>Meter Out: {tx.checkOutKWH} kWh</span>
+                      <span>Out: {tx.checkOutKWH} kWh</span>
                     </span>
                   )}
                 </div>
@@ -267,28 +266,31 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
           className="btn-menu-action"
           onClick={() => onSelectAction('check-in')}
         >
-          Check In
+          <LogIn size={15} style={{ marginRight: 6 }} />
+          <span>Check In</span>
         </button>
 
         <button
           className="btn-menu-action"
           onClick={() => onSelectAction('record-fuel')}
         >
-          Record Fuel Transfer
+          <Fuel size={15} style={{ marginRight: 6 }} />
+          <span>Record Fuel Transfer</span>
         </button>
 
         <button
           className="btn-menu-action"
           onClick={() => onSelectAction('check-out')}
         >
-          Check Out
+          <LogOut size={15} style={{ marginRight: 6 }} />
+          <span>Check Out</span>
         </button>
 
         <button
           className="btn-menu-action btn-menu-edit"
           onClick={onEditEquipment}
         >
-          <Edit3 size={13} style={{ marginRight: 4 }} />
+          <Edit3 size={15} style={{ marginRight: 6 }} />
           <span>Edit Equipment Details</span>
         </button>
       </div>

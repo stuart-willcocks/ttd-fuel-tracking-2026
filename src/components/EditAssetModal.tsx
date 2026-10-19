@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Equipment } from '../types';
+import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 
 interface EditAssetModalProps {
   asset: Equipment;
@@ -37,7 +38,10 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
     <div className="modal-backdrop">
       <div className="modal-box">
         <h3 className="modal-title">Edit Equipment Details</h3>
-        <p className="modal-subtitle">{asset.equipmentId} ({asset.type})</p>
+        <p className="modal-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="font-mono">{asset.equipmentId}</span>
+          <EquipmentTypeIcon type={asset.type} size={15} />
+        </p>
 
         <form onSubmit={handleSave} className="edit-form">
           <div className="form-field">
@@ -63,10 +67,10 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
           </div>
 
           <div className="form-field">
-            <label>what3words Address</label>
+            <label className="font-bold text-w3w">///</label>
             <input
               type="text"
-              className="text-input"
+              className="text-input font-mono"
               placeholder="///filled.count.soap"
               value={what3words}
               onChange={(e) => setWhat3words(e.target.value)}

@@ -41,14 +41,13 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="header-status-box">
-        {/* Network status pill */}
+        {/* Network status button: wifi icon only, no word "Online" */}
         <button
           className={`status-pill ${syncState.isOnline ? 'online' : 'offline'}`}
           onClick={onToggleSimulatedOffline}
-          title={syncState.isOnline ? 'Tap to simulate offline' : 'Tap to reconnect'}
+          title={syncState.isOnline ? 'Connected (Tap to simulate offline)' : 'Disconnected (Tap to reconnect)'}
         >
-          {syncState.isOnline ? <Wifi size={13} /> : <WifiOff size={13} />}
-          <span>{syncState.isOnline ? 'Online' : 'Offline'}</span>
+          {syncState.isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
           {syncState.isSimulatedOffline && <span className="sim-label">SIM</span>}
         </button>
 

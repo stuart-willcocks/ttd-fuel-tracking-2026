@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Plus, Minus } from 'lucide-react';
 import type { Equipment, ActionType, Transaction, TransactionType } from '../types';
+import { EquipmentTypeIcon } from './EquipmentTypeIcon';
+import { TransactionTypeIcon } from './TransactionTypeIcon';
 
 interface TransactionFormProps {
   asset: Equipment;
@@ -31,15 +33,15 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const actionTitle = useMemo(() => {
     switch (action) {
       case 'check-in':
-        return `Check In — ${asset.type}`;
+        return 'Check In';
       case 'check-out':
-        return `Check Out — ${asset.type}`;
+        return 'Check Out';
       case 'record-fuel':
-        return `Record Fuel Transfer — ${asset.type}`;
+        return 'Fuel Transfer';
       default:
-        return 'Record Transaction';
+        return 'Transaction';
     }
-  }, [action, asset.type]);
+  }, [action]);
 
   const isPercentageValid = (val: string): boolean => {
     if (val.trim() === '') return false;
@@ -183,7 +185,13 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       </div>
 
       <div className="form-card" onClick={handleContainerClick}>
-        <h2 className="form-title">{actionTitle}</h2>
+        <div className="form-title-row">
+          <div className="form-title-left">
+            <TransactionTypeIcon type={action} size={18} />
+            <h2 className="form-title">{actionTitle}</h2>
+          </div>
+          <EquipmentTypeIcon type={asset.type} size={20} />
+        </div>
 
         <form onSubmit={handleSubmit} noValidate>
           {/* ======================================================= */}

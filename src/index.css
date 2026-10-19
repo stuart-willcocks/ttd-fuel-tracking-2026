@@ -558,14 +558,43 @@ body {
   font-size: 12px;
   font-weight: 600;
   padding: 4px 10px;
-  border-radius: var(--radius-sm);
+  border-radius: 0 !important;
   cursor: pointer;
-  height: 28px;
+  height: 30px;
 }
 
 .btn-back:hover {
   background: var(--bg-card-subtle);
   color: var(--text-main);
+}
+
+/* User requirement: "BACK" button (white text on green, simple rectangular, no corner radii) */
+.btn-back-green {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: var(--btn-green);
+  color: #FFFFFF !important;
+  border: 1px solid #22c55e;
+  border-radius: 0 !important;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 4px 14px;
+  height: 32px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: background-color 0.15s ease;
+}
+
+.btn-back-green:hover {
+  background-color: var(--btn-green-hover);
+}
+
+.btn-back-green:active {
+  background-color: #14532d;
 }
 
 .current-id-badge {
@@ -594,6 +623,17 @@ body {
   border-bottom: 1px solid var(--border-color);
 }
 
+.card-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qr-title-icon {
+  color: var(--accent-blue);
+  flex-shrink: 0;
+}
+
 .equipment-id {
   font-size: 16px;
   font-weight: 700;
@@ -608,6 +648,56 @@ body {
   color: var(--accent-blue);
   padding: 2px 6px;
   border-radius: 0;
+}
+
+.type-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: 0 !important;
+}
+
+.type-icon-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Equipment type icons: GENERATOR, TANK, PLANT */
+.eq-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.eq-generator {
+  color: #FACC15; /* Yellow for generator / electricity */
+}
+
+.eq-tank {
+  color: #38BDF8; /* Blue for fuel tank */
+}
+
+.eq-plant {
+  color: #FB923C; /* Orange for machinery / plant */
+}
+
+.info-label-icon {
+  color: var(--accent-blue);
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.text-w3w {
+  color: #F87171 !important;
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 1px;
 }
 
 .info-table {
@@ -844,6 +934,37 @@ body {
 
 .icon-fueltransfer {
   color: #F59E0B;
+}
+
+.tx-type-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: 0 !important;
+}
+
+.tx-type-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.form-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.form-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tx-item-top-right {

@@ -1,5 +1,7 @@
 import React from 'react';
 import type { Equipment, Transaction } from '../types';
+import { EquipmentTypeIcon } from './EquipmentTypeIcon';
+import { TransactionTypeIcon } from './TransactionTypeIcon';
 
 interface ConfirmationModalProps {
   asset: Equipment;
@@ -23,7 +25,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       <div className="modal-box">
         <h3 className="modal-title">Confirm Submission</h3>
         <p className="modal-subtitle">
-          Verify the entered values for {asset.equipmentId}:
+          Verify entered values for {asset.equipmentId}:
         </p>
 
         <div className="values-table-wrap">
@@ -31,11 +33,16 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             <tbody>
               <tr>
                 <td className="lbl">Asset</td>
-                <td className="val">{asset.equipmentId} ({asset.type})</td>
+                <td className="val font-mono" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>{asset.equipmentId}</span>
+                  <EquipmentTypeIcon type={asset.type} size={15} />
+                </td>
               </tr>
               <tr>
-                <td className="lbl">Transaction</td>
-                <td className="val">{transactionData.transactionType}</td>
+                <td className="lbl">Type</td>
+                <td className="val">
+                  <TransactionTypeIcon type={transactionData.transactionType} size={18} />
+                </td>
               </tr>
               {transactionData.checkInFuelPercentage !== undefined && (
                 <tr>
@@ -104,7 +111,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         {/* Cancel and Confirm buttons */}
         <div className="modal-buttons-row">
           <button className="btn-modal-cancel" onClick={onCancel}>
-            Cancel / Abort
+            Cancel
           </button>
           <button className="btn-modal-confirm" onClick={onConfirm}>
             Confirm & Save
