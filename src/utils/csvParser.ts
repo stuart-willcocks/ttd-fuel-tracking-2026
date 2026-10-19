@@ -1,4 +1,4 @@
-import type { Equipment } from '../types';
+import type { Equipment, Transaction, TransactionType } from '../types';
 
 /**
  * Robust RFC 4180 compliant CSV parser
@@ -159,4 +159,129 @@ export function mapRowToEquipment(row: Record<string, string>, index: number): E
     rentalSerialNumber: rentalSerialNumber.trim(),
     updatedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Extracts CheckIn, FuelTransfer, and CheckOut transactions from CSV row
+ */
+export function mapRowToTransactions(
+  row: Record<string, string>,
+  index: number,
+  equipment: Equipment
+): Transaction[] {
+  const txs: Transaction[] = [];
+  const baseCheckInTime = new Date('2026-07-02T08:00:00Z').getTime();
+  const baseFuelTime = new Date('2026-07-04T12:00:00Z').getTime();
+  const baseCheckOutTime = new Date('2026-07-07T16:00:00Z').getTime();
+
+  const checkInDate = new Date(baseCheckInTime + index * 60000).toISOString();
+  const fuelDate = new Date(baseFuelTime + index * 60000).toISOString();
+  const checkOutDate = new Date(baseCheckOutTime + index * 60000).toISOString();
+
+  const qtyIn = parseInt(row.qtycheckins || '0', 10);
+  const qtyOut = parseInt(row.qtycheckouts || '0', 10);
+  const fuelLitres = parseInt(row.fueltransferred || '0', 10);
+  const defLitres = parseInt(row.deftransferred || '0', 10);
+
+  // 1. Check-In Transaction (when QtyCheckIns > 0)
+  if (qtyIn > 0) {
+    const txType: TransactionType =
+      equipment.type === 'TANK'
+        ? 'CheckInTank'
+        : equipment.type === 'PLANT'
+        ? 'CheckInPlant'
+        : 'CheckInGenerator';
+
+    const fuelPct =
+      row.checkinfuelpercentage !== undefined && row.checkinfuelpercentage !== ''
+        ? Math.min(100, Math.max(0, parseInt(row.checkinfuelpercentage, 10) || 0))
+        : undefined;
+    const defPct =
+      row.checkindefpercentage !== undefined && row.checkindefpercentage !== ''
+        ? Math.min(100, Math.max(0, parseInt(row.checkindefpercentage, 10) || 0))
+        : undefined;
+    const kwh = row.checkinkwh ? parseInt(row.checkinkwh, 10) || undefined : undefined;
+
+    txs.push({
+      id:
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `tx-in-${index}-${Date.now()}`,
+      equipmentId: equipment.equipmentId,
+      transactionTimestamp: checkInDate,
+      uploadTimestamp: new Date().toISOString(),
+      transactionType: txType,
+      checkInFuelPercentage: fuelPct,
+      checkInDefPercentage: defPct,
+      checkInKWH: kwh,
+      syncStatus: 'synced',
+      deviceId: 'IMPORT-SEED',
+      createdAt: checkInDate,
+    });
+  }
+
+  // 2. Fuel Transfer Transaction (when FuelTransferred > 0 or DefTransferred > 0)
+  if (fuelLitres > 0 || defLitres > 0) {
+    const txType: TransactionType =
+      equipment.type === 'TANK'
+        ? 'FuelTransferTank'
+        : equipment.type === 'PLANT'
+        ? 'FuelTransferPlant'
+        : 'FuelTransferGenerator';
+
+    txs.push({
+      id:
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `tx-fuel-${index}-${Date.now()}`,
+      equipmentId: equipment.equipmentId,
+      transactionTimestamp: fuelDate,
+      uploadTimestamp: new Date().toISOString(),
+      transactionType: txType,
+      fuelTransferLitres: fuelLitres > 0 ? fuelLitres : undefined,
+      defTransferLitres: defLitres > 0 ? defLitres : undefined,
+      syncStatus: 'synced',
+      deviceId: 'IMPORT-SEED',
+      createdAt: fuelDate,
+    });
+  }
+
+  // 3. Check-Out Transaction (when QtyCheckOuts > 0)
+  if (qtyOut > 0) {
+    const txType: TransactionType =
+      equipment.type === 'TANK'
+        ? 'CheckOutTank'
+        : equipment.type === 'PLANT'
+        ? 'CheckOutPlant'
+        : 'CheckOutGenerator';
+
+    const fuelPct =
+      row.checkoutfuelpercentage !== undefined && row.checkoutfuelpercentage !== ''
+        ? Math.min(100, Math.max(0, parseInt(row.checkoutfuelpercentage, 10) || 0))
+        : undefined;
+    const defPct =
+      row.checkoutdefpercentage !== undefined && row.checkoutdefpercentage !== ''
+        ? Math.min(100, Math.max(0, parseInt(row.checkoutdefpercentage, 10) || 0))
+        : undefined;
+    const kwh = row.checkoutkwh ? parseInt(row.checkoutkwh, 10) || undefined : undefined;
+
+    txs.push({
+      id:
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `tx-out-${index}-${Date.now()}`,
+      equipmentId: equipment.equipmentId,
+      transactionTimestamp: checkOutDate,
+      uploadTimestamp: new Date().toISOString(),
+      transactionType: txType,
+      checkOutFuelPercentage: fuelPct,
+      checkOutDefPercentage: defPct,
+      checkOutKWH: kwh,
+      syncStatus: 'synced',
+      deviceId: 'IMPORT-SEED',
+      createdAt: checkOutDate,
+    });
+  }
+
+  return txs;
 }

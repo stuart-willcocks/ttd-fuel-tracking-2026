@@ -19,7 +19,7 @@ import {
   getSupabaseClient,
   SUPABASE_SQL_SCHEMA,
 } from '../../services/supabase';
-import { parseCSV, mapRowToEquipment } from '../../utils/csvParser';
+import { parseCSV, mapRowToEquipment, mapRowToTransactions } from '../../utils/csvParser';
 import { wipeAndImportFleet } from '../../services/api';
 
 interface SettingsViewProps {
@@ -130,10 +130,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
 
     const equipmentList = rows.map((row, idx) => mapRowToEquipment(row, idx));
+    const transactionsList = rows.flatMap((row, idx) =>
+      mapRowToTransactions(row, idx, equipmentList[idx])
+    );
 
     if (
       !window.confirm(
-        `WARNING: This will permanently DELETE ALL existing records and transactions in Supabase, and import ${equipmentList.length} assets. Proceed?`
+        `WARNING: This will permanently DELETE ALL existing records and transactions in Supabase, and import ${equipmentList.length} assets and ${transactionsList.length} transactions. Proceed?`
       )
     ) {
       return;
@@ -143,11 +146,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setImportResult(null);
 
     try {
-      const count = await wipeAndImportFleet(equipmentList);
+      const { equipmentCount, transactionCount } = await wipeAndImportFleet(
+        equipmentList,
+        transactionsList
+      );
       await onTriggerSync();
       setImportResult({
         success: true,
-        message: `Success! Wiped old database and imported ${count} assets from CSV.`,
+        message: `Success! Wiped old database and imported ${equipmentCount} assets and ${transactionCount} transactions (including all fuel transfers).`,
       });
       setCsvText('');
     } catch (err: unknown) {

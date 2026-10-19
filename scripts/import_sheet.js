@@ -123,7 +123,12 @@ export async function runWipeAndImport(csvContent) {
   const transactions = [];
 
   const baseCheckInTime = new Date('2026-07-02T08:00:00Z').getTime();
-  const baseCheckOutTime = new Date('2026-07-06T17:00:00Z').getTime();
+  const baseFuelTransferTime = new Date('2026-07-04T12:00:00Z').getTime();
+  const baseCheckOutTime = new Date('2026-07-07T16:00:00Z').getTime();
+
+  let fuelTransferCount = 0;
+  let checkInCount = 0;
+  let checkOutCount = 0;
 
   for (let idx = 0; idx < rows.length; idx++) {
     const row = rows[idx];
@@ -160,6 +165,7 @@ export async function runWipeAndImport(csvContent) {
 
     // Stagger timestamps by asset index so transactions sort naturally
     const checkInDate = new Date(baseCheckInTime + idx * 60000).toISOString();
+    const fuelTransferDate = new Date(baseFuelTransferTime + idx * 60000).toISOString();
     const checkOutDate = new Date(baseCheckOutTime + idx * 60000).toISOString();
 
     const qtyCheckIns = parseInt(row.QtyCheckIns || '0', 10);
@@ -178,14 +184,21 @@ export async function runWipeAndImport(csvContent) {
     const fuelTransfer = parseIntSafe(row.FuelTransferred);
     const defTransfer = parseIntSafe(row.DefTransferred);
 
-    // If Check-In occurred
-    if (qtyCheckIns > 0 || checkInFuelPct !== null || checkInKwh !== null) {
+    // 1. Check-In Transaction (when QtyCheckIns > 0)
+    if (qtyCheckIns > 0) {
+      const txType =
+        type === 'TANK'
+          ? 'CheckInTank'
+          : type === 'PLANT'
+          ? 'CheckInPlant'
+          : 'CheckInGenerator';
+
       transactions.push({
         id: crypto.randomUUID(),
         equipment_id: eqId,
         transaction_timestamp: checkInDate,
         upload_timestamp: new Date().toISOString(),
-        transaction_type: 'CheckIn',
+        transaction_type: txType,
         device_id: 'IMPORT-SEED',
         check_in_fuel_eighths: checkInFuelEighths,
         check_out_fuel_eighths: null,
@@ -193,21 +206,59 @@ export async function runWipeAndImport(csvContent) {
         check_out_fuel_percentage: null,
         check_in_def_percentage: checkInDefPct,
         check_out_def_percentage: null,
-        fuel_transfer_litres: fuelTransfer,
-        def_transfer_litres: defTransfer,
+        fuel_transfer_litres: null,
+        def_transfer_litres: null,
         check_in_kwh: checkInKwh,
         check_out_kwh: null,
       });
+      checkInCount++;
     }
 
-    // If Check-Out occurred
-    if (qtyCheckOuts > 0 || checkOutFuelPct !== null || checkOutKwh !== null) {
+    // 2. Fuel Transfer Transaction (when FuelTransferred > 0 or DefTransferred > 0)
+    if ((fuelTransfer !== null && fuelTransfer > 0) || (defTransfer !== null && defTransfer > 0)) {
+      const txType =
+        type === 'TANK'
+          ? 'FuelTransferTank'
+          : type === 'PLANT'
+          ? 'FuelTransferPlant'
+          : 'FuelTransferGenerator';
+
+      transactions.push({
+        id: crypto.randomUUID(),
+        equipment_id: eqId,
+        transaction_timestamp: fuelTransferDate,
+        upload_timestamp: new Date().toISOString(),
+        transaction_type: txType,
+        device_id: 'IMPORT-SEED',
+        check_in_fuel_eighths: null,
+        check_out_fuel_eighths: null,
+        check_in_fuel_percentage: null,
+        check_out_fuel_percentage: null,
+        check_in_def_percentage: null,
+        check_out_def_percentage: null,
+        fuel_transfer_litres: fuelTransfer || null,
+        def_transfer_litres: defTransfer || null,
+        check_in_kwh: null,
+        check_out_kwh: null,
+      });
+      fuelTransferCount++;
+    }
+
+    // 3. Check-Out Transaction (when QtyCheckOuts > 0)
+    if (qtyCheckOuts > 0) {
+      const txType =
+        type === 'TANK'
+          ? 'CheckOutTank'
+          : type === 'PLANT'
+          ? 'CheckOutPlant'
+          : 'CheckOutGenerator';
+
       transactions.push({
         id: crypto.randomUUID(),
         equipment_id: eqId,
         transaction_timestamp: checkOutDate,
         upload_timestamp: new Date().toISOString(),
-        transaction_type: 'CheckOut',
+        transaction_type: txType,
         device_id: 'IMPORT-SEED',
         check_in_fuel_eighths: null,
         check_out_fuel_eighths: checkOutFuelEighths,
@@ -220,11 +271,15 @@ export async function runWipeAndImport(csvContent) {
         check_in_kwh: null,
         check_out_kwh: checkOutKwh,
       });
+      checkOutCount++;
     }
   }
 
   console.log(`Generated ${equipmentRecords.length} equipment records.`);
-  console.log(`Generated ${transactions.length} matching real-world transactions.`);
+  console.log(`Generated ${transactions.length} transactions total:`);
+  console.log(`  - Check-Ins: ${checkInCount}`);
+  console.log(`  - Fuel Transfers: ${fuelTransferCount}`);
+  console.log(`  - Check-Outs: ${checkOutCount}`);
 
   // 1. DELETE ALL TRANSACTIONS
   console.log('1. Deleting all transactions in Supabase...');
@@ -320,7 +375,13 @@ export async function runWipeAndImport(csvContent) {
   console.log(`5. Synchronized local fallback database at: ${dbJsonPath}`);
 
   console.log('--- WIPE AND IMPORT COMPLETED SUCCESSFULLY ---');
-  return { equipmentCount: equipmentRecords.length, transactionCount: transactions.length };
+  return {
+    equipmentCount: equipmentRecords.length,
+    transactionCount: transactions.length,
+    fuelTransferCount,
+    checkInCount,
+    checkOutCount,
+  };
 }
 
 async function main() {

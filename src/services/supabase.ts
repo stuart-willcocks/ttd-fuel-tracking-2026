@@ -159,6 +159,42 @@ export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]):
 }
 
 /**
+ * Bulk import transaction records into Supabase in chunks
+ */
+export async function bulkImportTransactionsToSupabase(transactions: Transaction[]): Promise<number> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const rows = transactions.map((tx) => ({
+    id: tx.id,
+    equipment_id: tx.equipmentId,
+    transaction_timestamp: tx.transactionTimestamp,
+    upload_timestamp: tx.uploadTimestamp || new Date().toISOString(),
+    transaction_type: tx.transactionType,
+    device_id: tx.deviceId || 'IMPORT',
+    check_in_fuel_eighths: tx.checkInFuelEighths ?? null,
+    check_out_fuel_eighths: tx.checkOutFuelEighths ?? null,
+    check_in_fuel_percentage: tx.checkInFuelPercentage !== undefined ? Math.min(100, Math.max(0, tx.checkInFuelPercentage)) : null,
+    check_out_fuel_percentage: tx.checkOutFuelPercentage !== undefined ? Math.min(100, Math.max(0, tx.checkOutFuelPercentage)) : null,
+    check_in_def_percentage: tx.checkInDefPercentage !== undefined ? Math.min(100, Math.max(0, tx.checkInDefPercentage)) : null,
+    check_out_def_percentage: tx.checkOutDefPercentage !== undefined ? Math.min(100, Math.max(0, tx.checkOutDefPercentage)) : null,
+    fuel_transfer_litres: tx.fuelTransferLitres ?? null,
+    def_transfer_litres: tx.defTransferLitres ?? null,
+    check_in_kwh: tx.checkInKWH ?? null,
+    check_out_kwh: tx.checkOutKWH ?? null,
+  }));
+
+  const chunkSize = 50;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error } = await client.from('transactions').insert(chunk);
+    if (error) throw error;
+  }
+
+  return transactions.length;
+}
+
+/**
  * Fetch transactions from Supabase
  */
 export async function fetchTransactionsFromSupabase(): Promise<Transaction[]> {
