@@ -3,7 +3,6 @@ import './admin.css';
 import { LaptopOnlyGuard } from './components/LaptopOnlyGuard';
 import { AdminSidebar, type AdminViewType } from './components/AdminSidebar';
 import { AdminHeader } from './components/AdminHeader';
-import { DashboardView } from './views/DashboardView';
 import { AssetsView } from './views/AssetsView';
 import { TransactionsView } from './views/TransactionsView';
 import { SettingsView } from './views/SettingsView';
@@ -26,7 +25,7 @@ import {
 import { isSupabaseConfigured } from '../services/supabase';
 
 export const AdminApp: React.FC = () => {
-  const [currentView, setCurrentView] = useState<AdminViewType>('DASHBOARD');
+  const [currentView, setCurrentView] = useState<AdminViewType>('ASSETS');
   const [assets, setAssets] = useState<Equipment[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -186,16 +185,14 @@ export const AdminApp: React.FC = () => {
 
   const getPageTitle = () => {
     switch (currentView) {
-      case 'DASHBOARD':
-        return 'Mission Operations Dashboard';
       case 'ASSETS':
-        return 'Fleet Asset Management';
+        return 'Fleet Assets';
       case 'TRANSACTIONS':
-        return 'Master Transactions Audit Log';
+        return 'All Transactions';
       case 'SETTINGS':
-        return 'System Configuration & Settings';
+        return 'Cloud & Settings';
       default:
-        return 'Admin Portal';
+        return 'Fleet Admin';
     }
   };
 
@@ -226,20 +223,10 @@ export const AdminApp: React.FC = () => {
 
           {/* Dynamic Views */}
           <main style={{ flex: 1 }}>
-            {currentView === 'DASHBOARD' && (
-              <DashboardView
-                assets={assets}
-                transactions={transactions}
-                onSelectAsset={(id) => setSelectedAssetId(id)}
-                onOpenCreateAsset={() => setIsCreateModalOpen(true)}
-                onSelectView={(v) => setCurrentView(v)}
-                onInspectTransaction={(tx) => setInspectingTransaction(tx)}
-              />
-            )}
-
             {currentView === 'ASSETS' && (
               <AssetsView
                 assets={assets}
+                transactions={transactions}
                 onOpenCreateModal={() => setIsCreateModalOpen(true)}
                 onOpenEditModal={(asset) => setEditingAsset(asset)}
                 onOpenDeleteModal={(asset) => setAssetPendingDelete(asset)}
@@ -284,7 +271,7 @@ export const AdminApp: React.FC = () => {
           />
         )}
 
-        {/* Asset Details Drawer */}
+        {/* Asset Details & Transactions Drawer */}
         {selectedAssetId && (
           <AssetDetailDrawer
             asset={selectedAsset}
@@ -301,6 +288,7 @@ export const AdminApp: React.FC = () => {
             }}
             onOpenQR={(asset) => setQrAsset(asset)}
             onTogglePower={handleTogglePower}
+            onInspectTransaction={(tx) => setInspectingTransaction(tx)}
           />
         )}
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, QrCode, Edit, Trash2, Zap, Fuel, Activity, Clock, MapPin } from 'lucide-react';
+import { X, QrCode, Edit, Trash2, Zap, ReceiptText, Clock, MapPin, CheckCircle2 } from 'lucide-react';
 import type { Equipment, Transaction } from '../../types';
 
 interface AssetDetailDrawerProps {
@@ -11,6 +11,7 @@ interface AssetDetailDrawerProps {
   onDelete: (asset: Equipment) => void;
   onOpenQR: (asset: Equipment) => void;
   onTogglePower: (asset: Equipment) => void;
+  onInspectTransaction?: (tx: Transaction) => void;
 }
 
 export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
@@ -22,40 +23,20 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
   onDelete,
   onOpenQR,
   onTogglePower,
+  onInspectTransaction,
 }) => {
   if (!isOpen || !asset) return null;
 
   const assetTxs = transactions.filter((t) => t.equipmentId === asset.equipmentId);
-
-  // Calculate cumulative stats
-  const totalDieselLitres = assetTxs.reduce((sum, t) => sum + (t.fuelTransferLitres || 0), 0);
-  const totalDefLitres = assetTxs.reduce((sum, t) => sum + (t.defTransferLitres || 0), 0);
-
   const isRunning = Boolean(asset.poweredUpTimestamp && !asset.poweredDownTimestamp);
-
-  const formatRuntime = () => {
-    if (!asset.poweredUpTimestamp) return 'Offline';
-    try {
-      const start = new Date(asset.poweredUpTimestamp.replace(' ', 'T')).getTime();
-      const end = asset.poweredDownTimestamp
-        ? new Date(asset.poweredDownTimestamp.replace(' ', 'T')).getTime()
-        : Date.now();
-      const diffMs = Math.max(0, end - start);
-      const hours = Math.floor(diffMs / (1000 * 60 * 60));
-      const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-      return `${hours}h ${mins}m runtime`;
-    } catch {
-      return 'N/A';
-    }
-  };
 
   return (
     <div className="admin-modal-backdrop" onClick={onClose}>
-      <div className="admin-drawer-panel" onClick={(e) => e.stopPropagation()}>
+      <div className="admin-drawer-panel" onClick={(e) => e.stopPropagation()} style={{ width: '680px', maxWidth: '92vw' }}>
         {/* Drawer Header */}
         <div
           style={{
-            padding: '24px',
+            padding: '20px 24px',
             borderBottom: '1px solid var(--adm-border-subtle)',
             display: 'flex',
             alignItems: 'center',
@@ -64,7 +45,7 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
           }}
         >
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <span className={`admin-badge admin-badge-${asset.type.toLowerCase()}`}>
                 {asset.type}
               </span>
@@ -81,7 +62,6 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
                 fontSize: '1.45rem',
                 fontWeight: 800,
                 color: '#ffffff',
-                marginTop: '4px',
               }}
             >
               {asset.equipmentId}
@@ -104,19 +84,19 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
           }}
         >
           <button
-            onClick={() => onOpenQR(asset)}
-            className="admin-btn admin-btn-primary admin-btn-sm"
-          >
-            <QrCode size={14} />
-            <span>Print QR Label</span>
-          </button>
-
-          <button
             onClick={() => onEdit(asset)}
-            className="admin-btn admin-btn-secondary admin-btn-sm"
+            className="admin-btn admin-btn-primary admin-btn-sm"
           >
             <Edit size={14} />
             <span>Edit Asset</span>
+          </button>
+
+          <button
+            onClick={() => onOpenQR(asset)}
+            className="admin-btn admin-btn-secondary admin-btn-sm"
+          >
+            <QrCode size={14} />
+            <span>Print QR Tag</span>
           </button>
 
           {asset.type === 'GENERATOR' && (
@@ -142,117 +122,68 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
 
         {/* Drawer Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-          {/* Key Specs Card */}
+          {/* Asset Specs Row */}
           <div
             style={{
               background: 'var(--adm-surface-2)',
-              borderRadius: 'var(--adm-radius-lg)',
+              borderRadius: 'var(--adm-radius-md)',
               border: '1px solid var(--adm-border-subtle)',
-              padding: '18px',
+              padding: '16px 20px',
               marginBottom: '24px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: '14px',
             }}
           >
-            <h4
-              style={{
-                fontSize: '0.78rem',
-                textTransform: 'uppercase',
-                color: 'var(--adm-text-muted)',
-                letterSpacing: '0.05em',
-                marginBottom: '14px',
-                fontWeight: 700,
-              }}
-            >
-              Asset Specifications
-            </h4>
+            <div>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
+                Location
+              </span>
+              <p style={{ fontWeight: 600, fontSize: '0.88rem', color: '#ffffff' }}>
+                {asset.area}
+              </p>
+              <p style={{ fontSize: '0.78rem', color: 'var(--adm-text-secondary)' }}>
+                {asset.location}
+              </p>
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div>
-                <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>Location / Area</span>
-                <p style={{ fontWeight: 600, fontSize: '0.9rem', color: '#ffffff' }}>
-                  {asset.area}
-                </p>
-                <p style={{ fontSize: '0.8rem', color: 'var(--adm-text-secondary)' }}>
-                  {asset.location}
-                </p>
-              </div>
+            <div>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
+                Capacity
+              </span>
+              <p style={{ fontWeight: 600, fontSize: '0.88rem', color: '#ffffff' }}>
+                {asset.type === 'GENERATOR' && asset.capacity ? `${asset.capacity} kVA` : null}
+                {asset.type === 'TANK' && asset.capacity ? `${asset.capacity.toLocaleString()} Litres` : null}
+                {asset.type === 'PLANT' ? 'Unrated' : null}
+              </p>
+            </div>
 
-              <div>
-                <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>What3Words</span>
-                <p style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.86rem', color: '#ef4444' }}>
-                  <MapPin size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                  {asset.what3words}
-                </p>
-              </div>
+            <div>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
+                What3Words
+              </span>
+              <p style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.82rem', color: '#ef4444' }}>
+                <MapPin size={11} style={{ display: 'inline', marginRight: '3px' }} />
+                {asset.what3words}
+              </p>
+            </div>
 
-              <div>
-                <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>Capacity</span>
-                <p style={{ fontWeight: 600, fontSize: '0.9rem', color: '#ffffff' }}>
-                  {asset.type === 'GENERATOR' && asset.capacity ? `${asset.capacity} kVA` : null}
-                  {asset.type === 'TANK' && asset.capacity ? `${asset.capacity.toLocaleString()} Litres` : null}
-                  {asset.type === 'PLANT' ? 'Unrated' : null}
-                </p>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>Rental Serial Number</span>
-                <p style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.86rem', color: '#f59e0b' }}>
-                  {asset.rentalSerialNumber}
-                </p>
-              </div>
+            <div>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
+                Rental Serial #
+              </span>
+              <p style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.82rem', color: '#f59e0b' }}>
+                {asset.rentalSerialNumber}
+              </p>
             </div>
           </div>
 
-          {/* Telemetry Metrics Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '24px' }}>
-            <div
-              style={{
-                background: 'var(--adm-surface-2)',
-                padding: '16px',
-                borderRadius: 'var(--adm-radius-md)',
-                border: '1px solid var(--adm-border-subtle)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#06b6d4', marginBottom: '6px' }}>
-                <Fuel size={16} />
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Fuel Dispensed</span>
-              </div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff' }}>
-                {totalDieselLitres.toLocaleString()} <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>Litres</span>
-              </div>
-              {totalDefLitres > 0 && (
-                <div style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)', marginTop: '4px' }}>
-                  + {totalDefLitres.toLocaleString()} L DEF
-                </div>
-              )}
-            </div>
-
-            <div
-              style={{
-                background: 'var(--adm-surface-2)',
-                padding: '16px',
-                borderRadius: 'var(--adm-radius-md)',
-                border: '1px solid var(--adm-border-subtle)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', marginBottom: '6px' }}>
-                <Clock size={16} />
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Runtime State</span>
-              </div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff' }}>
-                {asset.type === 'GENERATOR' ? formatRuntime() : `${assetTxs.length} Transactions`}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)', marginTop: '4px' }}>
-                {isRunning ? `Online since ${asset.poweredUpTimestamp?.substring(11, 16)}` : 'Standby / Logged'}
-              </div>
-            </div>
-          </div>
-
-          {/* Associated Transactions Timeline */}
+          {/* Asset Transactions History */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Activity size={16} color="#f59e0b" />
-                <span>Transaction History</span>
+                <ReceiptText size={17} color="#06b6d4" />
+                <span>Transactions for {asset.equipmentId}</span>
                 <span className="admin-nav-badge">{assetTxs.length}</span>
               </h3>
             </div>
@@ -261,14 +192,14 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
               <div
                 style={{
                   textAlign: 'center',
-                  padding: '30px',
+                  padding: '40px 20px',
                   background: 'var(--adm-surface-2)',
                   borderRadius: 'var(--adm-radius-md)',
                   color: 'var(--adm-text-muted)',
-                  fontSize: '0.85rem',
+                  fontSize: '0.88rem',
                 }}
               >
-                No refuelling or status transactions logged for this asset yet.
+                No fuel transfers or inspections logged for this asset yet.
               </div>
             ) : (
               <div className="admin-table-container">
@@ -277,20 +208,23 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
                     <tr>
                       <th>Timestamp</th>
                       <th>Action</th>
-                      <th>Telemetry</th>
-                      <th>Device</th>
+                      <th>Recorded Telemetry</th>
+                      <th>Device ID</th>
+                      <th>Status</th>
+                      {onInspectTransaction && <th></th>}
                     </tr>
                   </thead>
                   <tbody>
                     {assetTxs.map((tx) => (
                       <tr key={tx.id}>
                         <td style={{ fontSize: '0.78rem' }} className="admin-mono">
+                          <Clock size={11} style={{ display: 'inline', marginRight: '4px', color: '#64748b' }} />
                           {tx.transactionTimestamp}
                         </td>
                         <td>
                           <span
                             style={{
-                              fontSize: '0.75rem',
+                              fontSize: '0.78rem',
                               fontWeight: 600,
                               color: tx.transactionType.includes('Fuel')
                                 ? '#06b6d4'
@@ -299,20 +233,31 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
                                 : '#f59e0b',
                             }}
                           >
-                            {tx.transactionType.replace('Generator', '').replace('Tank', '').replace('Plant', '')}
+                            {tx.transactionType}
                           </span>
                         </td>
-                        <td style={{ fontSize: '0.78rem' }}>
+                        <td style={{ fontSize: '0.8rem' }}>
                           {tx.fuelTransferLitres && (
-                            <span style={{ color: '#06b6d4', fontWeight: 600 }}>
-                              +{tx.fuelTransferLitres}L{' '}
+                            <span style={{ color: '#06b6d4', fontWeight: 700 }}>
+                              +{tx.fuelTransferLitres} L Fuel{' '}
+                            </span>
+                          )}
+                          {tx.defTransferLitres && (
+                            <span style={{ color: '#3b82f6', fontWeight: 600 }}>
+                              +{tx.defTransferLitres} L DEF{' '}
                             </span>
                           )}
                           {tx.checkInFuelPercentage !== undefined && (
-                            <span>{tx.checkInFuelPercentage}% fuel </span>
+                            <span>{tx.checkInFuelPercentage}% in </span>
+                          )}
+                          {tx.checkOutFuelPercentage !== undefined && (
+                            <span>{tx.checkOutFuelPercentage}% out </span>
                           )}
                           {tx.checkInFuelEighths !== undefined && (
-                            <span>{tx.checkInFuelEighths}/8 tank </span>
+                            <span>{tx.checkInFuelEighths}/8 in </span>
+                          )}
+                          {tx.checkOutFuelEighths !== undefined && (
+                            <span>{tx.checkOutFuelEighths}/8 out </span>
                           )}
                           {tx.checkInKWH !== undefined && (
                             <span style={{ color: '#10b981' }}>{tx.checkInKWH.toLocaleString()} kWh </span>
@@ -321,12 +266,29 @@ export const AssetDetailDrawer: React.FC<AssetDetailDrawerProps> = ({
                             tx.checkInFuelPercentage === undefined &&
                             tx.checkInFuelEighths === undefined &&
                             tx.checkInKWH === undefined && (
-                              <span style={{ color: 'var(--adm-text-muted)' }}>Status Log</span>
+                              <span style={{ color: 'var(--adm-text-muted)' }}>Status Recorded</span>
                             )}
                         </td>
-                        <td style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)' }} className="admin-mono">
+                        <td style={{ fontSize: '0.75rem', color: 'var(--adm-text-secondary)' }} className="admin-mono">
                           {tx.deviceId || 'PDA-Zebra'}
                         </td>
+                        <td>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', color: '#10b981' }}>
+                            <CheckCircle2 size={11} />
+                            <span>Synced</span>
+                          </span>
+                        </td>
+                        {onInspectTransaction && (
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              onClick={() => onInspectTransaction(tx)}
+                              className="admin-btn admin-btn-outline admin-btn-sm"
+                              style={{ padding: '3px 7px', fontSize: '0.74rem' }}
+                            >
+                              Inspect
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

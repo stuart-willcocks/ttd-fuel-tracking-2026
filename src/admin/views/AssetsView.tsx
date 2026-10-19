@@ -11,11 +11,13 @@ import {
   MapPin,
   LayoutGrid,
   Table as TableIcon,
+  ReceiptText,
 } from 'lucide-react';
-import type { Equipment } from '../../types';
+import type { Equipment, Transaction } from '../../types';
 
 interface AssetsViewProps {
   assets: Equipment[];
+  transactions: Transaction[];
   onOpenCreateModal: () => void;
   onOpenEditModal: (asset: Equipment) => void;
   onOpenDeleteModal: (asset: Equipment) => void;
@@ -28,6 +30,7 @@ type FilterType = 'ALL' | 'GENERATOR' | 'TANK' | 'PLANT' | 'RUNNING' | 'STANDBY'
 
 export const AssetsView: React.FC<AssetsViewProps> = ({
   assets,
+  transactions,
   onOpenCreateModal,
   onOpenEditModal,
   onOpenDeleteModal,
@@ -39,6 +42,15 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
   const [selectedArea, setSelectedArea] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'TABLE' | 'GRID'>('TABLE');
+
+  // Transaction counts per asset
+  const txCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const t of transactions) {
+      map[t.equipmentId] = (map[t.equipmentId] || 0) + 1;
+    }
+    return map;
+  }, [transactions]);
 
   // Distinct areas for filter dropdown
   const uniqueAreas = useMemo(() => {
@@ -391,6 +403,17 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     {/* Action buttons */}
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        {/* View Transactions for this asset */}
+                        <button
+                          onClick={() => onSelectAsset(asset.equipmentId)}
+                          className="admin-btn admin-btn-secondary admin-btn-sm"
+                          title={`View transactions for ${asset.equipmentId}`}
+                          style={{ padding: '5px 10px', gap: '5px', color: '#06b6d4' }}
+                        >
+                          <ReceiptText size={13} />
+                          <span>Transactions ({txCounts[asset.equipmentId] || 0})</span>
+                        </button>
+
                         {/* QR Label Print */}
                         <button
                           onClick={() => onOpenQRModal(asset)}
@@ -534,6 +557,16 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                   </button>
 
                   <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      onClick={() => onSelectAsset(asset.equipmentId)}
+                      className="admin-btn admin-btn-secondary admin-btn-sm"
+                      title="View Transactions for this asset"
+                      style={{ color: '#06b6d4', padding: '5px 8px' }}
+                    >
+                      <ReceiptText size={14} />
+                      <span>{txCounts[asset.equipmentId] || 0} Txs</span>
+                    </button>
+
                     <button
                       onClick={() => onOpenEditModal(asset)}
                       className="admin-btn admin-btn-outline admin-btn-sm"
