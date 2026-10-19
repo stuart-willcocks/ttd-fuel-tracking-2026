@@ -1,34 +1,24 @@
-/**
- * Formats a timestamp into human-friendly format: YYYY-MM-DD HH:mm:ss
- */
-export function formatHumanTimestamp(val?: string | null): string {
-  if (!val) return '—';
-
-  // If it's already in YYYY-MM-DD HH:mm:ss format
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(val)) {
-    return val;
-  }
-
-  try {
-    const d = new Date(val);
-    if (isNaN(d.getTime())) {
-      return String(val).replace('T', ' ').substring(0, 19);
-    }
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  } catch {
-    return String(val);
-  }
-}
-
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const FULL_MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 
 /**
- * Formats timestamp to match original app screenshot:
- * e.g. "Fri 16 Aug 2024 at 11:30"
+ * Formats timestamps for the PDA app:
+ * e.g. "Thu 2 July 2026 at 12:24"
  */
-export function formatOldAppTimestamp(val?: string | null): string {
+export function formatPdaTimestamp(val?: string | null): string {
   if (!val) return '—';
 
   try {
@@ -38,7 +28,7 @@ export function formatOldAppTimestamp(val?: string | null): string {
     }
     const dayName = DAYS[d.getDay()];
     const dateNum = d.getDate();
-    const monthName = MONTHS[d.getMonth()];
+    const monthName = FULL_MONTHS[d.getMonth()];
     const year = d.getFullYear();
     const pad = (n: number) => String(n).padStart(2, '0');
     const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -47,3 +37,34 @@ export function formatOldAppTimestamp(val?: string | null): string {
     return String(val);
   }
 }
+
+/**
+ * Formats timestamps for the Admin app:
+ * e.g. "ddd YYYY-MM-DD HH:mm:ss" -> "Thu 2026-07-02 12:24:00"
+ */
+export function formatAdminTimestamp(val?: string | null): string {
+  if (!val) return '—';
+
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) {
+      return String(val);
+    }
+    const dayName = DAYS[d.getDay()];
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const date = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    const seconds = pad(d.getSeconds());
+
+    return `${dayName} ${year}-${month}-${date} ${hours}:${minutes}:${seconds}`;
+  } catch {
+    return String(val);
+  }
+}
+
+// Aliases for compatibility
+export const formatOldAppTimestamp = formatPdaTimestamp;
+export const formatHumanTimestamp = formatAdminTimestamp;

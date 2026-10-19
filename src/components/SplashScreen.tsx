@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getDeviceId, getDeviceName, setDeviceName } from '../services/device';
-import { BUILD_NUMBER, BUILD_TIME } from '../version';
+import { BUILD_NUMBER, APP_VERSION } from '../version';
 
 interface SplashScreenProps {
   onContinue: () => void;
@@ -10,6 +10,8 @@ const PRESET_PDAS = ['PDA 1', 'PDA 2', 'PDA 3', 'PDA 4', 'PDA 5'];
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
   const [deviceName, setDeviceNameState] = useState<string>(getDeviceName());
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(true);
+  const [updateStatus, setUpdateStatus] = useState<string>('Checking for updates...');
   const persistentId = getDeviceId();
 
   const handleSelectPreset = (name: string) => {
@@ -17,27 +19,75 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
     setDeviceName(name);
   };
 
+  const checkForUpdates = useCallback(async () => {
+    setIsCheckingUpdate(true);
+    setUpdateStatus('Checking for updates...');
+
+    try {
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          await reg.update();
+          if (reg.waiting) {
+            setUpdateStatus('Applying update...');
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              window.location.reload();
+            });
+            return;
+          }
+        }
+      }
+      // Ensure the user visibly sees the update check complete
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      setUpdateStatus(`App is up to date (Build ${BUILD_NUMBER})`);
+    } catch {
+      setUpdateStatus(`Running Build ${BUILD_NUMBER}`);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkForUpdates();
+  }, [checkForUpdates]);
+
   return (
     <div className="old-splash-screen">
       <div className="old-splash-content">
         {/* Top Build Number */}
         <div className="old-splash-build-top">{BUILD_NUMBER}</div>
 
-        {/* Title: The Technical Department <newline> Fuel Tracking */}
-        <div className="old-splash-title-block">
-          <h1 className="old-splash-main-title">The Technical Department</h1>
-          <h2 className="old-splash-sub-title">Fuel Tracking</h2>
+        {/* Technical Department Ltd Logo */}
+        <div className="old-splash-logo-wrap">
+          <img
+            src="/assets/logo-01.png"
+            alt="The Technical Department Ltd"
+            className="old-splash-logo"
+          />
         </div>
 
-        {/* Event & Version Tag */}
-        <div className="old-splash-event-block">
-          <h3 className="old-splash-event-name">Silverstone 2026</h3>
-          <div className="old-splash-event-code">{BUILD_TIME?.replace(/[- :]/g, '').slice(0, 9) || '20261019E'}</div>
+        {/* Title: The Technical Department Ltd <newline> Fuel Tracking App */}
+        <div className="old-splash-title-block">
+          <h1 className="old-splash-main-title">The Technical Department Ltd</h1>
+          <h2 className="old-splash-sub-title">Fuel Tracking App</h2>
+        </div>
+
+        {/* Version & Device Info */}
+        <div className="old-splash-version-info">
+          Version {APP_VERSION} &middot; Device ID: <strong>{deviceName}</strong>
         </div>
 
         {/* Diagnostics & Initialization Log */}
         <div className="old-splash-log-box">
           <div className="log-line">Starting...</div>
+          <div className="log-line log-update-line">
+            {isCheckingUpdate ? (
+              <span className="log-checking">{updateStatus}</span>
+            ) : (
+              <span className="log-updated">{updateStatus}</span>
+            )}
+          </div>
           <div className="log-line">Checking tables...</div>
           <div className="log-line">Equipment table exists.</div>
           <div className="log-line">Transaction table exists.</div>
@@ -49,7 +99,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
           </div>
         </div>
 
-        {/* Device Switcher Chips */}
+        {/* Device Switcher Chips (rectangular, no corner radii) */}
         <div className="old-splash-pda-row">
           {PRESET_PDAS.map((preset) => (
             <button
@@ -67,14 +117,15 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
           <span>Token: <code>{persistentId.slice(0, 18)}...</code></span>
         </div>
 
-        {/* Continue Button: Light Grey, Rectangular, Center-Justified */}
+        {/* Continue Button: Full width, rectangular, center-justified, disabled while checking */}
         <div className="old-splash-btn-row">
           <button
             type="button"
-            className="old-splash-btn-continue"
+            className={`old-splash-btn-continue ${isCheckingUpdate ? 'disabled' : ''}`}
+            disabled={isCheckingUpdate}
             onClick={onContinue}
           >
-            Continue
+            {isCheckingUpdate ? 'Checking for updates...' : 'Continue'}
           </button>
         </div>
       </div>

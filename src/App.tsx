@@ -5,6 +5,7 @@ import { resetRemoteData } from './services/api';
 import { type Equipment, type Transaction, type ActionType, generateUUID } from './types';
 import { Header } from './components/Header';
 import { ScannerView } from './components/ScannerView';
+import { AssetDetailView } from './components/AssetDetailView';
 import { SplashScreen } from './components/SplashScreen';
 import { TransactionForm } from './components/TransactionForm';
 import { ConfirmationModal } from './components/ConfirmationModal';
@@ -13,7 +14,7 @@ import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
 import { getDeviceName } from './services/device';
 
-export type AppView = 'SPLASH_SCREEN' | 'SCAN_VIEW';
+export type AppView = 'SPLASH_SCREEN' | 'SCAN_SCREEN' | 'ASSET_DETAIL_VIEW';
 
 export const App: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
@@ -96,9 +97,12 @@ export const App: React.FC = () => {
       window.removeEventListener('touchend', handleFirstGesture);
     };
   }, []);
+
   const [activeAssetId, setActiveAssetId] = useState<string | null>(null);
   const activeAssetIdRef = useRef<string | null>(null);
-  activeAssetIdRef.current = activeAssetId;
+  useEffect(() => {
+    activeAssetIdRef.current = activeAssetId;
+  }, [activeAssetId]);
 
   const [currentView, setCurrentView] = useState<AppView>('SPLASH_SCREEN');
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
@@ -172,6 +176,7 @@ export const App: React.FC = () => {
       .reverse()
       .sortBy('transactionTimestamp');
     setCurrentAssetTransactions(txs);
+    return asset;
   }, [refreshAssetsList]);
 
   // Boot & synchronization listeners
@@ -179,7 +184,6 @@ export const App: React.FC = () => {
     const init = async () => {
       await initializeDatabase();
       await refreshAssetsList();
-      // Perform immediate sync with central server
       await syncEngine.syncWithRemote();
     };
     init();
@@ -188,7 +192,6 @@ export const App: React.FC = () => {
       setSyncState(state);
     });
 
-    // Real-time remote data listener: update UI when PC or other PDAs post data
     const unsubData = syncEngine.onRemoteDataUpdated(async () => {
       await refreshAssetsList();
       if (activeAssetIdRef.current) {
@@ -202,18 +205,19 @@ export const App: React.FC = () => {
     };
   }, [refreshAssetsList, loadAssetDetails]);
 
-  useEffect(() => {
-    if (activeAssetId) {
-      loadAssetDetails(activeAssetId);
-    } else {
-      setCurrentAsset(null);
-      setCurrentAssetTransactions([]);
-    }
-  }, [activeAssetId, loadAssetDetails]);
-
-  const handleAssetSelected = (equipmentId: string | null) => {
+  const handleAssetScannedOrSelected = async (equipmentId: string) => {
     setActiveAssetId(equipmentId);
     setActiveAction(null);
+    await loadAssetDetails(equipmentId);
+    setCurrentView('ASSET_DETAIL_VIEW');
+  };
+
+  const handleBackToScanner = () => {
+    setActiveAssetId(null);
+    setCurrentAsset(null);
+    setCurrentAssetTransactions([]);
+    setActiveAction(null);
+    setCurrentView('SCAN_SCREEN');
   };
 
   const handleFormSubmitValues = (data: Partial<Transaction>) => {
@@ -257,33 +261,11 @@ export const App: React.FC = () => {
     await loadAssetDetails(currentAsset.equipmentId);
   };
 
-  const handlePowerToggle = async (powerAction: 'PoweredUp' | 'PoweredDown') => {
-    if (!currentAsset) return;
-
-    const timestamp = getLocalFormattedTimestamp();
-    const newTx: Transaction = {
-      id: generateUUID(),
-      equipmentId: currentAsset.equipmentId,
-      transactionTimestamp: timestamp,
-      transactionType: powerAction,
-      syncStatus: 'pending',
-      deviceId: getDeviceName(),
-      createdAt: new Date().toISOString(),
-    };
-
-    await syncEngine.queueTransaction(newTx);
-    if (syncEngine.isEffectivelyOnline()) {
-      await syncEngine.flushOutbox();
-    }
-    await loadAssetDetails(currentAsset.equipmentId);
-  };
-
   const handleSaveEditedAsset = async (updated: Equipment) => {
     await db.equipments.put(updated);
     setCurrentAsset(updated);
     setIsEditingAsset(false);
     await refreshAssetsList();
-    // Also push to central server
     await syncEngine.syncWithRemote();
   };
 
@@ -303,14 +285,16 @@ export const App: React.FC = () => {
     }
   };
 
+  // 1. SPLASH SCREEN
   if (currentView === 'SPLASH_SCREEN') {
     return (
       <div className="app-root">
-        <SplashScreen onContinue={() => setCurrentView('SCAN_VIEW')} />
+        <SplashScreen onContinue={() => setCurrentView('SCAN_SCREEN')} />
       </div>
     );
   }
 
+  // 2. MAIN APP CONTAINER (SCAN_SCREEN or ASSET_DETAIL_VIEW)
   return (
     <div className="app-root">
       <Header
@@ -325,16 +309,10 @@ export const App: React.FC = () => {
       />
 
       <main className="app-main">
-        {!activeAction ? (
+        {currentView === 'SCAN_SCREEN' ? (
           <ScannerView
-            activeAssetId={activeAssetId}
-            currentAsset={currentAsset}
-            transactions={currentAssetTransactions}
             availableAssets={availableAssets}
-            onAssetSelected={handleAssetSelected}
-            onSelectAction={(action) => setActiveAction(action)}
-            onEditEquipment={() => setIsEditingAsset(true)}
-            onPowerToggle={handlePowerToggle}
+            onAssetSelected={handleAssetScannedOrSelected}
             isAnyModalOpen={
               isSettingsModalOpen ||
               isOutboxModalOpen ||
@@ -343,13 +321,23 @@ export const App: React.FC = () => {
             }
           />
         ) : (
+          /* ASSET_DETAIL_VIEW */
           currentAsset && (
-            <TransactionForm
-              asset={currentAsset}
-              action={activeAction}
-              onCancel={() => setActiveAction(null)}
-              onSubmitValues={handleFormSubmitValues}
-            />
+            !activeAction ? (
+              <AssetDetailView
+                asset={currentAsset}
+                transactions={currentAssetTransactions}
+                onSelectAction={(action) => setActiveAction(action)}
+                onBack={handleBackToScanner}
+              />
+            ) : (
+              <TransactionForm
+                asset={currentAsset}
+                action={activeAction}
+                onCancel={() => setActiveAction(null)}
+                onSubmitValues={handleFormSubmitValues}
+              />
+            )
           )
         )}
       </main>

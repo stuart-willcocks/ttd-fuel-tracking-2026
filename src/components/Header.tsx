@@ -1,95 +1,79 @@
 import React from 'react';
-import { Wifi, WifiOff, RefreshCw, Settings, Maximize2, Minimize2 } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, UploadCloud } from 'lucide-react';
 import type { SyncState } from '../services/syncEngine';
-import { APP_VERSION } from '../version';
+import { APP_VERSION, BUILD_NUMBER } from '../version';
 
 interface HeaderProps {
   syncState: SyncState;
-  isFullscreen: boolean;
+  isFullscreen?: boolean;
   onToggleSimulatedOffline: () => void;
   onTriggerSync: () => void;
-  onToggleFullscreen: () => void;
+  onToggleFullscreen?: () => void;
   onOpenOutbox: () => void;
-  onOpenSettings: () => void;
+  onOpenSettings?: () => void;
   onShowSplash?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   syncState,
-  isFullscreen,
   onToggleSimulatedOffline,
   onTriggerSync,
-  onToggleFullscreen,
   onOpenOutbox,
-  onOpenSettings,
   onShowSplash,
 }) => {
   return (
     <header className="app-header">
+      {/* Top Left: App Title and Version */}
       <div
         className="header-title-box"
         onClick={onShowSplash}
         style={{ cursor: onShowSplash ? 'pointer' : 'default' }}
-        title={onShowSplash ? 'Click to view Splash Screen' : undefined}
+        title="The Technical Department Ltd"
       >
-        <img
-          src="/assets/logo-01.png"
-          alt="TTD Logo"
-          className="header-brand-logo"
-        />
         <div className="header-text-col">
-          <div className="header-company-name">The Technical Department</div>
+          <div className="header-company-name">The Technical Department Ltd</div>
           <div className="header-sub-row">
             <span className="header-app-title">Fuel Tracking</span>
-            <span className="header-version-pill">v{APP_VERSION}</span>
+            <span className="header-version-pill">v{APP_VERSION} ({BUILD_NUMBER})</span>
           </div>
         </div>
       </div>
 
+      {/* Top Right: Online Indicator & Refresh / Upload Queue Indicator */}
       <div className="header-status-box">
-        {/* Network status button: wifi icon only, no word "Online" */}
-        <button
-          className={`status-pill ${syncState.isOnline ? 'online' : 'offline'}`}
-          onClick={onToggleSimulatedOffline}
-          title={syncState.isOnline ? 'Connected (Tap to simulate offline)' : 'Disconnected (Tap to reconnect)'}
-        >
-          {syncState.isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
-          {syncState.isSimulatedOffline && <span className="sim-label">SIM</span>}
-        </button>
-
-        {/* Pending outbox count pill */}
+        {/* Upload Queue Indicator (visible if items are queued) */}
         {syncState.pendingCount > 0 && (
-          <button className="pending-pill" onClick={onOpenOutbox} title="View offline queue">
+          <button
+            type="button"
+            className="pending-pill"
+            onClick={onOpenOutbox}
+            title="Upload queue: pending sync"
+          >
+            <UploadCloud size={13} />
             <span>{syncState.pendingCount}</span>
           </button>
         )}
 
-        {/* Sync button */}
+        {/* Refresh / Sync Button */}
         <button
+          type="button"
           className={`icon-btn ${syncState.isSyncing ? 'spinning' : ''}`}
           onClick={onTriggerSync}
           disabled={!syncState.isOnline || syncState.isSyncing}
-          title="Sync now"
+          title="Refresh / Sync with server"
         >
           <RefreshCw size={14} />
         </button>
 
-        {/* Fullscreen toggle button */}
+        {/* Online Indicator */}
         <button
-          className="icon-btn"
-          onClick={onToggleFullscreen}
-          title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (hide address bar)'}
+          type="button"
+          className={`status-pill ${syncState.isOnline ? 'online' : 'offline'}`}
+          onClick={onToggleSimulatedOffline}
+          title={syncState.isOnline ? 'Online (Tap to toggle offline mode)' : 'Offline (Tap to reconnect)'}
         >
-          {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </button>
-
-        {/* Settings button */}
-        <button
-          className="icon-btn"
-          onClick={onOpenSettings}
-          title="Settings & Schema"
-        >
-          <Settings size={14} />
+          {syncState.isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+          <span className="status-label">{syncState.isOnline ? 'ONLINE' : 'OFFLINE'}</span>
         </button>
       </div>
     </header>

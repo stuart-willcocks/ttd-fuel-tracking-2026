@@ -1,13 +1,13 @@
 /* ==========================================================================
    TTD FUEL TRACKING — ZEBRA TC26 HANDHELD APPLICATION
-   Design System: Scheme 3 "High-Visibility Slate" (Daylight / Sun-Optimized)
+   Design System: Simple, robust, high-contrast rectangular industrial design
    ========================================================================== */
 
 :root {
   /* Slate Theme Surfaces */
   --bg-page: #1E222B;          /* Solid Deep Slate */
   --bg-header: #171B22;        /* Sleek Status Bar Slate */
-  --bg-banner: #171B22;        /* Contrast Top Banner */
+  --bg-banner: #000000;        /* Pure Black Top Banner */
   --bg-surface: #272C38;       /* Clean Steel Gray */
   --bg-surface-hover: #323846; /* Active Card Slate */
   --border-subtle: #373E4F;    /* Hairline Crisp Steel */
@@ -19,39 +19,29 @@
   --text-dim: #6B7688;         /* Subdued Label Gray */
 
   /* Signal Accents */
-  --color-w3w: #FACC15;        /* Industrial Signal Yellow */
-  --color-spec: #9AA4B2;       /* Slate Specs */
-  --color-power-on: #4ADE80;   /* Muted Emerald */
-  --color-power-off: #9AA4B2;  /* Muted Slate */
-
   --accent-yellow: #FACC15;    /* Primary Action Yellow */
   --accent-yellow-dark: #EAB308;
-  --btn-primary-bg: #FACC15;
-  --btn-primary-text: #111827;
-
-  --btn-secondary-bg: #272C38;
-  --btn-secondary-border: #373E4F;
-  --btn-secondary-text: #FFFFFF;
-
-  --btn-danger-bg: rgba(239, 68, 68, 0.15);
-  --btn-danger-border: rgba(239, 68, 68, 0.35);
-  --btn-danger-text: #F87171;
 }
 
-/* Enforce crisp industrial rectangular controls with subtle 4px radii */
+/* Strict Rectangular Controls: ZERO corner radii, ZERO drop shadows across all PDA elements */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
 button,
 input,
 select,
 textarea {
-  border-radius: 4px;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   font-family: inherit;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  -webkit-tap-highlight-color: transparent;
 }
 
 html, body {
@@ -98,7 +88,7 @@ html, body {
 }
 
 /* ==========================================================================
-   SYSTEM & SYNC HEADER (Top Sleek Bar)
+   APP_HEADER (App Title, Version, Online Indicator, Refresh / Queue Indicator)
    ========================================================================== */
 
 .app-header {
@@ -116,17 +106,8 @@ html, body {
 .header-title-box {
   display: flex;
   align-items: center;
-  gap: 10px;
   min-width: 0;
   user-select: none;
-}
-
-.header-brand-logo {
-  width: 26px;
-  height: 26px;
-  border-radius: 4px;
-  object-fit: cover;
-  flex-shrink: 0;
 }
 
 .header-text-col {
@@ -149,6 +130,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-top: 2px;
 }
 
 .header-app-title {
@@ -159,8 +141,8 @@ html, body {
 
 .header-version-pill {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 600;
   color: var(--text-muted);
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
@@ -177,14 +159,13 @@ html, body {
 .status-pill {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
-  padding: 2px 7px;
+  padding: 3px 8px;
   cursor: pointer;
-  height: 28px;
-  min-width: 30px;
+  height: 30px;
 }
 
 .status-pill.online {
@@ -199,32 +180,32 @@ html, body {
   background: rgba(250, 204, 21, 0.1);
 }
 
-.sim-label {
-  font-size: 8px;
-  font-weight: 700;
-  margin-left: 3px;
-  background: var(--border-subtle);
-  color: var(--text-main);
-  padding: 0 3px;
+.status-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
 }
 
 .pending-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   background: rgba(239, 68, 68, 0.2);
   color: #F87171;
   border: 1px solid rgba(239, 68, 68, 0.4);
-  padding: 2px 6px;
+  padding: 3px 7px;
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  height: 28px;
+  height: 30px;
 }
 
 .icon-btn {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -268,326 +249,182 @@ html, body {
 }
 
 /* ==========================================================================
-   TOP BANNER (Asset Header Bar)
+   SPLASH_SCREEN (Layout based on Screenshot_20261019-112856.png)
    ========================================================================== */
 
-.old-top-banner {
-  flex-shrink: 0;
-  background-color: var(--bg-banner);
-  color: var(--text-main);
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.old-banner-title {
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--text-main);
-  text-align: center;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.old-banner-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background-color: var(--bg-surface);
-  color: var(--text-main) !important;
-  border: 1px solid var(--border-subtle);
-  font-size: 12px;
-  font-weight: 700;
-  padding: 4px 10px;
-  cursor: pointer;
-  height: 30px;
-}
-
-.old-banner-back-btn:hover {
-  background-color: var(--bg-surface-hover);
-  border-color: var(--border-medium);
-}
-
-/* ==========================================================================
-   METADATA HEADER (what3words, Type, Power, Location)
-   ========================================================================== */
-
-.old-meta-header {
-  flex-shrink: 0;
-  background-color: var(--bg-surface);
-  padding: 8px 14px;
-  text-align: center;
+.old-splash-screen {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  background-color: #FDB813; /* High-Visibility Yellow background */
+  color: #000000;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-/* what3words: Clean Yellow Link */
-.old-meta-w3w-row {
-  margin-bottom: 2px;
-}
-
-.old-meta-w3w {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--accent-yellow) !important;
-  text-decoration: none;
-  letter-spacing: 0.3px;
-}
-
-.old-meta-w3w:hover {
-  text-decoration: underline;
-}
-
-/* Equipment Spec: Slate Clean Text */
-.old-meta-spec {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-main);
-  letter-spacing: 0.2px;
-}
-
-/* Generator Power Toggle Row: Muted Green ON / Muted Slate OFF */
-.old-meta-power-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin: 4px 0;
-}
-
-.old-btn-power-chip {
-  border: 1px solid var(--border-subtle);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 10px;
-  cursor: pointer;
-  background: var(--bg-page);
-  color: var(--text-muted);
-}
-
-.old-btn-power-chip.on.active {
-  background-color: rgba(74, 222, 128, 0.2);
-  color: #4ADE80;
-  border-color: rgba(74, 222, 128, 0.4);
-}
-
-.old-btn-power-chip.off.active {
-  background-color: rgba(154, 164, 178, 0.15);
-  color: var(--text-muted);
-  border-color: var(--border-medium);
-}
-
-.old-power-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  margin-right: 6px;
-}
-
-/* Area & Location */
-.old-meta-area,
-.old-meta-location {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  line-height: 1.3;
-}
-
-/* ==========================================================================
-   TRANSACTION HISTORY LIST
-   ========================================================================== */
-
-.old-history-scroll-area {
-  flex: 1;
-  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  background-color: var(--bg-page);
 }
 
-.old-empty-history {
-  padding: 30px 20px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.old-tx-list {
+.old-splash-content {
+  padding: 20px 20px;
   display: flex;
   flex-direction: column;
-}
-
-.old-tx-row {
-  display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  background-color: var(--bg-surface);
-  border-bottom: 1px solid var(--border-subtle);
+  text-align: center;
+  margin: auto 0;
+  width: 100%;
+  max-width: 440px;
+  align-self: center;
 }
 
-.old-tx-icon-col {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent-yellow);
+.old-splash-build-top {
+  font-size: 16px;
+  font-weight: 700;
+  color: #000000;
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 12px;
 }
 
-.tx-png-icon {
-  width: 26px;
-  height: 26px;
+.old-splash-logo-wrap {
+  margin-bottom: 12px;
+}
+
+.old-splash-logo {
+  width: 64px;
+  height: 64px;
   object-fit: contain;
   display: block;
 }
 
-.old-tx-content-col {
-  flex: 1;
-  min-width: 0;
+.old-splash-title-block {
+  margin-bottom: 8px;
 }
 
-.old-tx-datetime {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-main);
-  font-family: 'JetBrains Mono', monospace;
-  line-height: 1.3;
+.old-splash-main-title {
+  font-size: 21px;
+  font-weight: 800;
+  color: #000000;
+  line-height: 1.25;
 }
 
-.old-tx-details {
+.old-splash-sub-title {
+  font-size: 19px;
+  font-weight: 800;
+  color: #000000;
+  margin-top: 4px;
+}
+
+.old-splash-version-info {
   font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  margin-top: 2px;
-  line-height: 1.3;
-}
-
-.old-tx-sync-col {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-}
-
-.sync-icon-synced {
-  color: #4ADE80;
-}
-
-.sync-icon-pending {
-  color: var(--accent-yellow);
-}
-
-/* ==========================================================================
-   BOTTOM ACTION BUTTONS (4 Stacked Clean Slate Buttons)
-   ========================================================================== */
-
-.old-bottom-actions-stack {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 12px;
-  background-color: var(--bg-header);
-  border-top: 1px solid var(--border-subtle);
-}
-
-.old-btn-black-action {
-  width: 100%;
-  height: 42px;
-  background-color: var(--bg-surface);
-  color: var(--text-main);
-  border: 1px solid var(--border-subtle);
-  font-size: 14px;
   font-weight: 600;
+  color: #1F2937;
+  margin-bottom: 12px;
+}
+
+.old-splash-log-box {
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #000000;
+  margin-bottom: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  padding: 10px 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.log-line {
+  margin-bottom: 2px;
+}
+
+.log-checking {
+  color: #1E3A8A;
+  font-weight: 700;
+}
+
+.log-updated {
+  color: #14532D;
+  font-weight: 700;
+}
+
+.device-id-line strong {
+  color: #000000;
+  font-weight: 800;
+}
+
+.old-splash-pda-row {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.old-splash-pda-chip {
+  flex: 1;
+  height: 36px;
+  font-size: 12px;
+  font-weight: 700;
+  background-color: #FFFFFF;
+  color: #000000;
+  border: 1px solid #000000;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  letter-spacing: 0.2px;
+  text-align: center;
 }
 
-.old-btn-black-action:hover,
-.old-btn-black-action:active {
-  background-color: var(--bg-surface-hover);
-  border-color: var(--accent-yellow);
-  color: var(--accent-yellow);
+.old-splash-pda-chip.active {
+  background-color: #000000;
+  color: #FFFFFF;
 }
 
-/* Active Scan Input Banner when Asset is Selected */
-.scan-active-banner {
-  flex-shrink: 0;
-  background-color: var(--bg-banner);
-  color: var(--text-main);
-  height: 52px;
-  display: flex;
-  align-items: center;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--border-subtle);
-  gap: 8px;
+.old-splash-hw-id {
+  font-size: 10px;
+  color: #374151;
+  margin-bottom: 14px;
+  font-family: 'JetBrains Mono', monospace;
 }
 
-.scan-active-input-wrap {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 8px;
+.old-splash-btn-row {
   width: 100%;
 }
 
-.old-scan-input-active {
-  flex: 1;
-  height: 38px;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-medium);
-  color: var(--text-main);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 16px;
+.old-splash-btn-continue {
+  width: 100%;
+  height: 44px;
+  background-color: #000000;
+  color: #FFFFFF;
+  border: 1px solid #000000;
+  font-size: 15px;
   font-weight: 700;
-  text-align: center;
-  padding: 0 10px;
-  outline: none;
-  transition: all 0.15s ease;
-}
-
-.old-scan-input-active:focus {
-  border-color: var(--accent-yellow);
-  background-color: #2E3443;
-  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.25);
-}
-
-.old-scan-clear-btn {
-  height: 38px;
-  padding: 0 12px;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  letter-spacing: 0.3px;
 }
 
-.old-scan-clear-btn:hover,
-.old-scan-clear-btn:active {
-  color: #F87171;
-  border-color: rgba(239, 68, 68, 0.4);
-  background-color: rgba(239, 68, 68, 0.1);
+.old-splash-btn-continue:hover {
+  background-color: #1F2937;
+}
+
+.old-splash-btn-continue.disabled {
+  background-color: #6B7280;
+  color: #D1D5DB;
+  border-color: #6B7280;
+  cursor: not-allowed;
 }
 
 /* ==========================================================================
-   SCANNER VIEW MIDDLE AREA (Zebra Barcode Box)
+   SCAN_SCREEN (Only QR Code Entry Box and Select Asset From List Button)
    ========================================================================== */
+
+.scan-screen-only {
+  background-color: var(--bg-page);
+}
 
 .old-scanner-middle-area {
   flex: 1;
@@ -596,9 +433,9 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 18px 16px;
-  gap: 14px;
-  background-color: var(--bg-page);
+  padding: 20px 16px;
+  gap: 16px;
+  width: 100%;
 }
 
 .scan-input-wrapper {
@@ -607,23 +444,21 @@ html, body {
 
 .old-scan-input {
   width: 100%;
-  height: 54px;
+  height: 48px;
   background-color: var(--bg-surface);
-  border: 2px solid var(--border-subtle);
+  border: 2px solid var(--border-medium);
   color: var(--text-main);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   text-align: center;
   padding: 0 12px;
-  transition: border-color 0.15s ease;
 }
 
 .old-scan-input:focus {
   outline: none;
   border-color: var(--accent-yellow);
   background-color: #2E3443;
-  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.2);
 }
 
 .old-error-message {
@@ -645,19 +480,225 @@ html, body {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   color: var(--text-main);
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
   gap: 8px;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
 .old-btn-select-fleet:hover {
   background-color: var(--bg-surface-hover);
   border-color: var(--border-medium);
+}
+
+/* ==========================================================================
+   ASSET_DETAIL_VIEW (Layout based on Screenshot_20250324-201513.png)
+   ========================================================================== */
+
+.asset-detail-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background-color: #FFFFFF; /* High contrast daylight white */
+  color: #000000;
+}
+
+/* 1. ASSET ID: Solid black banner across top */
+.asset-detail-id-banner {
+  flex-shrink: 0;
+  width: 100%;
+  background-color: #000000;
+  color: #FFFFFF;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* 2. METADATA SECTION */
+.asset-detail-meta-box {
+  flex-shrink: 0;
+  background-color: #FFFFFF;
+  padding: 8px 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.asset-detail-w3w {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: #DC2626; /* Red centered */
+  letter-spacing: 0.2px;
+}
+
+.asset-detail-spec {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1D4ED8; /* Blue centered uppercase */
+  letter-spacing: 0.2px;
+}
+
+.asset-detail-serial {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1D4ED8;
+}
+
+.asset-detail-area,
+.asset-detail-location {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1D4ED8; /* Blue centered uppercase */
+  line-height: 1.25;
+}
+
+/* 3. SCROLLABLE TRANSACTIONS PANE */
+.asset-detail-tx-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background-color: #F3F4F6;
+}
+
+.tx-list-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.tx-row-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.tx-row-card:nth-child(even) {
+  background-color: #F9FAFB;
+}
+
+.tx-type-icon-col {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+}
+
+.tx-info-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tx-timestamp-line {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.3;
+}
+
+.tx-data-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #374151;
+  font-weight: 600;
+}
+
+.tx-data-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.data-icon {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.icon-fuel {
+  color: #D97706; /* Amber fuel pump icon */
+}
+
+.icon-def {
+  color: #2563EB; /* Blue DEF droplet icon */
+}
+
+.icon-kwh {
+  color: #EA580C; /* Electric orange kWh icon */
+}
+
+.tx-sync-col {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 4px;
+}
+
+.sync-green-tick {
+  color: #16A34A !important; /* Green tick */
+}
+
+.tx-empty-state {
+  padding: 36px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+/* 4. TRANSACTION BUTTONS STACK (Check In, Record Fuel Transfer, Check Out, Back) */
+.asset-detail-btn-stack {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background-color: #FFFFFF;
+  border-top: 1px solid #E5E7EB;
+}
+
+/* Standard PDA Rectangular Button: full width, center justified, height 44px, no corner radii or drop shadows */
+.btn-pda-rect {
+  width: 100% !important;
+  height: 44px !important;
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #000000 !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+}
+
+.btn-pda-rect:hover,
+.btn-pda-rect:active {
+  background-color: #1F2937 !important;
 }
 
 /* ==========================================================================
@@ -678,7 +719,7 @@ html, body {
 }
 
 .old-form-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--accent-yellow);
   text-align: center;
@@ -754,8 +795,8 @@ html, body {
 }
 
 .old-btn-step {
-  width: 38px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   background-color: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   color: var(--text-main);
@@ -783,7 +824,7 @@ html, body {
 }
 
 .old-tank-chip {
-  padding: 5px 9px;
+  padding: 6px 10px;
   font-size: 12px;
   font-weight: 600;
   background-color: var(--bg-surface);
@@ -802,27 +843,29 @@ html, body {
 /* Submit & Cancel Buttons */
 .old-form-btn-row {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  margin-top: 12px;
+  flex-direction: column;
+  gap: 8px;
   width: 100%;
+  margin-top: 12px;
 }
 
 .old-btn-submit {
+  width: 100%;
   height: 44px;
-  flex: 1;
-  max-width: 140px;
   border: none;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   letter-spacing: 0.2px;
 }
 
 .old-btn-submit.valid {
-  background-color: var(--accent-yellow);
-  color: #111827;
+  background-color: #16A34A;
+  color: #FFFFFF;
 }
 
 .old-btn-submit.disabled {
@@ -833,160 +876,18 @@ html, body {
 }
 
 .old-btn-cancel {
-  height: 44px;
-  flex: 1;
-  max-width: 140px;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.old-btn-cancel:hover {
-  border-color: var(--border-medium);
-  color: var(--text-main);
-}
-
-/* ==========================================================================
-   SPLASH SCREEN
-   ========================================================================== */
-
-.old-splash-screen {
   width: 100%;
-  height: 100%;
-  height: 100dvh;
-  background-color: var(--bg-page);
-  color: var(--text-main);
+  height: 44px;
+  background-color: #DC2626;
+  border: 1px solid #DC2626;
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
   display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.old-splash-content {
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  text-align: center;
-  margin: auto 0;
-}
-
-.old-splash-build-top {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
-  margin-bottom: 24px;
-}
-
-.old-splash-title-block {
-  margin-bottom: 24px;
-}
-
-.old-splash-main-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-main);
-  line-height: 1.25;
-}
-
-.old-splash-sub-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--accent-yellow);
-  margin-top: 6px;
-}
-
-.old-splash-event-block {
-  margin-bottom: 24px;
-}
-
-.old-splash-event-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.old-splash-event-code {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-.old-splash-log-box {
-  width: 100%;
-  max-width: 320px;
-  text-align: left;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text-muted);
-  margin-bottom: 20px;
-  background: var(--bg-surface);
-  padding: 12px 14px;
-  border: 1px solid var(--border-subtle);
-}
-
-.log-line {
-  margin-bottom: 2px;
-}
-
-.device-id-line strong {
-  color: var(--accent-yellow);
-}
-
-.old-splash-pda-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
   justify-content: center;
-  margin-bottom: 12px;
-}
-
-.old-splash-pda-chip {
-  padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  background-color: var(--bg-surface);
-  color: var(--text-muted);
-  border: 1px solid var(--border-subtle);
-  cursor: pointer;
-}
-
-.old-splash-pda-chip.active {
-  background-color: var(--accent-yellow);
-  color: #111827;
-  border-color: var(--accent-yellow);
-  font-weight: 700;
-}
-
-.old-splash-hw-id {
-  font-size: 11px;
-  color: var(--text-dim);
-  margin-bottom: 20px;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.old-splash-btn-row {
-  margin-top: 6px;
-}
-
-.old-splash-btn-continue {
-  height: 44px;
-  min-width: 140px;
-  background-color: var(--accent-yellow);
-  color: #111827;
-  border: none;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.old-splash-btn-continue:hover {
-  background-color: var(--accent-yellow-dark);
+  text-align: center;
 }
 
 /* ==========================================================================
@@ -1014,7 +915,6 @@ html, body {
   padding: 18px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 .modal-title {
@@ -1112,20 +1012,40 @@ html, body {
   font-size: 13px;
 }
 
-.btn-danger-cancel {
+.modal-single-button-row {
   width: 100%;
-  height: 40px;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
+  margin-top: 10px;
 }
 
-.btn-danger-cancel:hover {
-  border-color: var(--border-medium);
-  color: var(--text-main);
+.btn-danger-cancel,
+.btn-modal-cancel {
+  width: 100%;
+  height: 44px;
+  background-color: #374151;
+  border: 1px solid #4B5563;
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.btn-modal-confirm {
+  width: 100%;
+  height: 44px;
+  background-color: var(--accent-yellow);
+  color: #111827;
+  border: 1px solid var(--accent-yellow);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .values-table-wrap {
@@ -1163,39 +1083,10 @@ html, body {
 
 .modal-buttons-row {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
   margin-top: 14px;
-}
-
-.btn-modal-cancel {
-  flex: 1;
-  height: 42px;
-  background-color: var(--bg-page);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-modal-cancel:hover {
-  border-color: var(--border-medium);
-  color: var(--text-main);
-}
-
-.btn-modal-confirm {
-  flex: 1;
-  height: 42px;
-  background-color: var(--accent-yellow);
-  color: #111827;
-  border: none;
-  font-size: 13.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.btn-modal-confirm:hover {
-  background-color: var(--accent-yellow-dark);
 }
 
 .btn-close {

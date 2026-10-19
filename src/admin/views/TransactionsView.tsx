@@ -17,6 +17,7 @@ import {
   Boxes,
 } from 'lucide-react';
 import type { Transaction, Equipment } from '../../types';
+import { formatAdminTimestamp } from '../../utils/dateFormat';
 
 interface TransactionsViewProps {
   transactions: Transaction[];
@@ -588,7 +589,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     {/* Timestamp */}
                     <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }} className="admin-mono">
                       <Clock size={12} style={{ display: 'inline', marginRight: '6px', color: '#64748b' }} />
-                      {tx.transactionTimestamp}
+                      {formatAdminTimestamp(tx.transactionTimestamp)}
                     </td>
 
                     {/* Equipment ID */}

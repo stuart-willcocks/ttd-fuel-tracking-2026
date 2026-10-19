@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, ReceiptText, Code } from 'lucide-react';
 import type { Transaction, Equipment } from '../../types';
+import { formatAdminTimestamp } from '../../utils/dateFormat';
 
 interface TransactionDetailModalProps {
   transaction: Transaction | null;
@@ -114,7 +115,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           <div style={{ background: 'var(--adm-surface-2)', padding: '14px', borderRadius: '8px' }}>
             <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>Transaction Time (Local)</span>
             <div style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.86rem', color: '#ffffff' }}>
-              {transaction.transactionTimestamp}
+              {formatAdminTimestamp(transaction.transactionTimestamp)}
             </div>
           </div>
 
