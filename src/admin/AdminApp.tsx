@@ -80,8 +80,9 @@ export const AdminApp: React.FC = () => {
     document.body.classList.add('admin-body');
     loadFleetData();
 
-    // Auto-refresh interval every 30 seconds for live operations
+    // Auto-refresh interval every 30 seconds for live operations (pauses if editing modal is open)
     const interval = setInterval(() => {
+      if (isCreateModalOpen || Boolean(editingAsset)) return;
       loadFleetData(true);
     }, 30000);
 
@@ -89,7 +90,7 @@ export const AdminApp: React.FC = () => {
       document.body.classList.remove('admin-body');
       clearInterval(interval);
     };
-  }, [loadFleetData]);
+  }, [loadFleetData, isCreateModalOpen, editingAsset]);
 
   // Selected asset object
   const selectedAsset = useMemo(() => {
@@ -271,6 +272,7 @@ export const AdminApp: React.FC = () => {
         {/* Create / Edit Asset Modal */}
         {(isCreateModalOpen || editingAsset) && (
           <AssetFormModal
+            key={editingAsset ? `edit-${editingAsset.equipmentId}` : 'create-asset'}
             isOpen={isCreateModalOpen || Boolean(editingAsset)}
             initialAsset={editingAsset}
             existingAssets={assets}

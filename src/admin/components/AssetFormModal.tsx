@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { X, Plus, Sparkles, MapPin, Check, Zap } from 'lucide-react';
 import type { Equipment, AssetType } from '../../types';
 
@@ -32,19 +32,8 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
 }) => {
   const isEditMode = Boolean(initialAsset);
 
-  const [equipmentId, setEquipmentId] = useState<string>('');
-  const [type, setType] = useState<AssetType>('GENERATOR');
-  const [capacity, setCapacity] = useState<string>('100');
-  const [area, setArea] = useState<string>('North Zone');
-  const [location, setLocation] = useState<string>('');
-  const [what3words, setWhat3words] = useState<string>('');
-  const [rentalSerialNumber, setRentalSerialNumber] = useState<string>('');
-  const [isPoweredUp, setIsPoweredUp] = useState<boolean>(false);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  // Auto-suggest next sequential Equipment ID
-  const suggestNextId = useCallback((preferredPrefix = 'TTD-MAT-') => {
+  // Auto-suggest next sequential Equipment ID based on latest fleet
+  const suggestNextId = (preferredPrefix = 'TTD-MAT-') => {
     let maxNum = 0;
     for (const eq of existingAssets) {
       if (eq.equipmentId.startsWith(preferredPrefix)) {
@@ -57,32 +46,47 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     const nextNum = maxNum + 1;
     const formattedNum = String(nextNum).padStart(4, '0');
     return `${preferredPrefix}${formattedNum}`;
-  }, [existingAssets]);
+  };
 
-  useEffect(() => {
+  // Form input states initialized once on mount
+  const [equipmentId, setEquipmentId] = useState<string>(() => {
+    return initialAsset?.equipmentId || suggestNextId();
+  });
+
+  const [type, setType] = useState<AssetType>(() => {
+    return initialAsset?.type || 'GENERATOR';
+  });
+
+  const [capacity, setCapacity] = useState<string>(() => {
     if (initialAsset) {
-      setEquipmentId(initialAsset.equipmentId);
-      setType(initialAsset.type);
-      setCapacity(initialAsset.capacity ? String(initialAsset.capacity) : '');
-      setArea(initialAsset.area || 'North Zone');
-      setLocation(initialAsset.location || '');
-      setWhat3words(initialAsset.what3words || '');
-      setRentalSerialNumber(initialAsset.rentalSerialNumber || '');
-      setIsPoweredUp(Boolean(initialAsset.poweredUpTimestamp && !initialAsset.poweredDownTimestamp));
-    } else {
-      // Create mode defaults
-      const nextId = suggestNextId();
-      setEquipmentId(nextId);
-      setType('GENERATOR');
-      setCapacity('100');
-      setArea('North Zone');
-      setLocation('');
-      setWhat3words('///field.power.setup');
-      setRentalSerialNumber(`RSN-${Math.floor(10000 + Math.random() * 90000)}`);
-      setIsPoweredUp(false);
+      return initialAsset.capacity !== undefined ? String(initialAsset.capacity) : '';
     }
-    setErrorMsg(null);
-  }, [initialAsset, isOpen, suggestNextId]);
+    return '100';
+  });
+
+  const [area, setArea] = useState<string>(() => {
+    return initialAsset?.area || 'North Zone';
+  });
+
+  const [location, setLocation] = useState<string>(() => {
+    return initialAsset?.location || '';
+  });
+
+  const [what3words, setWhat3words] = useState<string>(() => {
+    return initialAsset?.what3words || '///field.power.setup';
+  });
+
+  const [rentalSerialNumber, setRentalSerialNumber] = useState<string>(() => {
+    if (initialAsset) return initialAsset.rentalSerialNumber || '';
+    return `RSN-${Math.floor(10000 + Math.random() * 90000)}`;
+  });
+
+  const [isPoweredUp, setIsPoweredUp] = useState<boolean>(() => {
+    return Boolean(initialAsset?.poweredUpTimestamp && !initialAsset?.poweredDownTimestamp);
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
