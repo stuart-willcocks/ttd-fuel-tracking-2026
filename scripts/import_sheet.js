@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,9 +32,6 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-/**
- * Simple CSV parser handling quotes, commas, and newlines
- */
 function parseCSV(csvText) {
   const cleanText = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const lines = [];
@@ -48,7 +46,7 @@ function parseCSV(csvText) {
     if (inQuotes) {
       if (char === '"' && nextChar === '"') {
         currentField += '"';
-        i++; // skip escaped quote
+        i++;
       } else if (char === '"') {
         inQuotes = false;
       } else {
@@ -84,7 +82,7 @@ function parseCSV(csvText) {
     throw new Error('CSV contains no data rows');
   }
 
-  const rawHeaders = lines[0].map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const rawHeaders = lines[0].map(h => h.trim());
   const rows = [];
 
   for (let r = 1; r < lines.length; r++) {
@@ -92,7 +90,7 @@ function parseCSV(csvText) {
     const rowObj = {};
     for (let c = 0; c < lines[0].length; c++) {
       const headerKey = rawHeaders[c] || `col_${c}`;
-      rowObj[headerKey] = rowValues[c] ?? '';
+      rowObj[headerKey] = (rowValues[c] ?? '').trim();
     }
     rows.push(rowObj);
   }
@@ -100,157 +98,189 @@ function parseCSV(csvText) {
   return { headers: rawHeaders, rows };
 }
 
-/**
- * Maps CSV row to equipment_list schema
- */
-function mapRowToEquipment(row, index) {
-  // Find equipment ID
-  const eqId =
-    row.equipmentid ||
-    row.assetid ||
-    row.equipment ||
-    row.asset ||
-    row.id ||
-    row.assetnumber ||
-    `EQ-${String(index + 1).padStart(4, '0')}`;
+function clamp(val, min, max) {
+  if (val === null || val === undefined || isNaN(val)) return null;
+  return Math.min(max, Math.max(min, Math.round(val)));
+}
 
-  // Find Type
-  let rawType = (
-    row.type ||
-    row.equipmenttype ||
-    row.assettype ||
-    row.category ||
-    'GENERATOR'
-  ).toUpperCase();
-
-  let type = 'GENERATOR';
-  if (rawType.includes('TANK') || rawType.includes('BOWSER') || rawType.includes('FUEL')) {
-    type = 'TANK';
-  } else if (rawType.includes('PLANT') || rawType.includes('LIGHT') || rawType.includes('TOWER') || rawType.includes('TELEHANDLER') || rawType.includes('PUMP')) {
-    type = 'PLANT';
-  } else if (rawType.includes('GEN') || rawType.includes('GENERATOR') || rawType.includes('POWER')) {
-    type = 'GENERATOR';
+function parseIntSafe(val, min, max) {
+  if (val === null || val === undefined || val === '') return null;
+  const num = parseInt(String(val).replace(/[^0-9-]/g, ''), 10);
+  if (isNaN(num)) return null;
+  if (min !== undefined && max !== undefined) {
+    return clamp(num, min, max);
   }
+  return num >= 0 ? num : null;
+}
 
-  // Find Area
-  const area =
-    row.area ||
-    row.zone ||
-    row.sector ||
-    row.field ||
-    row.site ||
-    'Site Area';
+export async function runWipeAndImport(csvContent) {
+  console.log('--- STARTING DATABASE WIPE & IMPORT ---');
+  const { headers, rows } = parseCSV(csvContent);
+  console.log(`Parsed CSV headers: ${headers.join(', ')}`);
+  console.log(`Parsed ${rows.length} total equipment records.`);
 
-  // Find Location
-  const location =
-    row.location ||
-    row.description ||
-    row.name ||
-    row.title ||
-    row.position ||
-    'Location TBC';
+  const equipmentRecords = [];
+  const transactions = [];
 
-  // Find What3Words
-  let what3words =
-    row.what3words ||
-    row.w3w ||
-    row.words ||
-    row.coordinates ||
-    '///setup.field.power';
-  if (!what3words.startsWith('///')) {
-    what3words = '///' + what3words.replace(/^[/]+/, '');
-  }
+  const baseCheckInTime = new Date('2026-07-02T08:00:00Z').getTime();
+  const baseCheckOutTime = new Date('2026-07-06T17:00:00Z').getTime();
 
-  // Find Capacity
-  let capacity = null;
-  const rawCap = row.capacity || row.cap || row.fuelcapacity || row.litres || row.kva || row.size;
-  if (rawCap) {
-    const num = parseInt(String(rawCap).replace(/[^0-9]/g, ''), 10);
-    if (!isNaN(num) && num > 0) {
-      capacity = num;
+  for (let idx = 0; idx < rows.length; idx++) {
+    const row = rows[idx];
+    const eqId = row.EquipmentId || `TTD-EQ-${String(idx + 1).padStart(4, '0')}`;
+    const area = row.Area || 'Site Area';
+    const location = row.Location || 'Field Location';
+    let w3w = row.what3words || 'test.test.test';
+    if (!w3w.startsWith('///')) w3w = `///${w3w.replace(/^[/]+/, '')}`;
+
+    let type = (row.Type || 'GENERATOR').toUpperCase();
+    if (!['GENERATOR', 'TANK', 'PLANT'].includes(type)) {
+      if (type.includes('TANK')) type = 'TANK';
+      else if (type.includes('PLANT')) type = 'PLANT';
+      else type = 'GENERATOR';
+    }
+
+    const size = parseIntSafe(row.Size, 0, 100000);
+    const serial = row.SerialNumber || `RSN-${eqId}`;
+
+    const eqRecord = {
+      equipment_id: eqId,
+      area,
+      location,
+      what3words: w3w,
+      type,
+      capacity: size,
+      rental_serial_number: serial,
+      device_id: 'IMPORT-SYNC',
+      powered_up_timestamp: null,
+      powered_down_timestamp: null,
+      updated_at: new Date().toISOString(),
+    };
+    equipmentRecords.push(eqRecord);
+
+    // Stagger timestamps by asset index so transactions sort naturally
+    const checkInDate = new Date(baseCheckInTime + idx * 60000).toISOString();
+    const checkOutDate = new Date(baseCheckOutTime + idx * 60000).toISOString();
+
+    const qtyCheckIns = parseInt(row.QtyCheckIns || '0', 10);
+    const qtyCheckOuts = parseInt(row.QtyCheckOuts || '0', 10);
+
+    const checkInFuelEighths = parseIntSafe(row.CheckInFuelEighths, 0, 8);
+    const checkInFuelPct = parseIntSafe(row.CheckInFuelPercentage, 0, 100);
+    const checkInDefPct = parseIntSafe(row.CheckInDefPercentage, 0, 100);
+    const checkInKwh = parseIntSafe(row.CheckInKWH);
+
+    const checkOutFuelEighths = parseIntSafe(row.CheckOutFuelEighths, 0, 8);
+    const checkOutFuelPct = parseIntSafe(row.CheckOutFuelPercentage, 0, 100);
+    const checkOutDefPct = parseIntSafe(row.CheckOutDefPercentage, 0, 100);
+    const checkOutKwh = parseIntSafe(row.CheckOutKWH);
+
+    const fuelTransfer = parseIntSafe(row.FuelTransferred);
+    const defTransfer = parseIntSafe(row.DefTransferred);
+
+    // If Check-In occurred
+    if (qtyCheckIns > 0 || checkInFuelPct !== null || checkInKwh !== null) {
+      transactions.push({
+        id: crypto.randomUUID(),
+        equipment_id: eqId,
+        transaction_timestamp: checkInDate,
+        upload_timestamp: new Date().toISOString(),
+        transaction_type: 'CheckIn',
+        device_id: 'IMPORT-SEED',
+        check_in_fuel_eighths: checkInFuelEighths,
+        check_out_fuel_eighths: null,
+        check_in_fuel_percentage: checkInFuelPct,
+        check_out_fuel_percentage: null,
+        check_in_def_percentage: checkInDefPct,
+        check_out_def_percentage: null,
+        fuel_transfer_litres: fuelTransfer,
+        def_transfer_litres: defTransfer,
+        check_in_kwh: checkInKwh,
+        check_out_kwh: null,
+      });
+    }
+
+    // If Check-Out occurred
+    if (qtyCheckOuts > 0 || checkOutFuelPct !== null || checkOutKwh !== null) {
+      transactions.push({
+        id: crypto.randomUUID(),
+        equipment_id: eqId,
+        transaction_timestamp: checkOutDate,
+        upload_timestamp: new Date().toISOString(),
+        transaction_type: 'CheckOut',
+        device_id: 'IMPORT-SEED',
+        check_in_fuel_eighths: null,
+        check_out_fuel_eighths: checkOutFuelEighths,
+        check_in_fuel_percentage: null,
+        check_out_fuel_percentage: checkOutFuelPct,
+        check_in_def_percentage: null,
+        check_out_def_percentage: checkOutDefPct,
+        fuel_transfer_litres: null,
+        def_transfer_litres: null,
+        check_in_kwh: null,
+        check_out_kwh: checkOutKwh,
+      });
     }
   }
 
-  // Find Rental Serial Number
-  const rentalSerialNumber =
-    row.rentalserialnumber ||
-    row.serialnumber ||
-    row.serial ||
-    row.rsn ||
-    row.fleetno ||
-    row.fleetnumber ||
-    `RSN-${eqId}`;
+  console.log(`Generated ${equipmentRecords.length} equipment records.`);
+  console.log(`Generated ${transactions.length} matching real-world transactions.`);
 
-  return {
-    equipment_id: eqId,
-    area,
-    location,
-    what3words,
-    type,
-    capacity,
-    rental_serial_number: rentalSerialNumber,
-    device_id: null,
-    powered_up_timestamp: null,
-    powered_down_timestamp: null,
-    updated_at: new Date().toISOString(),
-  };
-}
-
-export async function importData(csvContent) {
-  console.log('Parsing CSV content...');
-  const { headers, rows } = parseCSV(csvContent);
-  console.log(`Detected headers: ${headers.join(', ')}`);
-  console.log(`Detected ${rows.length} rows.`);
-
-  const equipmentRecords = rows
-    .map((row, idx) => mapRowToEquipment(row, idx))
-    .filter(eq => eq.equipment_id && eq.equipment_id.trim().length > 0);
-
-  console.log(`Prepared ${equipmentRecords.length} equipment records for import.`);
-  if (equipmentRecords.length === 0) {
-    throw new Error('No valid equipment records parsed from CSV');
-  }
-
-  // Step 1: Wipe transactions
-  console.log('Deleting existing transactions in Supabase...');
-  const { error: txDelErr } = await supabase
+  // 1. DELETE ALL TRANSACTIONS
+  console.log('1. Deleting all transactions in Supabase...');
+  const { error: delTxErr } = await supabase
     .from('transactions')
     .delete()
-    .neq('id', '00000000-0000-0000-0000-000000000000'); // Deletes all rows
-  if (txDelErr) {
-    console.error('Error deleting transactions:', txDelErr);
-    throw txDelErr;
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+  if (delTxErr) {
+    console.error('Failed to wipe transactions:', delTxErr);
+    throw delTxErr;
   }
-  console.log('Transactions deleted successfully.');
+  console.log('Transactions wiped successfully.');
 
-  // Step 2: Wipe equipment_list
-  console.log('Deleting existing equipment_list in Supabase...');
-  const { error: eqDelErr } = await supabase
+  // 2. DELETE ALL EQUIPMENT
+  console.log('2. Deleting all equipment in Supabase...');
+  const { error: delEqErr } = await supabase
     .from('equipment_list')
     .delete()
-    .neq('equipment_id', '__DUMMY_ID_THAT_DOES_NOT_EXIST__'); // Deletes all rows
-  if (eqDelErr) {
-    console.error('Error deleting equipment_list:', eqDelErr);
-    throw eqDelErr;
+    .neq('equipment_id', '__NEQ_ALL__');
+  if (delEqErr) {
+    console.error('Failed to wipe equipment_list:', delEqErr);
+    throw delEqErr;
   }
   console.log('Equipment list wiped successfully.');
 
-  // Step 3: Insert new equipment records in chunks
-  console.log(`Inserting ${equipmentRecords.length} new records into equipment_list...`);
-  const chunkSize = 50;
-  for (let i = 0; i < equipmentRecords.length; i += chunkSize) {
-    const chunk = equipmentRecords.slice(i, i + chunkSize);
-    const { error: insertErr } = await supabase
-      .from('equipment_list')
-      .upsert(chunk, { onConflict: 'equipment_id' });
-    if (insertErr) {
-      console.error(`Error inserting chunk ${i} - ${i + chunk.length}:`, insertErr);
-      throw insertErr;
+  // 3. INSERT EQUIPMENT RECORDS IN BATCHES
+  console.log(`3. Inserting ${equipmentRecords.length} equipment records...`);
+  const eqBatchSize = 50;
+  for (let i = 0; i < equipmentRecords.length; i += eqBatchSize) {
+    const chunk = equipmentRecords.slice(i, i + eqBatchSize);
+    const { error: insEqErr } = await supabase.from('equipment_list').upsert(chunk);
+    if (insEqErr) {
+      console.error(`Error inserting equipment batch ${i}-${i + chunk.length}:`, insEqErr);
+      throw insEqErr;
     }
+    process.stdout.write(`   Equipment inserted: ${Math.min(i + eqBatchSize, equipmentRecords.length)} / ${equipmentRecords.length}\r`);
   }
-  console.log('All records inserted into Supabase successfully!');
+  console.log(`\nAll ${equipmentRecords.length} equipment records successfully inserted into Supabase!`);
 
-  // Step 4: Synchronize local data/database.json
+  // 4. INSERT TRANSACTIONS IN BATCHES
+  if (transactions.length > 0) {
+    console.log(`4. Inserting ${transactions.length} transaction records...`);
+    const txBatchSize = 50;
+    for (let i = 0; i < transactions.length; i += txBatchSize) {
+      const chunk = transactions.slice(i, i + txBatchSize);
+      const { error: insTxErr } = await supabase.from('transactions').insert(chunk);
+      if (insTxErr) {
+        console.error(`Error inserting transaction batch ${i}-${i + chunk.length}:`, insTxErr);
+        throw insTxErr;
+      }
+      process.stdout.write(`   Transactions inserted: ${Math.min(i + txBatchSize, transactions.length)} / ${transactions.length}\r`);
+    }
+    console.log(`\nAll ${transactions.length} transaction records successfully inserted into Supabase!`);
+  }
+
+  // 5. UPDATE LOCAL FALLBACK data/database.json
   const dbJsonPath = path.join(ROOT_DIR, 'data', 'database.json');
   const localDb = {
     equipment: equipmentRecords.map(eq => ({
@@ -265,78 +295,58 @@ export async function importData(csvContent) {
       poweredDownTimestamp: null,
       updatedAt: eq.updated_at,
     })),
-    transactions: [],
+    transactions: transactions.map(tx => ({
+      id: tx.id,
+      equipmentId: tx.equipment_id,
+      transactionTimestamp: tx.transaction_timestamp,
+      uploadTimestamp: tx.upload_timestamp,
+      transactionType: tx.transaction_type,
+      checkInFuelEighths: tx.check_in_fuel_eighths ?? undefined,
+      checkOutFuelEighths: tx.check_out_fuel_eighths ?? undefined,
+      checkInFuelPercentage: tx.check_in_fuel_percentage ?? undefined,
+      checkOutFuelPercentage: tx.check_out_fuel_percentage ?? undefined,
+      checkInDefPercentage: tx.check_in_def_percentage ?? undefined,
+      checkOutDefPercentage: tx.check_out_def_percentage ?? undefined,
+      fuelTransferLitres: tx.fuel_transfer_litres ?? undefined,
+      defTransferLitres: tx.def_transfer_litres ?? undefined,
+      checkInKWH: tx.check_in_kwh ?? undefined,
+      checkOutKWH: tx.check_out_kwh ?? undefined,
+      syncStatus: 'synced',
+      deviceId: tx.device_id,
+      createdAt: tx.transaction_timestamp,
+    })),
   };
   fs.writeFileSync(dbJsonPath, JSON.stringify(localDb, null, 2), 'utf8');
-  console.log(`Updated local fallback database at ${dbJsonPath}`);
+  console.log(`5. Synchronized local fallback database at: ${dbJsonPath}`);
 
-  return equipmentRecords.length;
+  console.log('--- WIPE AND IMPORT COMPLETED SUCCESSFULLY ---');
+  return { equipmentCount: equipmentRecords.length, transactionCount: transactions.length };
 }
 
-// CLI Execution
 async function main() {
-  const arg = process.argv[2];
-
+  const filePath = path.join(ROOT_DIR, 'data', 'real_equipment.csv');
   let csvData = '';
 
-  if (arg && fs.existsSync(arg)) {
-    console.log(`Reading CSV from local file: ${arg}`);
-    csvData = fs.readFileSync(arg, 'utf8');
-  } else if (arg && arg.startsWith('http')) {
-    console.log(`Fetching CSV from URL: ${arg}`);
-    const res = await fetch(arg);
-    if (!res.ok) {
-      throw new Error(`Failed to fetch URL: HTTP ${res.status} ${res.statusText}`);
-    }
-    csvData = await res.text();
+  if (fs.existsSync(filePath)) {
+    console.log(`Reading cached CSV from: ${filePath}`);
+    csvData = fs.readFileSync(filePath, 'utf8');
   } else {
-    // Check if data/real_equipment.csv or data/equipment.csv exists
-    const candidates = [
-      path.join(ROOT_DIR, 'data', 'real_equipment.csv'),
-      path.join(ROOT_DIR, 'data', 'equipment.csv'),
-      path.join(ROOT_DIR, 'data', 'equipment_import.csv'),
-    ];
-    for (const c of candidates) {
-      if (fs.existsSync(c)) {
-        console.log(`Found CSV file at: ${c}`);
-        csvData = fs.readFileSync(c, 'utf8');
-        break;
-      }
-    }
-  }
-
-  if (!csvData) {
-    // Try downloading directly from the user's Google Sheet URL export link
     const sheetId = '1-pFXEhmhjs8lJ-sZYNecUqRd-D_nDbK_Uv5766Twt2M';
     const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
-    console.log(`Attempting to fetch Google Sheet export from: ${exportUrl}`);
-    try {
-      const res = await fetch(exportUrl);
-      if (res.ok) {
-        const text = await res.text();
-        if (text.includes('<!DOCTYPE') || text.includes('accounts.google.com')) {
-          console.error('\n[ACCESS ERROR]: Google Sheet requires sign-in. It is not shared publicly.');
-          process.exit(2);
-        } else {
-          csvData = text;
-        }
-      } else {
-        console.error(`Failed to fetch Google Sheet: HTTP ${res.status}`);
-        process.exit(2);
-      }
-    } catch (err) {
-      console.error('Fetch error:', err.message);
-      process.exit(2);
+    console.log(`Fetching live Google Sheet export from: ${exportUrl}`);
+    const res = await fetch(exportUrl);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch Google Sheet: HTTP ${res.status}`);
     }
+    csvData = await res.text();
   }
 
-  await importData(csvData);
-  console.log('Import completed successfully!');
+  await runWipeAndImport(csvData);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch(err => {
-    console.error('Import failed:', err);
+    console.error('Fatal error during import:', err);
     process.exit(1);
   });
 }
