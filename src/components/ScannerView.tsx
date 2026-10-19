@@ -257,3 +257,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     </div>
   );
 };
+
+export { ScannerView as ScanView };
+export type { ScannerViewProps as ScanViewProps };

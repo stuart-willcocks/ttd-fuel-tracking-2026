@@ -2,6 +2,8 @@ import React from 'react';
 import { Wifi, WifiOff, RefreshCw, Settings, Maximize2, Minimize2 } from 'lucide-react';
 import type { SyncState } from '../services/syncEngine';
 
+import { APP_VERSION } from '../version';
+
 interface HeaderProps {
   syncState: SyncState;
   isFullscreen: boolean;
@@ -10,6 +12,7 @@ interface HeaderProps {
   onToggleFullscreen: () => void;
   onOpenOutbox: () => void;
   onOpenSettings: () => void;
+  onShowSplash?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,11 +23,21 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleFullscreen,
   onOpenOutbox,
   onOpenSettings,
+  onShowSplash,
 }) => {
   return (
     <header className="app-header">
-      <div className="header-title-box">
-        <h1 className="header-title">TTD Fuel Tracking</h1>
+      <div
+        className="header-title-box"
+        onClick={onShowSplash}
+        style={{ cursor: onShowSplash ? 'pointer' : 'default' }}
+        title={onShowSplash ? 'Click to view Splash Screen' : undefined}
+      >
+        <div className="header-company-name">The Technical Department Ltd</div>
+        <div className="header-sub-row">
+          <span className="header-app-title">Fuel Tracking App</span>
+          <span className="header-version-pill">v{APP_VERSION}</span>
+        </div>
       </div>
 
       <div className="header-status-box">

@@ -5,14 +5,16 @@ import { resetRemoteData } from './services/api';
 import { type Equipment, type Transaction, type ActionType, generateUUID } from './types';
 import { Header } from './components/Header';
 import { ScannerView } from './components/ScannerView';
-import { AssetDetailView } from './components/AssetDetailView';
+import { TransactionView } from './components/TransactionView';
+import { SplashScreen } from './components/SplashScreen';
 import { TransactionForm } from './components/TransactionForm';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { EditAssetModal } from './components/EditAssetModal';
 import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
-import { APP_VERSION } from './version';
 import { getDeviceName } from './services/device';
+
+export type AppView = 'SPLASH_SCREEN' | 'SCAN_VIEW' | 'TRANSACTION_VIEW';
 
 export const App: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
@@ -99,6 +101,7 @@ export const App: React.FC = () => {
   const activeAssetIdRef = useRef<string | null>(null);
   activeAssetIdRef.current = activeAssetId;
 
+  const [currentView, setCurrentView] = useState<AppView>('SPLASH_SCREEN');
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
   const [isEditingAsset, setIsEditingAsset] = useState<boolean>(false);
 
@@ -212,12 +215,14 @@ export const App: React.FC = () => {
   const handleAssetSelected = (equipmentId: string) => {
     setActiveAssetId(equipmentId);
     setActiveAction(null);
+    setCurrentView('TRANSACTION_VIEW');
   };
 
   const handleBackToScanner = () => {
     setActiveAssetId(null);
     setActiveAction(null);
     setCurrentAsset(null);
+    setCurrentView('SCAN_VIEW');
   };
 
   const handleFormSubmitValues = (data: Partial<Transaction>) => {
@@ -307,6 +312,14 @@ export const App: React.FC = () => {
     }
   };
 
+  if (currentView === 'SPLASH_SCREEN') {
+    return (
+      <div className="app-root">
+        <SplashScreen onContinue={() => setCurrentView('SCAN_VIEW')} />
+      </div>
+    );
+  }
+
   return (
     <div className="app-root">
       <Header
@@ -317,10 +330,11 @@ export const App: React.FC = () => {
         onToggleFullscreen={toggleFullscreen}
         onOpenOutbox={() => setIsOutboxModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onShowSplash={() => setCurrentView('SPLASH_SCREEN')}
       />
 
       <main className="app-main">
-        {!activeAssetId ? (
+        {currentView === 'SCAN_VIEW' || !activeAssetId ? (
           <ScannerView
             onAssetSelected={handleAssetSelected}
             availableAssets={availableAssets}
@@ -337,7 +351,7 @@ export const App: React.FC = () => {
           )
         ) : (
           currentAsset && (
-            <AssetDetailView
+            <TransactionView
               asset={currentAsset}
               transactions={currentAssetTransactions}
               onBackToScanner={handleBackToScanner}
@@ -383,12 +397,11 @@ export const App: React.FC = () => {
         onClose={() => setIsSettingsModalOpen(false)}
         onResetData={handleResetData}
         onTriggerSync={() => syncEngine.syncWithRemote()}
+        onShowSplash={() => {
+          setIsSettingsModalOpen(false);
+          setCurrentView('SPLASH_SCREEN');
+        }}
       />
-
-      {/* Discreet Version Footer */}
-      <footer className="app-version-footer">
-        <span>v{APP_VERSION}</span>
-      </footer>
     </div>
   );
 };

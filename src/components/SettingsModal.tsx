@@ -15,6 +15,7 @@ interface SettingsModalProps {
   onClose: () => void;
   onResetData: () => void;
   onTriggerSync: () => void;
+  onShowSplash?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -22,6 +23,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onResetData,
   onTriggerSync,
+  onShowSplash,
 }) => {
   const currentConfig = getSupabaseConfig();
   const [url, setUrl] = useState(currentConfig.url);
@@ -122,6 +124,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 (Web security standards prevent browsers from reading physical SIM numbers or hardware IMEIs, so this persistent identifier reliably tracks each PDA.)
               </span>
             </div>
+
+            {onShowSplash && (
+              <button
+                type="button"
+                className="btn-secondary w-full mt-2"
+                onClick={onShowSplash}
+              >
+                View Welcome Splash Screen
+              </button>
+            )}
           </div>
         </div>
 
