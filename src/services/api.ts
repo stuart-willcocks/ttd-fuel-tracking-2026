@@ -3,6 +3,7 @@ import {
   isSupabaseConfigured,
   fetchEquipmentFromSupabase,
   saveEquipmentToSupabase,
+  deleteEquipmentFromSupabase,
   fetchTransactionsFromSupabase,
 } from './supabase';
 
@@ -36,6 +37,22 @@ export async function postRemoteEquipment(equipment: Equipment): Promise<void> {
     body: JSON.stringify(equipment),
   });
   if (!res.ok) throw new Error(`Failed to save equipment: ${res.statusText}`);
+}
+
+export async function deleteRemoteEquipment(equipmentId: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    try {
+      await deleteEquipmentFromSupabase(equipmentId);
+      return;
+    } catch (err) {
+      console.warn('Supabase delete equipment failed, falling back to local API:', err);
+    }
+  }
+
+  const res = await fetch(`/api/equipment?id=${encodeURIComponent(equipmentId)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(`Failed to delete equipment: ${res.statusText}`);
 }
 
 export async function fetchRemoteTransactions(): Promise<Transaction[]> {

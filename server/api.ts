@@ -168,7 +168,7 @@ export function apiMiddleware(): Connect.NextHandleFunction {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') {
@@ -199,6 +199,28 @@ export function apiMiddleware(): Connect.NextHandleFunction {
         writeData(data);
         res.statusCode = 200;
         res.end(JSON.stringify({ success: true, equipment: body }));
+        return;
+      }
+
+      // DELETE /api/equipment
+      if (pathname === '/api/equipment' && req.method === 'DELETE') {
+        const query = new URL(rawUrl, 'http://localhost').searchParams;
+        let targetId = query.get('id') || query.get('equipmentId');
+        if (!targetId) {
+          const body = await parseJsonBody(req).catch(() => ({}));
+          targetId = body.equipmentId || body.id;
+        }
+        if (!targetId) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'Missing equipmentId parameter' }));
+          return;
+        }
+        const data = readData();
+        const beforeCount = data.equipments.length;
+        data.equipments = data.equipments.filter((e) => e.equipmentId !== targetId);
+        writeData(data);
+        res.statusCode = 200;
+        res.end(JSON.stringify({ success: true, deletedId: targetId, removed: beforeCount !== data.equipments.length }));
         return;
       }
 

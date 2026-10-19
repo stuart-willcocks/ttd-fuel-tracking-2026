@@ -1,7 +1,12 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { apiMiddleware } from './server/api.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [
@@ -74,7 +79,7 @@ export default defineConfig({
           {
             name: 'Scan Asset QR',
             short_name: 'Scan QR',
-            description: 'Launch QR scanner to scan asset barcode',
+            description: 'Launch QR scanner to scan barcode',
             url: '/',
             icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
           },
@@ -115,6 +120,31 @@ export default defineConfig({
       },
     }),
     {
+      name: 'ttd-admin-router',
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          const rawUrl = req.url || '';
+          const url = rawUrl.split('?')[0];
+          if (url === '/admin' || url === '/admin/') {
+            const query = rawUrl.includes('?') ? '?' + rawUrl.split('?')[1] : '';
+            req.url = '/admin.html' + query;
+          }
+          next();
+        });
+      },
+      configurePreviewServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          const rawUrl = req.url || '';
+          const url = rawUrl.split('?')[0];
+          if (url === '/admin' || url === '/admin/') {
+            const query = rawUrl.includes('?') ? '?' + rawUrl.split('?')[1] : '';
+            req.url = '/admin.html' + query;
+          }
+          next();
+        });
+      },
+    },
+    {
       name: 'ttd-api-server',
       configureServer(server) {
         server.middlewares.use(apiMiddleware());
@@ -124,6 +154,14 @@ export default defineConfig({
       },
     },
   ],
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        admin: path.resolve(__dirname, 'admin.html'),
+      },
+    },
+  },
   server: {
     host: true,
   },

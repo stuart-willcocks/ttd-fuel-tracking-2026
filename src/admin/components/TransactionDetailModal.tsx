@@ -1,0 +1,257 @@
+import React, { useState } from 'react';
+import { X, ReceiptText, Code } from 'lucide-react';
+import type { Transaction, Equipment } from '../../types';
+
+interface TransactionDetailModalProps {
+  transaction: Transaction | null;
+  asset?: Equipment | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectAsset?: (equipmentId: string) => void;
+}
+
+export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
+  transaction,
+  asset,
+  isOpen,
+  onClose,
+  onSelectAsset,
+}) => {
+  const [showJson, setShowJson] = useState(false);
+
+  if (!isOpen || !transaction) return null;
+
+  return (
+    <div className="admin-modal-backdrop" onClick={onClose}>
+      <div className="admin-modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: 'rgba(6, 182, 212, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#06b6d4',
+              }}
+            >
+              <ReceiptText size={22} />
+            </div>
+            <div>
+              <h3 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>
+                Transaction Telemetry
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--adm-text-secondary)', fontFamily: 'var(--adm-font-mono)' }}>
+                UUID: {transaction.id}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="admin-btn admin-btn-outline admin-btn-sm" style={{ padding: '6px' }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Target Asset Banner */}
+        <div
+          style={{
+            padding: '16px',
+            background: 'var(--adm-surface-2)',
+            borderRadius: 'var(--adm-radius-md)',
+            border: '1px solid var(--adm-border-subtle)',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
+              Target Asset
+            </span>
+            <div style={{ fontFamily: 'var(--adm-font-mono)', fontSize: '1.15rem', fontWeight: 800, color: '#f59e0b' }}>
+              {transaction.equipmentId}
+            </div>
+            {asset && (
+              <div style={{ fontSize: '0.82rem', color: 'var(--adm-text-secondary)' }}>
+                {asset.type} • {asset.area} ({asset.location})
+              </div>
+            )}
+          </div>
+
+          {onSelectAsset && (
+            <button
+              onClick={() => {
+                onClose();
+                onSelectAsset(transaction.equipmentId);
+              }}
+              className="admin-btn admin-btn-outline admin-btn-sm"
+            >
+              View Asset ↗
+            </button>
+          )}
+        </div>
+
+        {/* Telemetry Data Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+          <div style={{ background: 'var(--adm-surface-2)', padding: '14px', borderRadius: '8px' }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>Action Type</span>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#ffffff' }}>
+              {transaction.transactionType}
+            </div>
+          </div>
+
+          <div style={{ background: 'var(--adm-surface-2)', padding: '14px', borderRadius: '8px' }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>PDA Handheld Device</span>
+            <div style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.9rem', color: '#38bdf8' }}>
+              {transaction.deviceId || 'Field PDA (Zebra)'}
+            </div>
+          </div>
+
+          <div style={{ background: 'var(--adm-surface-2)', padding: '14px', borderRadius: '8px' }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>Transaction Time (Local)</span>
+            <div style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.86rem', color: '#ffffff' }}>
+              {transaction.transactionTimestamp}
+            </div>
+          </div>
+
+          <div style={{ background: 'var(--adm-surface-2)', padding: '14px', borderRadius: '8px' }}>
+            <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>Cloud Upload Time</span>
+            <div style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.86rem', color: '#10b981' }}>
+              {transaction.uploadTimestamp || 'Synced'}
+            </div>
+          </div>
+        </div>
+
+        {/* Specific Measurements Section */}
+        <div
+          style={{
+            background: 'var(--adm-surface-1)',
+            border: '1px solid var(--adm-border-subtle)',
+            borderRadius: 'var(--adm-radius-md)',
+            padding: '16px',
+            marginBottom: '20px',
+          }}
+        >
+          <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--adm-text-secondary)', fontWeight: 700, marginBottom: '12px' }}>
+            Recorded Values
+          </h4>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+            {transaction.fuelTransferLitres !== undefined && (
+              <div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Fuel Transfer</span>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#06b6d4' }}>
+                  {transaction.fuelTransferLitres} L
+                </p>
+              </div>
+            )}
+
+            {transaction.defTransferLitres !== undefined && (
+              <div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>DEF Transfer</span>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#3b82f6' }}>
+                  {transaction.defTransferLitres} L
+                </p>
+              </div>
+            )}
+
+            {transaction.checkInFuelPercentage !== undefined && (
+              <div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-in Fuel</span>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                  {transaction.checkInFuelPercentage}%
+                </p>
+              </div>
+            )}
+
+            {transaction.checkOutFuelPercentage !== undefined && (
+              <div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-out Fuel</span>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                  {transaction.checkOutFuelPercentage}%
+                </p>
+              </div>
+            )}
+
+            {transaction.checkInFuelEighths !== undefined && (
+              <div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-in Eighths</span>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                  {transaction.checkInFuelEighths}/8
+                </p>
+              </div>
+            )}
+
+            {transaction.checkOutFuelEighths !== undefined && (
+              <div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-out Eighths</span>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                  {transaction.checkOutFuelEighths}/8
+                </p>
+              </div>
+            )}
+
+            {transaction.checkInKWH !== undefined && (
+              <div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-in kWh</span>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#10b981' }}>
+                  {transaction.checkInKWH.toLocaleString()} kWh
+                </p>
+              </div>
+            )}
+
+            {transaction.checkOutKWH !== undefined && (
+              <div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-out kWh</span>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#10b981' }}>
+                  {transaction.checkOutKWH.toLocaleString()} kWh
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Raw JSON toggle */}
+        <div style={{ marginBottom: '14px' }}>
+          <button
+            onClick={() => setShowJson(!showJson)}
+            className="admin-btn admin-btn-outline admin-btn-sm"
+            style={{ fontSize: '0.78rem' }}
+          >
+            <Code size={14} />
+            <span>{showJson ? 'Hide Raw JSON Payload' : 'Inspect Raw JSON Payload'}</span>
+          </button>
+
+          {showJson && (
+            <pre
+              style={{
+                marginTop: '10px',
+                padding: '12px',
+                background: '#04070d',
+                borderRadius: '8px',
+                border: '1px solid var(--adm-border-subtle)',
+                fontSize: '0.76rem',
+                fontFamily: 'var(--adm-font-mono)',
+                color: '#34d399',
+                overflowX: 'auto',
+                maxHeight: '180px',
+              }}
+            >
+              {JSON.stringify(transaction, null, 2)}
+            </pre>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid var(--adm-border-subtle)' }}>
+          <button onClick={onClose} className="admin-btn admin-btn-secondary">
+            Close Inspector
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

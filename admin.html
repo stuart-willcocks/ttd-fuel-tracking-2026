@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64x64.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0B0F19" />
+    <meta name="application-name" content="TTD Fleet Admin" />
+    <title>TTD Fleet Admin Portal — Asset Management & Telemetry Dashboard</title>
+    <!-- Modern Industrial Typography: Outfit, Inter, JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+      /* Print styling for printing physical asset QR labels */
+      @media print {
+        body {
+          background: #ffffff !important;
+          color: #000000 !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .print-only {
+          display: block !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="admin-root"></div>
+    <script type="module" src="/src/admin/main.tsx"></script>
+  </body>
+</html>

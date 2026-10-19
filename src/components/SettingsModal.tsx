@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, Copy, RefreshCw, Smartphone } from 'lucide-react';
+import { X, Check, Copy, RefreshCw, Smartphone, Laptop } from 'lucide-react';
 import {
   getSupabaseConfig,
   saveSupabaseConfig,
@@ -227,6 +227,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             )}
           </div>
+        </div>
+
+        <div className="settings-section">
+          <h4 className="settings-heading">Administrator Portal (Laptop / Desktop)</h4>
+          <p className="settings-desc">
+            Open the dedicated Administrator Web App for fleet asset CRUD management, data grids, and telemetry dashboard:
+          </p>
+          <a
+            href="/admin"
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary w-full mt-2"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none' }}
+          >
+            <Laptop size={14} />
+            <span>Launch Admin Portal (/admin)</span>
+          </a>
         </div>
 
         <div className="settings-section">

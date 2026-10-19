@@ -1,0 +1,343 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import './admin.css';
+import { LaptopOnlyGuard } from './components/LaptopOnlyGuard';
+import { AdminSidebar, type AdminViewType } from './components/AdminSidebar';
+import { AdminHeader } from './components/AdminHeader';
+import { DashboardView } from './views/DashboardView';
+import { AssetsView } from './views/AssetsView';
+import { TransactionsView } from './views/TransactionsView';
+import { SettingsView } from './views/SettingsView';
+import { AssetFormModal } from './components/AssetFormModal';
+import { AssetDetailDrawer } from './components/AssetDetailDrawer';
+import { DeleteAssetModal } from './components/DeleteAssetModal';
+import { AssetQRLabelModal } from './components/AssetQRLabelModal';
+import { TransactionDetailModal } from './components/TransactionDetailModal';
+import { ToastContainer, type ToastMessage } from './components/Toast';
+
+import type { Equipment, Transaction } from '../types';
+import {
+  fetchRemoteEquipment,
+  postRemoteEquipment,
+  deleteRemoteEquipment,
+  fetchRemoteTransactions,
+  postRemoteTransaction,
+  resetRemoteData,
+} from '../services/api';
+import { isSupabaseConfigured } from '../services/supabase';
+
+export const AdminApp: React.FC = () => {
+  const [currentView, setCurrentView] = useState<AdminViewType>('DASHBOARD');
+  const [assets, setAssets] = useState<Equipment[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSupabaseOnline, setIsSupabaseOnline] = useState(false);
+
+  // Modals & Drawers state
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<Equipment | null>(null);
+  const [assetPendingDelete, setAssetPendingDelete] = useState<Equipment | null>(null);
+  const [qrAsset, setQrAsset] = useState<Equipment | null>(null);
+  const [inspectingTransaction, setInspectingTransaction] = useState<Transaction | null>(null);
+
+  // Toast Notifications
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = `${Date.now()}_${Math.random()}`;
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // Fetch initial data
+  const loadFleetData = useCallback(async (silent = false) => {
+    if (!silent) setIsRefreshing(true);
+    try {
+      const [fetchedAssets, fetchedTxs] = await Promise.all([
+        fetchRemoteEquipment(),
+        fetchRemoteTransactions(),
+      ]);
+
+      setAssets(fetchedAssets);
+      setTransactions(fetchedTxs);
+      setIsSupabaseOnline(isSupabaseConfigured());
+    } catch (err: unknown) {
+      console.error('Failed to load fleet data:', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!silent) showToast(`Data sync warning: ${msg}`, 'error');
+    } finally {
+      if (!silent) setIsRefreshing(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    document.body.classList.add('admin-body');
+    loadFleetData();
+
+    // Auto-refresh interval every 30 seconds for live operations
+    const interval = setInterval(() => {
+      loadFleetData(true);
+    }, 30000);
+
+    return () => {
+      document.body.classList.remove('admin-body');
+      clearInterval(interval);
+    };
+  }, [loadFleetData]);
+
+  // Selected asset object
+  const selectedAsset = useMemo(() => {
+    return assets.find((a) => a.equipmentId === selectedAssetId) || null;
+  }, [assets, selectedAssetId]);
+
+  // Create / Update Asset Handler
+  const handleSaveAsset = async (savedAsset: Equipment) => {
+    try {
+      await postRemoteEquipment(savedAsset);
+      await loadFleetData(true);
+      showToast(`Asset "${savedAsset.equipmentId}" saved successfully!`, 'success');
+      setEditingAsset(null);
+      setIsCreateModalOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Failed to save asset: ${msg}`, 'error');
+      throw err;
+    }
+  };
+
+  // Delete Asset Handler
+  const handleDeleteAsset = async (equipmentId: string) => {
+    try {
+      await deleteRemoteEquipment(equipmentId);
+      await loadFleetData(true);
+      showToast(`Asset "${equipmentId}" decommissioned and removed.`, 'success');
+      setAssetPendingDelete(null);
+      if (selectedAssetId === equipmentId) {
+        setSelectedAssetId(null);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Failed to delete asset: ${msg}`, 'error');
+      throw err;
+    }
+  };
+
+  // Power Toggle for Generator
+  const handleTogglePower = async (asset: Equipment) => {
+    if (asset.type !== 'GENERATOR') return;
+
+    const isRunning = Boolean(asset.poweredUpTimestamp && !asset.poweredDownTimestamp);
+    const newAction = isRunning ? 'PoweredDown' : 'PoweredUp';
+    const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    const updated: Equipment = {
+      ...asset,
+      poweredUpTimestamp: isRunning ? asset.poweredUpTimestamp : nowIso,
+      poweredDownTimestamp: isRunning ? nowIso : undefined,
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await postRemoteEquipment(updated);
+
+      // Also log the transaction
+      const newTx: Transaction = {
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `adm-tx-${Date.now()}`,
+        equipmentId: asset.equipmentId,
+        transactionTimestamp: nowIso,
+        transactionType: newAction,
+        syncStatus: 'synced',
+        deviceId: 'Admin-Workstation',
+        createdAt: new Date().toISOString(),
+      };
+
+      await postRemoteTransaction(newTx);
+      await loadFleetData(true);
+      showToast(
+        `${asset.equipmentId} is now ${isRunning ? 'Standby (Powered Down)' : 'Energized (Powered Up)'}`,
+        'success'
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Failed to toggle power state: ${msg}`, 'error');
+    }
+  };
+
+  // Reset database handler
+  const handleResetDatabase = async () => {
+    if (window.confirm('Reset all fleet assets and transactions to initial seed defaults?')) {
+      try {
+        await resetRemoteData();
+        await loadFleetData();
+        showToast('Database reset to factory default seed data.', 'info');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showToast(`Failed to reset data: ${msg}`, 'error');
+      }
+    }
+  };
+
+  const getPageTitle = () => {
+    switch (currentView) {
+      case 'DASHBOARD':
+        return 'Mission Operations Dashboard';
+      case 'ASSETS':
+        return 'Fleet Asset Management';
+      case 'TRANSACTIONS':
+        return 'Master Transactions Audit Log';
+      case 'SETTINGS':
+        return 'System Configuration & Settings';
+      default:
+        return 'Admin Portal';
+    }
+  };
+
+  return (
+    <LaptopOnlyGuard>
+      <div className="admin-shell">
+        {/* Left Navigation Sidebar */}
+        <AdminSidebar
+          currentView={currentView}
+          onSelectView={(view) => {
+            setCurrentView(view);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          assets={assets}
+          transactions={transactions}
+        />
+
+        {/* Main Content Viewport */}
+        <div className="admin-main-wrap">
+          {/* Header Bar */}
+          <AdminHeader
+            title={getPageTitle()}
+            isSupabaseOnline={isSupabaseOnline}
+            isRefreshing={isRefreshing}
+            onRefresh={() => loadFleetData()}
+            onOpenCreateAsset={() => setIsCreateModalOpen(true)}
+          />
+
+          {/* Dynamic Views */}
+          <main style={{ flex: 1 }}>
+            {currentView === 'DASHBOARD' && (
+              <DashboardView
+                assets={assets}
+                transactions={transactions}
+                onSelectAsset={(id) => setSelectedAssetId(id)}
+                onOpenCreateAsset={() => setIsCreateModalOpen(true)}
+                onSelectView={(v) => setCurrentView(v)}
+                onInspectTransaction={(tx) => setInspectingTransaction(tx)}
+              />
+            )}
+
+            {currentView === 'ASSETS' && (
+              <AssetsView
+                assets={assets}
+                onOpenCreateModal={() => setIsCreateModalOpen(true)}
+                onOpenEditModal={(asset) => setEditingAsset(asset)}
+                onOpenDeleteModal={(asset) => setAssetPendingDelete(asset)}
+                onOpenQRModal={(asset) => setQrAsset(asset)}
+                onSelectAsset={(id) => setSelectedAssetId(id)}
+                onTogglePower={handleTogglePower}
+              />
+            )}
+
+            {currentView === 'TRANSACTIONS' && (
+              <TransactionsView
+                transactions={transactions}
+                assets={assets}
+                onInspectTransaction={(tx) => setInspectingTransaction(tx)}
+                onSelectAsset={(id) => setSelectedAssetId(id)}
+              />
+            )}
+
+            {currentView === 'SETTINGS' && (
+              <SettingsView
+                onTriggerSync={() => loadFleetData()}
+                onResetDatabase={handleResetDatabase}
+              />
+            )}
+          </main>
+        </div>
+
+        {/* Modals & Drawers */}
+
+        {/* Create / Edit Asset Modal */}
+        {(isCreateModalOpen || editingAsset) && (
+          <AssetFormModal
+            isOpen={isCreateModalOpen || Boolean(editingAsset)}
+            initialAsset={editingAsset}
+            existingAssets={assets}
+            onClose={() => {
+              setIsCreateModalOpen(false);
+              setEditingAsset(null);
+            }}
+            onSave={handleSaveAsset}
+          />
+        )}
+
+        {/* Asset Details Drawer */}
+        {selectedAssetId && (
+          <AssetDetailDrawer
+            asset={selectedAsset}
+            transactions={transactions}
+            isOpen={Boolean(selectedAssetId)}
+            onClose={() => setSelectedAssetId(null)}
+            onEdit={(asset) => {
+              setSelectedAssetId(null);
+              setEditingAsset(asset);
+            }}
+            onDelete={(asset) => {
+              setSelectedAssetId(null);
+              setAssetPendingDelete(asset);
+            }}
+            onOpenQR={(asset) => setQrAsset(asset)}
+            onTogglePower={handleTogglePower}
+          />
+        )}
+
+        {/* Delete Asset Modal */}
+        {assetPendingDelete && (
+          <DeleteAssetModal
+            asset={assetPendingDelete}
+            transactions={transactions}
+            isOpen={Boolean(assetPendingDelete)}
+            onClose={() => setAssetPendingDelete(null)}
+            onConfirmDelete={handleDeleteAsset}
+          />
+        )}
+
+        {/* QR Code Printable Label Modal */}
+        {qrAsset && (
+          <AssetQRLabelModal
+            asset={qrAsset}
+            isOpen={Boolean(qrAsset)}
+            onClose={() => setQrAsset(null)}
+          />
+        )}
+
+        {/* Transaction Detail Inspector Modal */}
+        {inspectingTransaction && (
+          <TransactionDetailModal
+            transaction={inspectingTransaction}
+            asset={assets.find((a) => a.equipmentId === inspectingTransaction.equipmentId)}
+            isOpen={Boolean(inspectingTransaction)}
+            onClose={() => setInspectingTransaction(null)}
+            onSelectAsset={(id) => setSelectedAssetId(id)}
+          />
+        )}
+
+        {/* Toast Alerts */}
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      </div>
+    </LaptopOnlyGuard>
+  );
+};
+
+export default AdminApp;

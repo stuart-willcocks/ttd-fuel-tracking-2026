@@ -98,6 +98,17 @@ export async function saveEquipmentToSupabase(equipment: Equipment): Promise<voi
 }
 
 /**
+ * Delete equipment from Supabase
+ */
+export async function deleteEquipmentFromSupabase(equipmentId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const { error } = await client.from('equipment_list').delete().eq('equipment_id', equipmentId);
+  if (error) throw error;
+}
+
+/**
  * Fetch transactions from Supabase
  */
 export async function fetchTransactionsFromSupabase(): Promise<Transaction[]> {
