@@ -1,6 +1,21 @@
 import React from 'react';
-import { ArrowLeft, Clock, Power, PowerOff, CheckCircle2, CloudOff, Edit3 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Clock,
+  Power,
+  PowerOff,
+  CheckCircle2,
+  CloudOff,
+  Edit3,
+  LogIn,
+  LogOut,
+  Fuel,
+  Droplets,
+  Zap,
+  Gauge,
+} from 'lucide-react';
 import type { Equipment, Transaction, ActionType } from '../types';
+import { formatHumanTimestamp } from '../utils/dateFormat';
 
 export interface TransactionViewProps {
   asset: Equipment;
@@ -20,18 +35,31 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
   onPowerToggle,
 }) => {
   const isGenerator = asset.type === 'GENERATOR';
-
-  const capacityLabel = asset.capacity
-    ? isGenerator
-      ? `${asset.capacity} kVA`
-      : `${asset.capacity.toLocaleString()} L`
-    : '—';
-
   const isPoweredOn = Boolean(asset.poweredUpTimestamp && !asset.poweredDownTimestamp);
+
+  // Helper for Transaction Type icon
+  const renderTxTypeIcon = (type: string) => {
+    if (type.includes('CheckIn')) {
+      return <LogIn size={13} className="tx-type-icon icon-checkin" />;
+    }
+    if (type.includes('CheckOut')) {
+      return <LogOut size={13} className="tx-type-icon icon-checkout" />;
+    }
+    if (type === 'PoweredUp') {
+      return <Power size={13} className="tx-type-icon icon-powerup" />;
+    }
+    if (type === 'PoweredDown') {
+      return <PowerOff size={13} className="tx-type-icon icon-powerdown" />;
+    }
+    if (type.includes('FuelTransfer') || type.includes('Fuel')) {
+      return <Fuel size={13} className="tx-type-icon icon-fueltransfer" />;
+    }
+    return <Clock size={13} className="tx-type-icon" />;
+  };
 
   return (
     <div className="transaction-view asset-detail-view">
-      {/* Top back navigation button */}
+      {/* Top Navigation: Scan Another Asset Button */}
       <div className="top-nav-bar">
         <button className="btn-back" onClick={onBackToScanner}>
           <ArrowLeft size={16} />
@@ -39,8 +67,8 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
         </button>
       </div>
 
-      {/* Equipment Information Tonal Card */}
-      <div className="equipment-info-card">
+      {/* 1. ASSET_DETAIL_VIEW (Fields: ID, what3words, type, serial number, area, location) */}
+      <div className="asset-detail-card">
         <div className="card-title-row">
           <h2 className="equipment-id">{asset.equipmentId}</h2>
           <span className="type-tag">{asset.type}</span>
@@ -49,12 +77,8 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
         <table className="info-table">
           <tbody>
             <tr>
-              <td className="info-label">Area</td>
-              <td className="info-value">{asset.area}</td>
-            </tr>
-            <tr>
-              <td className="info-label">Location</td>
-              <td className="info-value">{asset.location}</td>
+              <td className="info-label">Asset ID</td>
+              <td className="info-value">{asset.equipmentId}</td>
             </tr>
             <tr>
               <td className="info-label">what3words</td>
@@ -70,29 +94,37 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
               </td>
             </tr>
             <tr>
-              <td className="info-label">Capacity / Size</td>
-              <td className="info-value">{capacityLabel}</td>
+              <td className="info-label">Asset Type</td>
+              <td className="info-value">{asset.type}</td>
             </tr>
             <tr>
-              <td className="info-label">Rental S/N</td>
+              <td className="info-label">Serial Number</td>
               <td className="info-value">{asset.rentalSerialNumber}</td>
+            </tr>
+            <tr>
+              <td className="info-label">Area</td>
+              <td className="info-value">{asset.area}</td>
+            </tr>
+            <tr>
+              <td className="info-label">Location</td>
+              <td className="info-value">{asset.location}</td>
             </tr>
             {isGenerator && (
               <>
                 <tr>
                   <td className="info-label">Power Up Time</td>
-                  <td className="info-value">{asset.poweredUpTimestamp || '—'}</td>
+                  <td className="info-value">{formatHumanTimestamp(asset.poweredUpTimestamp)}</td>
                 </tr>
                 <tr>
                   <td className="info-label">Power Down Time</td>
-                  <td className="info-value">{asset.poweredDownTimestamp || '—'}</td>
+                  <td className="info-value">{formatHumanTimestamp(asset.poweredDownTimestamp)}</td>
                 </tr>
               </>
             )}
           </tbody>
         </table>
 
-        {/* Generator power toggle */}
+        {/* Generator power toggle control */}
         {isGenerator && (
           <div className="power-control-row">
             <span className="power-status-text">
@@ -119,10 +151,10 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
         )}
       </div>
 
-      {/* Transaction History */}
-      <div className="history-block">
+      {/* 2. TRANSACTION_LIST_VIEW (Directly beneath ASSET_DETAIL_VIEW, most recent at top) */}
+      <div className="transaction-list-card">
         <div className="history-header">
-          <h3 className="sub-title">Transaction History</h3>
+          <h3 className="sub-title">Transaction List</h3>
           <span className="count-label">{transactions.length} records</span>
         </div>
 
@@ -134,6 +166,7 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
               <div key={tx.id} className="tx-item">
                 <div className="tx-item-top">
                   <div className="tx-item-top-left">
+                    {renderTxTypeIcon(tx.transactionType)}
                     <span className="tx-type">{tx.transactionType}</span>
                     {tx.deviceId && (
                       <span className="tx-pda-tag" title={`Executed on ${tx.deviceId}`}>
@@ -141,52 +174,84 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
                       </span>
                     )}
                   </div>
-                  <span className="tx-timestamp">
-                    <Clock size={11} /> {tx.transactionTimestamp}
-                  </span>
+
+                  <div className="tx-item-top-right">
+                    <span className="tx-timestamp">
+                      <Clock size={11} /> {formatHumanTimestamp(tx.transactionTimestamp)}
+                    </span>
+                    {/* Omit the word "synced" from the sync status indicator */}
+                    {tx.syncStatus === 'synced' ? (
+                      <span className="sync-tag-icon synced" title="Synced to cloud">
+                        <CheckCircle2 size={13} />
+                      </span>
+                    ) : (
+                      <span className="sync-tag-icon pending" title="Offline Queue">
+                        <CloudOff size={13} />
+                      </span>
+                    )}
+                  </div>
                 </div>
 
+                {/* Data values with required icons for fuel amount, DEF amount, kWh reading */}
                 <div className="tx-values">
                   {tx.checkInFuelPercentage !== undefined && (
-                    <span>Fuel In: {tx.checkInFuelPercentage}%</span>
+                    <span className="val-badge">
+                      <Fuel size={12} className="data-icon icon-fuel" />
+                      <span>Fuel In: {tx.checkInFuelPercentage}%</span>
+                    </span>
                   )}
                   {tx.checkOutFuelPercentage !== undefined && (
-                    <span>Fuel Out: {tx.checkOutFuelPercentage}%</span>
+                    <span className="val-badge">
+                      <Fuel size={12} className="data-icon icon-fuel" />
+                      <span>Fuel Out: {tx.checkOutFuelPercentage}%</span>
+                    </span>
                   )}
                   {tx.checkInFuelEighths !== undefined && (
-                    <span>Tank In: {tx.checkInFuelEighths}/8</span>
+                    <span className="val-badge">
+                      <Gauge size={12} className="data-icon icon-gauge" />
+                      <span>Tank In: {tx.checkInFuelEighths}/8</span>
+                    </span>
                   )}
                   {tx.checkOutFuelEighths !== undefined && (
-                    <span>Tank Out: {tx.checkOutFuelEighths}/8</span>
+                    <span className="val-badge">
+                      <Gauge size={12} className="data-icon icon-gauge" />
+                      <span>Tank Out: {tx.checkOutFuelEighths}/8</span>
+                    </span>
                   )}
                   {tx.checkInDefPercentage !== undefined && (
-                    <span>DEF In: {tx.checkInDefPercentage}%</span>
+                    <span className="val-badge">
+                      <Droplets size={12} className="data-icon icon-def" />
+                      <span>DEF In: {tx.checkInDefPercentage}%</span>
+                    </span>
                   )}
                   {tx.checkOutDefPercentage !== undefined && (
-                    <span>DEF Out: {tx.checkOutDefPercentage}%</span>
+                    <span className="val-badge">
+                      <Droplets size={12} className="data-icon icon-def" />
+                      <span>DEF Out: {tx.checkOutDefPercentage}%</span>
+                    </span>
                   )}
                   {tx.fuelTransferLitres !== undefined && (
-                    <span className="highlight">Fuel Added: {tx.fuelTransferLitres} L</span>
+                    <span className="val-badge highlight">
+                      <Fuel size={12} className="data-icon icon-fuel" />
+                      <span>Fuel Added: {tx.fuelTransferLitres} L</span>
+                    </span>
                   )}
                   {tx.defTransferLitres !== undefined && (
-                    <span className="highlight">DEF Added: {tx.defTransferLitres} L</span>
+                    <span className="val-badge highlight">
+                      <Droplets size={12} className="data-icon icon-def" />
+                      <span>DEF Added: {tx.defTransferLitres} L</span>
+                    </span>
                   )}
                   {tx.checkInKWH !== undefined && (
-                    <span>Meter In: {tx.checkInKWH} kWh</span>
+                    <span className="val-badge">
+                      <Zap size={12} className="data-icon icon-kwh" />
+                      <span>Meter In: {tx.checkInKWH} kWh</span>
+                    </span>
                   )}
                   {tx.checkOutKWH !== undefined && (
-                    <span>Meter Out: {tx.checkOutKWH} kWh</span>
-                  )}
-                </div>
-
-                <div className="tx-item-status">
-                  {tx.syncStatus === 'synced' ? (
-                    <span className="sync-tag synced">
-                      <CheckCircle2 size={11} /> Synced
-                    </span>
-                  ) : (
-                    <span className="sync-tag pending">
-                      <CloudOff size={11} /> Offline Queue
+                    <span className="val-badge">
+                      <Zap size={12} className="data-icon icon-kwh" />
+                      <span>Meter Out: {tx.checkOutKWH} kWh</span>
                     </span>
                   )}
                 </div>
@@ -196,7 +261,7 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
         )}
       </div>
 
-      {/* Menu Action Buttons (Material Design 3 tactile buttons) */}
+      {/* Action Buttons: Consistent rectangular styling, equal height, consistent text size */}
       <div className="menu-actions-grid">
         <button
           className="btn-menu-action"
@@ -230,3 +295,5 @@ export const TransactionView: React.FC<TransactionViewProps> = ({
     </div>
   );
 };
+
+export { TransactionView as AssetDetailView };

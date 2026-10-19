@@ -24,8 +24,16 @@
 
   --accent-blue: #38BDF8;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+}
+
+/* Enforce simple rectangular buttons with no corner radii */
+button,
+input,
+select,
+textarea {
+  border-radius: 0 !important;
 }
 
 * {
@@ -155,13 +163,14 @@ body {
   gap: 5px;
   background: transparent;
   border: 1px solid var(--border-color);
-  border-radius: 20px;
+  border-radius: 0;
   padding: 4px 8px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   color: var(--text-muted);
   flex-shrink: 0;
+  height: 30px;
 }
 
 .status-pill.online {
@@ -178,28 +187,29 @@ body {
   font-size: 9px;
   background: rgba(255, 255, 255, 0.1);
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 .pending-pill {
   background: #B45309;
   color: #fff;
   border: none;
-  border-radius: 20px;
+  border-radius: 0;
   padding: 4px 8px;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   flex-shrink: 0;
+  height: 30px;
 }
 
 .icon-btn {
   background: transparent;
   border: 1px solid var(--border-color);
   color: var(--text-muted);
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
+  width: 30px;
+  height: 30px;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -565,12 +575,13 @@ body {
   color: var(--accent-blue);
 }
 
-/* Equipment Info Card */
-.equipment-info-card {
+/* Equipment Info Card / ASSET_DETAIL_VIEW */
+.equipment-info-card,
+.asset-detail-card {
   flex-shrink: 0;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   padding: 8px 10px;
 }
 
@@ -596,7 +607,7 @@ body {
   background: var(--bg-card-subtle);
   color: var(--accent-blue);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 .info-table {
@@ -648,12 +659,13 @@ body {
 .btn-power {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   border: none;
   font-size: 11px;
   font-weight: 700;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  height: 30px;
+  border-radius: 0;
   cursor: pointer;
 }
 
@@ -667,14 +679,19 @@ body {
   color: #fff;
 }
 
-/* History block */
-.history-block {
+/* History block / TRANSACTION_LIST_VIEW */
+.history-block,
+.transaction-list-card {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
   overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0;
+  padding: 6px 8px;
 }
 
 .history-header {
@@ -698,9 +715,9 @@ body {
 }
 
 .empty-history {
-  background: var(--bg-card);
+  background: var(--bg-card-subtle);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   padding: 10px;
   font-size: 11px;
   color: var(--text-dim);
@@ -718,13 +735,13 @@ body {
 }
 
 .tx-item {
-  background: var(--bg-card);
+  background: var(--bg-page);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   padding: 6px 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .tx-item-top {
@@ -753,7 +770,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 0 !important;
   background: rgba(56, 189, 248, 0.15);
   color: #38bdf8;
   border: 1px solid rgba(56, 189, 248, 0.35);
@@ -774,7 +791,7 @@ body {
   background: var(--bg-card);
   color: var(--text-main);
   border: 1px solid var(--border-subtle);
-  border-radius: 4px;
+  border-radius: 0 !important;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -790,7 +807,7 @@ body {
   color: var(--text-dim);
   background: var(--bg-card-subtle);
   padding: 6px 10px;
-  border-radius: 4px;
+  border-radius: 0 !important;
   margin-top: 8px;
   line-height: 1.4;
 }
@@ -801,7 +818,54 @@ body {
   display: flex;
   align-items: center;
   gap: 3px;
-  font-family: monospace;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.tx-type-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.icon-checkin {
+  color: #38BDF8;
+}
+
+.icon-checkout {
+  color: #A855F7;
+}
+
+.icon-powerup {
+  color: #22C55E;
+}
+
+.icon-powerdown {
+  color: #EF4444;
+}
+
+.icon-fueltransfer {
+  color: #F59E0B;
+}
+
+.tx-item-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-tag-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 3px;
+  border-radius: 0 !important;
+}
+
+.sync-tag-icon.synced {
+  color: #22C55E;
+}
+
+.sync-tag-icon.pending {
+  color: #F59E0B;
 }
 
 .tx-values {
@@ -812,15 +876,42 @@ body {
   color: var(--text-muted);
 }
 
-.tx-values span {
+.val-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: var(--bg-card-subtle);
-  padding: 1px 5px;
-  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0 !important;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: var(--text-muted);
 }
 
-.tx-values .highlight {
+.val-badge.highlight {
   color: #FBBF24;
+  border-color: rgba(251, 191, 36, 0.3);
   font-weight: 600;
+}
+
+.data-icon {
+  flex-shrink: 0;
+}
+
+.icon-fuel {
+  color: #F59E0B;
+}
+
+.icon-def {
+  color: #38BDF8;
+}
+
+.icon-kwh {
+  color: #FACC15;
+}
+
+.icon-gauge {
+  color: #94A3B8;
 }
 
 .tx-item-status {
@@ -861,16 +952,17 @@ body {
   height: 44px;
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: 0 !important;
   color: var(--text-main);
-  font-size: 12px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 0 6px;
 }
 
 .btn-menu-action:hover {
@@ -1527,7 +1619,7 @@ body {
 }
 
 /* ========================================================= */
-/* SPLASH SCREEN (Material Design 3 Industrial Handheld)     */
+/* SPLASH SCREEN                                             */
 /* ========================================================= */
 
 .splash-screen {
@@ -1538,47 +1630,50 @@ body {
   padding: 16px;
   height: 100%;
   height: 100dvh;
-  background: radial-gradient(circle at 50% 20%, #152238 0%, #0B0F19 75%);
+  background: var(--bg-page);
   overflow: hidden;
+  text-align: center;
 }
 
 .splash-card {
   width: 100%;
   max-width: 400px;
-  background: rgba(18, 24, 39, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0 !important;
   padding: 24px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 .splash-icon-wrapper {
   margin-bottom: 14px;
+  display: flex;
+  justify-content: center;
 }
 
-.splash-icon-circle {
-  width: 68px;
-  height: 68px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.25) 0%, rgba(56, 189, 248, 0.15) 100%);
-  border: 2px solid rgba(56, 189, 248, 0.4);
+.splash-icon-square {
+  width: 60px;
+  height: 60px;
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: 0 !important;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 24px rgba(37, 99, 235, 0.35);
 }
 
 .splash-brand-icon {
-  color: #38BDF8;
+  color: var(--accent-blue);
 }
 
 .splash-title-block {
   margin-bottom: 8px;
+  text-align: center;
+  width: 100%;
 }
 
 .splash-company-name {
@@ -1589,95 +1684,98 @@ body {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   line-height: 1.3;
+  text-align: center;
 }
 
 .splash-app-name {
   font-family: 'Outfit', sans-serif;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 800;
   color: #60A5FA;
   letter-spacing: -0.02em;
   line-height: 1.2;
   margin-top: 2px;
+  text-align: center;
 }
 
 .splash-version-row {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
-.splash-version-badge {
+.splash-version-box {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   font-weight: 600;
   color: #94A3B8;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 0 !important;
   padding: 3px 12px;
-  border-radius: 9999px;
-  letter-spacing: 0.02em;
+  text-align: center;
 }
 
 .splash-device-card {
   width: 100%;
-  background: #0D1322;
-  border: 1px solid rgba(59, 130, 246, 0.25);
-  border-radius: 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 0 !important;
   padding: 12px 14px;
   margin-bottom: 20px;
-  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .splash-device-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.splash-device-label-group {
-  display: flex;
+  justify-content: center;
   align-items: center;
   gap: 6px;
-  color: #94A3B8;
+  margin-bottom: 10px;
+  text-align: center;
 }
 
 .splash-device-icon {
-  color: #38BDF8;
+  color: var(--accent-blue);
 }
 
 .splash-device-title {
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: #94A3B8;
 }
 
-.splash-device-active-badge {
+.splash-device-active-box {
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px;
   font-weight: 700;
-  color: #38BDF8;
-  background: rgba(56, 189, 248, 0.15);
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: var(--accent-blue);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0 !important;
   padding: 2px 8px;
-  border-radius: 6px;
 }
 
 .splash-device-pills {
   display: flex;
+  justify-content: center;
   gap: 6px;
   margin-bottom: 10px;
-  overflow-x: auto;
-  padding-bottom: 2px;
+  width: 100%;
 }
 
 .splash-pda-chip {
   flex: 1;
-  min-width: 52px;
-  height: 32px;
-  background: #162035;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  max-width: 60px;
+  height: 36px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0 !important;
   color: #94A3B8;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
@@ -1686,6 +1784,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
   transition: all 0.15s ease;
 }
 
@@ -1694,15 +1793,16 @@ body {
   border-color: #60A5FA;
   color: #FFFFFF;
   font-weight: 700;
-  box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
 }
 
 .splash-device-sub {
   font-size: 11px;
   color: #64748B;
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 4px;
+  text-align: center;
 }
 
 .splash-device-sub code {
@@ -1713,37 +1813,39 @@ body {
 
 .splash-btn-continue {
   width: 100%;
-  height: 50px;
-  border: none;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  height: 48px;
+  border: 1px solid #3B82F6;
+  border-radius: 0 !important;
+  background: #2563EB;
   color: #FFFFFF;
   font-family: 'Outfit', sans-serif;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.02em;
   display: flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
   gap: 8px;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
-  transition: transform 0.1s ease, filter 0.15s ease;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
-.splash-btn-continue:active {
-  transform: scale(0.98);
-  filter: brightness(1.1);
+.splash-btn-continue:hover {
+  background: #1D4ED8;
 }
 
 .splash-footer-note {
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 5px;
   font-size: 11px;
   color: #475569;
   margin-top: 14px;
   font-weight: 500;
+  text-align: center;
 }
+
 
 

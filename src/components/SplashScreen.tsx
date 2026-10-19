@@ -20,11 +20,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
 
   return (
     <div className="splash-screen">
-      {/* Centered Tonal Container */}
       <div className="splash-card">
-        {/* Brand Icon / Glyph */}
+        {/* Brand Icon */}
         <div className="splash-icon-wrapper">
-          <div className="splash-icon-circle">
+          <div className="splash-icon-square">
             <Fuel size={36} className="splash-brand-icon" />
           </div>
         </div>
@@ -35,19 +34,17 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
           <h2 className="splash-app-name">Fuel Tracking App</h2>
         </div>
 
-        {/* Version Badge */}
+        {/* Version */}
         <div className="splash-version-row">
-          <span className="splash-version-badge">Version {APP_VERSION}</span>
+          <span className="splash-version-box">Version {APP_VERSION}</span>
         </div>
 
-        {/* Device ID Section */}
+        {/* Device ID Display & Switcher */}
         <div className="splash-device-card">
           <div className="splash-device-header">
-            <div className="splash-device-label-group">
-              <Smartphone size={16} className="splash-device-icon" />
-              <span className="splash-device-title">Device Identifier</span>
-            </div>
-            <span className="splash-device-active-badge">{deviceName}</span>
+            <Smartphone size={15} className="splash-device-icon" />
+            <span className="splash-device-title">Device ID:</span>
+            <span className="splash-device-active-box">{deviceName}</span>
           </div>
 
           <div className="splash-device-pills">
@@ -69,7 +66,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
           </div>
         </div>
 
-        {/* Big tactile "Continue" Action Button */}
+        {/* Continue Button - Simple Rectangular, no corner radii, center justified */}
         <button
           type="button"
           className="splash-btn-continue"
