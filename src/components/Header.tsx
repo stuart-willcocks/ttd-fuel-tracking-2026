@@ -37,9 +37,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="header-company-name">The Technical Department Ltd</div>
           <div className="header-sub-row">
             <span className="header-app-title">Fuel Tracking</span>
-            <span className="header-version-pill">
-              V{APP_VERSION}{hasUpdate ? '*' : ''}
-            </span>
+            <span className="header-version-pill">V{APP_VERSION}</span>
           </div>
         </div>
       </div>
@@ -85,13 +83,13 @@ export const Header: React.FC<HeaderProps> = ({
           {syncState.isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}
         </button>
 
-        {/* Settings Button: Gear icon */}
+        {/* Settings Button: Gear icon (rendered in orange if update is available) */}
         {onOpenSettings && (
           <button
             type="button"
-            className="icon-btn"
+            className={`icon-btn ${hasUpdate ? 'has-update' : ''}`}
             onClick={onOpenSettings}
-            title="Settings & Sync Configuration"
+            title={hasUpdate ? "App update available - Settings" : "Settings"}
             aria-label="Settings"
           >
             <Settings size={15} />

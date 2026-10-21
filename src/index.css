@@ -247,6 +247,18 @@ html, body {
   border-color: var(--border-medium);
 }
 
+.icon-btn.has-update {
+  color: var(--brand-orange) !important;
+  border-color: rgba(236, 114, 30, 0.5) !important;
+  background: rgba(236, 114, 30, 0.15) !important;
+}
+
+.icon-btn.has-update:hover {
+  background: rgba(236, 114, 30, 0.25) !important;
+  border-color: var(--brand-orange) !important;
+  color: #FFFFFF !important;
+}
+
 .spinning {
   animation: spin 1s linear infinite;
   display: inline-block;
