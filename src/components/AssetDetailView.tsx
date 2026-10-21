@@ -3,6 +3,7 @@ import { Fuel, Droplet, Zap, Check } from 'lucide-react';
 import type { Equipment, Transaction, ActionType } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
+import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 
 export interface AssetDetailViewProps {
   asset: Equipment;
@@ -108,31 +109,27 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
   return (
     <div className="old-screen-container asset-detail-container">
-      {/* 1. ASSET ID: Solid black banner across top */}
+      {/* 1. ASSET ID: Orange banner matching scan view with equipment type icon on the left */}
       <div className="asset-detail-id-banner">
-        <span>{asset.equipmentId}</span>
+        <span className="asset-detail-id-icon">
+          <EquipmentTypeIcon type={asset.type} size={20} />
+        </span>
+        <span className="asset-detail-id-text">{asset.equipmentId}</span>
       </div>
 
-      {/* 2. METADATA SECTION */}
+      {/* 2. METADATA SECTION: Non-monospace what3words, light grey asset data, no equipment type text */}
       <div className="asset-detail-meta-box">
-        {/* what3words: Red Centered Monospace */}
+        {/* what3words: Clean sans-serif light grey */}
         <div className="asset-detail-w3w">
           {asset.what3words.replace('///', '')}
         </div>
 
-        {/* Asset Type & Capacity */}
-        <div className="asset-detail-spec">
-          {asset.type}
-          {asset.capacity
-            ? ` - ${asset.capacity} ${isGenerator ? 'kVA' : 'L'}`
-            : ''}
-          {asset.rentalSerialNumber ? ` - ${asset.rentalSerialNumber}` : ''}
-        </div>
-
-        {/* Asset Serial Number (if distinct or explicit) */}
-        {asset.rentalSerialNumber && (
-          <div className="asset-detail-serial">
-            {asset.rentalSerialNumber}
+        {/* Asset Capacity & Serial Number */}
+        {(asset.capacity !== undefined || asset.rentalSerialNumber) && (
+          <div className="asset-detail-spec">
+            {asset.capacity ? `${asset.capacity} ${isGenerator ? 'kVA' : 'L'}` : ''}
+            {asset.capacity && asset.rentalSerialNumber ? ' • ' : ''}
+            {asset.rentalSerialNumber ? `SN: ${asset.rentalSerialNumber}` : ''}
           </div>
         )}
 
@@ -178,7 +175,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       <div className="asset-detail-btn-stack">
         <button
           type="button"
-          className="btn-pda-rect btn-pda-green"
+          className="btn-pda-rect btn-pda-orange"
           onClick={() => onSelectAction('check-in')}
         >
           Check In
@@ -194,7 +191,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
         <button
           type="button"
-          className="btn-pda-rect btn-pda-blue"
+          className="btn-pda-rect btn-pda-orange"
           onClick={() => onSelectAction('check-out')}
         >
           Check Out
@@ -202,7 +199,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
         <button
           type="button"
-          className="btn-pda-rect btn-pda-light"
+          className="btn-pda-rect btn-pda-blue"
           onClick={onBack}
         >
           Back
