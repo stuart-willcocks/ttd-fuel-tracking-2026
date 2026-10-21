@@ -98,6 +98,25 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Detect desktop browser to constrain UI to PDA screen display
+  useEffect(() => {
+    const updateDesktopClass = () => {
+      const isMobileUA =
+        typeof navigator !== 'undefined' &&
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Zebra|TC26/i.test(navigator.userAgent);
+      const isDesktop = !isMobileUA;
+      if (isDesktop) {
+        document.documentElement.classList.add('is-desktop-browser');
+      } else {
+        document.documentElement.classList.remove('is-desktop-browser');
+      }
+    };
+
+    updateDesktopClass();
+    window.addEventListener('resize', updateDesktopClass);
+    return () => window.removeEventListener('resize', updateDesktopClass);
+  }, []);
+
   const [activeAssetId, setActiveAssetId] = useState<string | null>(null);
   const activeAssetIdRef = useRef<string | null>(null);
   useEffect(() => {
