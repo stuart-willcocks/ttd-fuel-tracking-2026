@@ -4,6 +4,7 @@ import { db, type OutboxItem } from '../db/indexedDB';
 import type { Transaction } from '../types';
 import { syncEngine, type SyncState } from '../services/syncEngine';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
+import { formatPdaTimestamp } from '../utils/dateFormat';
 
 interface OutboxModalProps {
   isOpen: boolean;
@@ -71,7 +72,7 @@ export const OutboxModal: React.FC<OutboxModalProps> = ({
                     <strong>{item.equipmentId}</strong>
                     <TransactionTypeIcon type={item.tx?.transactionType} size={15} />
                   </div>
-                  <div className="queue-time">{item.tx?.transactionTimestamp}</div>
+                  <div className="queue-time">{formatPdaTimestamp(item.tx?.transactionTimestamp)}</div>
                   {item.error && (
                     <div style={{ fontSize: '11px', color: '#f87171', marginTop: '2px' }}>
                       {item.error}

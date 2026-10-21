@@ -1,65 +1,99 @@
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const FULL_MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+/**
+ * Safely parses any date representation (ISO UTC, space-separated string, timestamp, or Date)
+ * into a valid Date object. Strings without timezone offsets are treated as UTC.
+ */
+export function parseToDate(val?: string | number | Date | null): Date | null {
+  if (!val) return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  if (typeof val === 'number') {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const s = String(val).trim();
+  if (!s) return null;
+
+  // If already standard ISO with Z or timezone offset (e.g. 2026-10-21T11:10:00Z or +01:00)
+  if (s.endsWith('Z') || /[+-]\d{2}(:?\d{2})?$/.test(s)) {
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // If format is YYYY-MM-DD HH:mm:ss or YYYY-MM-DDTHH:mm:ss without timezone offset:
+  // Timestamps in this database/system are UTC. Treat as UTC by appending 'Z'
+  const isoCandidate = s.includes('T') ? s : s.replace(' ', 'T');
+  const asUtc = new Date(isoCandidate + 'Z');
+  if (!isNaN(asUtc.getTime())) {
+    return asUtc;
+  }
+
+  // Fallback to standard parse
+  const fallback = new Date(s);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
 
 /**
- * Formats timestamps for the PDA app:
+ * Formats timestamps for the PDA app strictly in UK local time (Europe/London):
  * e.g. "Thu 2 July 2026 at 12:24"
+ * Accurately accounts for British Summer Time (BST / UTC+1) and Greenwich Mean Time (GMT / UTC+0).
  */
-export function formatPdaTimestamp(val?: string | null): string {
+export function formatPdaTimestamp(val?: string | number | Date | null): string {
   if (!val) return '—';
 
   try {
-    const d = new Date(val);
-    if (isNaN(d.getTime())) {
-      return String(val);
+    const d = parseToDate(val);
+    if (!d) return String(val);
+
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London',
+      weekday: 'short',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(d);
+
+    const m: Record<string, string> = {};
+    for (const p of parts) {
+      m[p.type] = p.value;
     }
-    const dayName = DAYS[d.getDay()];
-    const dateNum = d.getDate();
-    const monthName = FULL_MONTHS[d.getMonth()];
-    const year = d.getFullYear();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    return `${dayName} ${dateNum} ${monthName} ${year} at ${time}`;
+
+    return `${m.weekday} ${m.day} ${m.month} ${m.year} at ${m.hour}:${m.minute}`;
   } catch {
     return String(val);
   }
 }
 
 /**
- * Formats timestamps for the Admin app:
- * e.g. "ddd YYYY-MM-DD HH:mm:ss" -> "Thu 2026-07-02 12:24:00"
+ * Formats timestamps for the Admin portal strictly in UK local time (Europe/London):
+ * e.g. "Thu 2026-07-02 12:24:00"
  */
-export function formatAdminTimestamp(val?: string | null): string {
+export function formatAdminTimestamp(val?: string | number | Date | null): string {
   if (!val) return '—';
 
   try {
-    const d = new Date(val);
-    if (isNaN(d.getTime())) {
-      return String(val);
-    }
-    const dayName = DAYS[d.getDay()];
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const year = d.getFullYear();
-    const month = pad(d.getMonth() + 1);
-    const date = pad(d.getDate());
-    const hours = pad(d.getHours());
-    const minutes = pad(d.getMinutes());
-    const seconds = pad(d.getSeconds());
+    const d = parseToDate(val);
+    if (!d) return String(val);
 
-    return `${dayName} ${year}-${month}-${date} ${hours}:${minutes}:${seconds}`;
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London',
+      weekday: 'short',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(d);
+
+    const m: Record<string, string> = {};
+    for (const p of parts) {
+      m[p.type] = p.value;
+    }
+
+    return `${m.weekday} ${m.year}-${m.month}-${m.day} ${m.hour}:${m.minute}:${m.second}`;
   } catch {
     return String(val);
   }

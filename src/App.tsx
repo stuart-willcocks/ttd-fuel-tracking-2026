@@ -329,12 +329,6 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [checkForAppUpdate]);
 
-  const getLocalFormattedTimestamp = (): string => {
-    const d = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  };
-
   const refreshAssetsList = useCallback(async () => {
     const all = await db.equipments.toArray();
     setAvailableAssets(all);
@@ -431,10 +425,11 @@ export const App: React.FC = () => {
   const handleConfirmTransaction = async () => {
     if (!currentAsset || !pendingTxData) return;
 
+    const nowIso = new Date().toISOString();
     const newTx: Transaction = {
       id: generateUUID(),
       equipmentId: currentAsset.equipmentId,
-      transactionTimestamp: getLocalFormattedTimestamp(),
+      transactionTimestamp: nowIso,
       transactionType: pendingTxData.transactionType!,
       checkInFuelEighths: pendingTxData.checkInFuelEighths,
       checkOutFuelEighths: pendingTxData.checkOutFuelEighths,
@@ -448,7 +443,7 @@ export const App: React.FC = () => {
       checkOutKWH: pendingTxData.checkOutKWH,
       syncStatus: 'pending',
       deviceId: getDeviceName(),
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso,
     };
 
     // Store in IndexedDB and upload to shared central server
