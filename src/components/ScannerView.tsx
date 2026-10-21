@@ -306,68 +306,68 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 </div>
               </div>
 
-              {/* Search Box labeled "Search" with "X" clear button and "Hide keyboard" button */}
+              {/* Search Box labeled "Search" with shortened input and green hide-keyboard button */}
               <div className="picker-search-container">
-                <div className="picker-search-label-row">
-                  <label htmlFor="picker-search-input" className="picker-search-label">
-                    Search
-                  </label>
-                  {(isSearchFocused || isKeyboardVisible) && (
+                <label htmlFor="picker-search-input" className="picker-search-label">
+                  Search
+                </label>
+                <div className="picker-search-row">
+                  <div className="picker-search-input-wrap">
+                    <Search size={16} className="picker-search-icon" />
+                    <input
+                      ref={searchInputRef}
+                      id="picker-search-input"
+                      type="text"
+                      className="picker-search-input"
+                      placeholder="Search by ID, area, location, type..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => {
+                        setIsSearchFocused(true);
+                        setIsKeyboardVisible(true);
+                      }}
+                      onBlur={() => {
+                        setIsSearchFocused(false);
+                        setTimeout(() => {
+                          if (typeof window !== 'undefined' && window.visualViewport) {
+                            const isShrunk = (window.innerHeight - window.visualViewport.height) > 100;
+                            setIsKeyboardVisible(isShrunk);
+                          } else {
+                            setIsKeyboardVisible(false);
+                          }
+                        }, 150);
+                      }}
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck="false"
+                    />
                     <button
                       type="button"
-                      className="picker-hide-keyboard-btn"
-                      onClick={handleHideKeyboard}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onTouchStart={(e) => e.preventDefault()}
-                      title="Hide keyboard"
-                      aria-label="Hide keyboard"
+                      className={`picker-search-clear-btn ${!searchQuery ? 'picker-search-clear-empty' : ''}`}
+                      onClick={() => {
+                        setSearchQuery('');
+                        searchInputRef.current?.focus();
+                      }}
+                      title="Clear search"
+                      aria-label="Clear search"
                     >
-                      <Keyboard size={13} />
-                      <span>Hide keyboard</span>
-                      <ChevronDown size={13} />
+                      <X size={16} />
                     </button>
-                  )}
-                </div>
-                <div className="picker-search-input-wrap">
-                  <Search size={16} className="picker-search-icon" />
-                  <input
-                    ref={searchInputRef}
-                    id="picker-search-input"
-                    type="text"
-                    className="picker-search-input"
-                    placeholder="Search by ID, area, location, type..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onFocus={() => {
-                      setIsSearchFocused(true);
-                      setIsKeyboardVisible(true);
-                    }}
-                    onBlur={() => {
-                      setIsSearchFocused(false);
-                      setTimeout(() => {
-                        if (typeof window !== 'undefined' && window.visualViewport) {
-                          const isShrunk = (window.innerHeight - window.visualViewport.height) > 100;
-                          setIsKeyboardVisible(isShrunk);
-                        } else {
-                          setIsKeyboardVisible(false);
-                        }
-                      }, 150);
-                    }}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck="false"
-                  />
+                  </div>
+
                   <button
                     type="button"
-                    className={`picker-search-clear-btn ${!searchQuery ? 'picker-search-clear-empty' : ''}`}
-                    onClick={() => {
-                      setSearchQuery('');
-                      searchInputRef.current?.focus();
-                    }}
-                    title="Clear search"
-                    aria-label="Clear search"
+                    className={`picker-hide-keyboard-btn ${isKeyboardVisible ? 'kb-active' : ''}`}
+                    onClick={handleHideKeyboard}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onTouchStart={(e) => e.preventDefault()}
+                    title="Hide keyboard"
+                    aria-label="Hide keyboard"
                   >
-                    <X size={16} />
+                    <div className="picker-hide-kb-icon-wrap">
+                      <Keyboard size={18} />
+                      <ChevronDown size={11} className="picker-hide-kb-arrow" />
+                    </div>
                   </button>
                 </div>
               </div>

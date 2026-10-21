@@ -1272,41 +1272,7 @@ html.is-desktop-browser .app-root {
   border-color: var(--brand-orange);
 }
 
-.picker-search-label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
-  width: 100%;
-  min-height: 26px;
-}
 
-.picker-hide-keyboard-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background-color: var(--brand-orange);
-  color: var(--brand-light-grey);
-  border: 1px solid var(--brand-orange-hover);
-  padding: 4px 9px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  cursor: pointer;
-  border-radius: 0 !important;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-  line-height: 1;
-}
-
-.picker-hide-keyboard-btn:hover {
-  background-color: var(--brand-orange-hover);
-  border-color: var(--brand-orange-active);
-}
-
-.picker-hide-keyboard-btn:active {
-  background-color: var(--brand-orange-active);
-}
 
 .modal-title {
   font-size: 16px;
@@ -1346,7 +1312,7 @@ html.is-desktop-browser .app-root {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   width: 100%;
 }
 
@@ -1358,11 +1324,58 @@ html.is-desktop-browser .app-root {
   text-transform: uppercase;
 }
 
+/* Horizontal row containing shortened search input and the green hide-keyboard button */
+.picker-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
 .picker-search-input-wrap {
   position: relative;
   display: flex;
   align-items: center;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-hide-keyboard-btn {
+  width: 44px;
+  height: 42px;
+  background-color: var(--btn-green-bg);
+  border: 1px solid var(--btn-green-hover);
+  color: var(--btn-green-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  border-radius: 0 !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  padding: 0;
+}
+
+.picker-hide-keyboard-btn:hover {
+  background-color: var(--btn-green-hover);
+  border-color: var(--btn-green-active);
+}
+
+.picker-hide-keyboard-btn:active {
+  background-color: var(--btn-green-active);
+}
+
+.picker-hide-kb-icon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  gap: 1px;
+}
+
+.picker-hide-kb-arrow {
+  margin-top: -3px;
 }
 
 .picker-search-icon {
