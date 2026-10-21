@@ -1,7 +1,7 @@
 import React from 'react';
-import { Wifi, WifiOff, RefreshCw, UploadCloud } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw, UploadCloud, Settings } from 'lucide-react';
 import type { SyncState } from '../services/syncEngine';
-import { APP_VERSION, BUILD_NUMBER } from '../version';
+import { APP_VERSION } from '../version';
 
 interface HeaderProps {
   syncState: SyncState;
@@ -19,11 +19,12 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSimulatedOffline,
   onTriggerSync,
   onOpenOutbox,
+  onOpenSettings,
   onShowSplash,
 }) => {
   return (
     <header className="app-header">
-      {/* Top Left: App Title and Version */}
+      {/* Top Left: App Title and Version (Vnn) */}
       <div
         className="header-title-box"
         onClick={onShowSplash}
@@ -34,12 +35,12 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="header-company-name">The Technical Department Ltd</div>
           <div className="header-sub-row">
             <span className="header-app-title">Fuel Tracking</span>
-            <span className="header-version-pill">v{APP_VERSION} ({BUILD_NUMBER})</span>
+            <span className="header-version-pill">V{APP_VERSION}</span>
           </div>
         </div>
       </div>
 
-      {/* Top Right: Online Indicator & Refresh / Upload Queue Indicator */}
+      {/* Top Right: Upload Queue, Refresh, Connection Status, Settings */}
       <div className="header-status-box">
         {/* Upload Queue Indicator (visible if items are queued) */}
         {syncState.pendingCount > 0 && (
@@ -54,28 +55,46 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
-        {/* Refresh / Sync Button */}
+        {/* Refresh / Sync Button (circular arrows spin, square border does NOT spin) */}
         <button
           type="button"
-          className={`icon-btn ${syncState.isSyncing ? 'spinning' : ''}`}
+          className="icon-btn"
           onClick={onTriggerSync}
           disabled={!syncState.isOnline || syncState.isSyncing}
           title="Refresh / Sync with server"
+          aria-label="Refresh / Sync with server"
         >
-          <RefreshCw size={14} />
+          <RefreshCw
+            size={14}
+            className={syncState.isSyncing ? 'spinning' : ''}
+          />
         </button>
 
-        {/* Online Indicator */}
+        {/* Connection Status: Wifi icon only (no "online" text) */}
         <button
           type="button"
           className={`status-pill ${syncState.isOnline ? 'online' : 'offline'}`}
           onClick={onToggleSimulatedOffline}
           title={syncState.isOnline ? 'Online (Tap to toggle offline mode)' : 'Offline (Tap to reconnect)'}
+          aria-label={syncState.isOnline ? 'Online' : 'Offline'}
         >
-          {syncState.isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
-          <span className="status-label">{syncState.isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+          {syncState.isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}
         </button>
+
+        {/* Settings Button: Gear icon */}
+        {onOpenSettings && (
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onOpenSettings}
+            title="Settings & Sync Configuration"
+            aria-label="Settings"
+          >
+            <Settings size={15} />
+          </button>
+        )}
       </div>
     </header>
   );
 };
+
