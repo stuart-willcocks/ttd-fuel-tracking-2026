@@ -425,16 +425,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <p style={{ fontSize: '0.85rem', color: 'var(--adm-text-secondary)', marginBottom: '14px', lineHeight: 1.5 }}>
               Launch the mobile web app designed for Zebra TC26 laser barcode scanners in field operation.
             </p>
-            <a
-              href="/"
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={() => {
+                window.open('/', 'TTD_PDA_WINDOW', 'width=380,height=720,menubar=no,toolbar=no,location=no,status=no,resizable=yes');
+              }}
               className="admin-btn admin-btn-outline"
-              style={{ width: '100%' }}
+              style={{ width: '100%', gap: '8px' }}
             >
-              <span>Open Field Scanner App</span>
+              <span>Open Field Scanner App (PDA Window)</span>
               <ExternalLink size={14} />
-            </a>
+            </button>
           </div>
         </div>
       </div>
