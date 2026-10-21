@@ -12,18 +12,26 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
   const [isContinueEnabled, setIsContinueEnabled] = useState<boolean>(false);
   const needsReloadRef = useRef<boolean>(false);
 
-  const checkForUpdates = useCallback(async () => {
+  const isCheckingRef = useRef<boolean>(false);
+
+  const checkForUpdates = useCallback(async (isInitial: boolean = false) => {
+    if (isCheckingRef.current) return;
+    isCheckingRef.current = true;
+
     // 1. Check if we just updated and reloaded
-    try {
-      const justUpdatedVersion = sessionStorage.getItem('ttd_just_updated_to');
-      if (justUpdatedVersion) {
-        sessionStorage.removeItem('ttd_just_updated_to');
-        setVersionText(`Updated to version ${justUpdatedVersion}`);
-        setIsContinueEnabled(true);
-        return;
+    if (isInitial) {
+      try {
+        const justUpdatedVersion = sessionStorage.getItem('ttd_just_updated_to');
+        if (justUpdatedVersion) {
+          sessionStorage.removeItem('ttd_just_updated_to');
+          setVersionText(`Updated to version ${justUpdatedVersion}`);
+          setIsContinueEnabled(true);
+          isCheckingRef.current = false;
+          return;
+        }
+      } catch {
+        // Ignore sessionStorage error
       }
-    } catch {
-      // Ignore sessionStorage error
     }
 
     try {
@@ -46,6 +54,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
             updateFound = true;
             targetVersion = String(remoteData.version || remoteData.build);
             setVersionText('Fetching update');
+            setIsContinueEnabled(false);
           }
         }
       } catch {
@@ -61,6 +70,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
               updateFound = true;
               if (!targetVersion) targetVersion = String(BUILD_NUMBER + 1);
               setVersionText('Fetching update');
+              setIsContinueEnabled(false);
               reg.waiting.postMessage({ type: 'SKIP_WAITING' });
             }
 
@@ -70,11 +80,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
               updateFound = true;
               if (!targetVersion) targetVersion = String(BUILD_NUMBER + 1);
               setVersionText('Fetching update');
+              setIsContinueEnabled(false);
               reg.waiting.postMessage({ type: 'SKIP_WAITING' });
             } else if (reg.installing) {
               updateFound = true;
               if (!targetVersion) targetVersion = String(BUILD_NUMBER + 1);
               setVersionText('Fetching update');
+              setIsContinueEnabled(false);
 
               await new Promise<void>((resolve) => {
                 const worker = reg.installing!;
@@ -104,19 +116,33 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
         setIsContinueEnabled(true);
       } else {
         // App is already the latest version
-        await new Promise((r) => setTimeout(r, 600));
-        setVersionText(`Version ${APP_VERSION}`);
+        if (isInitial) {
+          await new Promise((r) => setTimeout(r, 600));
+        }
+        setVersionText((prev) => (prev.startsWith('Updated to version') ? prev : `Version ${APP_VERSION}`));
         setIsContinueEnabled(true);
       }
     } catch {
       // Offline fallback
-      setVersionText(`Version ${APP_VERSION}`);
+      setVersionText((prev) => (prev.startsWith('Updated to version') ? prev : `Version ${APP_VERSION}`));
       setIsContinueEnabled(true);
+    } finally {
+      isCheckingRef.current = false;
     }
   }, []);
 
   useEffect(() => {
-    checkForUpdates();
+    // Initial check on load
+    checkForUpdates(true);
+
+    // Periodically check for version updates while on splash screen (every 10 seconds)
+    const timer = setInterval(() => {
+      checkForUpdates(false);
+    }, 10000);
+
+    return () => {
+      clearInterval(timer);
+    };
   }, [checkForUpdates]);
 
   const handleContinueClick = () => {
