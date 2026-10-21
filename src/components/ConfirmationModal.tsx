@@ -34,7 +34,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             <tbody>
               <tr>
                 <td className="lbl">Asset</td>
-                <td className="val font-mono" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <td className="val font-equipment-id" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span>{asset.equipmentId}</span>
                   <EquipmentTypeIcon type={asset.type} size={15} />
                 </td>

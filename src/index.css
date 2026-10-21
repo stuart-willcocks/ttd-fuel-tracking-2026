@@ -24,6 +24,9 @@
   --btn-font-weight: 600;
   --btn-letter-spacing: 0.15px;
 
+  /* Industrial Fleet DIN Equipment ID Typography */
+  --font-equipment-id: 'Barlow Semi Condensed', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
   /* Vibrant Functional Palette (Matched precisely from style specimen) */
   --btn-blue-bg: #3B66FF;
   --btn-blue-hover: #2B55EE;
@@ -702,8 +705,8 @@ html.is-desktop-browser .app-root {
   background-color: var(--brand-orange);
   border: none !important;
   color: #FFFFFF;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 22px;
+  font-family: var(--font-equipment-id);
+  font-size: 24px;
   font-weight: 800;
   text-align: center;
   padding: 0 12px;
@@ -726,9 +729,10 @@ html.is-desktop-browser .app-root {
 
 .old-scan-input::placeholder {
   color: rgba(255, 255, 255, 0.9);
-  font-size: 20px;
+  font-family: var(--font-equipment-id);
+  font-size: 22px;
   font-weight: 800;
-  letter-spacing: 0.8px;
+  letter-spacing: 1.2px;
 }
 
 .old-error-message {
@@ -824,10 +828,10 @@ html.is-desktop-browser .app-root {
   align-items: center;
   justify-content: center;
   position: relative;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 22px;
+  font-family: var(--font-equipment-id);
+  font-size: 24px;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 1.2px;
   padding: 0 12px;
   box-sizing: border-box;
   border-radius: var(--radius-input);
@@ -843,12 +847,18 @@ html.is-desktop-browser .app-root {
 }
 
 .asset-detail-id-text {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 22px;
+  font-family: var(--font-equipment-id);
+  font-size: 24px;
   font-weight: 800;
   color: #FFFFFF;
-  letter-spacing: 1px;
+  letter-spacing: 1.2px;
   text-align: center;
+}
+
+.font-equipment-id {
+  font-family: var(--font-equipment-id);
+  font-weight: 800;
+  letter-spacing: 0.8px;
 }
 
 .eq-icon-wrap {
@@ -1730,10 +1740,11 @@ html.is-desktop-browser .app-root {
 }
 
 .row-id {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 14px;
-  font-weight: 700;
+  font-family: var(--font-equipment-id);
+  font-size: 15px;
+  font-weight: 800;
   color: var(--brand-orange);
+  letter-spacing: 0.6px;
   white-space: nowrap;
   flex-shrink: 0;
 }
