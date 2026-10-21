@@ -74,7 +74,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="modal-buttons-row">
           <button
             type="button"
-            className="btn-pda-rect btn-pda-light"
+            className="btn-pda-rect btn-pda-blue"
             onClick={onClose}
           >
             Close

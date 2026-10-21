@@ -1,51 +1,58 @@
 /* ==========================================================================
    TTD FLEET TRACKING 2026 — LAPTOP / DESKTOP ADMINISTRATOR PORTAL
-   Design System: Scheme 3 "High-Visibility Slate" (Daylight / Low-Glare)
+   Design System: Clean, Simple White Background Aesthetic
+   - Clean, simple, white background for every view (#FFFFFF)
+   - Rectangular cards as containers (border-radius: 0px)
+   - Buttons have slightly radiused corners (border-radius: 4px)
+   - Primary blue, green, red button background colours
+   - No yellow or orange accents
    ========================================================================== */
 
 :root {
-  /* Slate & Steel Backgrounds */
-  --adm-bg: #1E222B;               /* Solid Deep Slate */
-  --adm-surface-1: #242935;        /* Secondary Slate Panel */
-  --adm-surface-2: #272C38;        /* Clean Steel Gray Card/Row */
-  --adm-surface-3: #323846;        /* Hover / Elevated Surface */
-  --adm-card-bg: #272C38;
-  --adm-card-hover: #2E3443;
+  /* Clean White Surfaces */
+  --adm-bg: #FFFFFF;
+  --adm-surface-1: #F8FAFC;
+  --adm-surface-2: #FFFFFF;
+  --adm-surface-3: #F1F5F9;
+  --adm-card-bg: #FFFFFF;
+  --adm-card-hover: #F8FAFC;
 
   /* Subtle Hairline Dividers */
-  --adm-border-subtle: #373E4F;     /* 1px Hairline Steel */
-  --adm-border-medium: #485165;     /* Focused / Emphasized Border */
-  --adm-border-strong: #5E6981;
+  --adm-border-subtle: #E2E8F0;
+  --adm-border-medium: #CBD5E1;
+  --adm-border-strong: #94A3B8;
 
   /* High-Contrast Typographic Hierarchy */
-  --adm-text-primary: #FFFFFF;     /* Crisp Ice White */
-  --adm-text-secondary: #9AA4B2;   /* Cool Mist Silver / Subtext */
-  --adm-text-muted: #6B7688;       /* Subdued / Muted Gray */
+  --adm-text-primary: #0F172A;
+  --adm-text-secondary: #475569;
+  --adm-text-muted: #64748B;
 
-  /* Single Primary Signal Accent: Industrial Signal Yellow */
-  --adm-accent-yellow: #FACC15;
-  --adm-accent-yellow-light: #FDE047;
-  --adm-accent-yellow-glow: rgba(250, 204, 21, 0.18);
+  /* Primary Blue Accent (replaces yellow/orange) */
+  --adm-accent-yellow: #2563EB;
+  --adm-accent-yellow-light: #1D4ED8;
+  --adm-accent-yellow-glow: rgba(37, 99, 235, 0.15);
 
-  /* Functional Status Tones (Quiet & Controlled) */
-  --adm-status-success: #4ADE80;
-  --adm-status-warning: #FACC15;
-  --adm-status-danger: #F87171;
-  --adm-status-neutral: #9AA4B2;
+  /* Functional Status Tones */
+  --adm-status-success: #16A34A;
+  --adm-status-warning: #2563EB;
+  --adm-status-danger: #DC2626;
+  --adm-status-neutral: #64748B;
 
-  /* Single Standard Font Family: Inter */
+  /* Typography */
   --adm-font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --adm-font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --adm-font-mono: 'JetBrains Mono', monospace;
 
-  --adm-radius-sm: 4px;
-  --adm-radius-md: 6px;
-  --adm-radius-lg: 8px;
-  --adm-radius-xl: 12px;
+  /* Cards have 0px radius; Buttons have 4px radius */
+  --adm-radius-sm: 0px;
+  --adm-radius-md: 0px;
+  --adm-radius-lg: 0px;
+  --adm-radius-xl: 0px;
+  --adm-radius-btn: 4px;
 
-  --adm-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --adm-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4);
-  --adm-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.55);
+  --adm-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --adm-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --adm-shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
 }
 
 *, *::before, *::after {
@@ -71,7 +78,7 @@ body.admin-body {
   position: fixed;
   inset: 0;
   z-index: 99999;
-  background: var(--adm-bg);
+  background: #F8FAFC;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -80,9 +87,9 @@ body.admin-body {
 
 .laptop-guard-card {
   max-width: 520px;
-  background: var(--adm-surface-2);
+  background: #FFFFFF;
   border: 1px solid var(--adm-border-subtle);
-  border-radius: var(--adm-radius-xl);
+  border-radius: 0px !important;
   padding: 36px;
   box-shadow: var(--adm-shadow-lg);
   text-align: center;
@@ -92,9 +99,9 @@ body.admin-body {
   width: 64px;
   height: 64px;
   margin: 0 auto 20px;
-  border-radius: 50%;
-  background: rgba(250, 204, 21, 0.12);
-  border: 2px solid var(--adm-accent-yellow);
+  border-radius: 0px !important;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid var(--adm-accent-yellow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -120,10 +127,10 @@ body.admin-body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--adm-accent-yellow);
-  color: #111827;
+  background: #2563EB;
+  color: #FFFFFF;
   padding: 10px 20px;
-  border-radius: var(--adm-radius-md);
+  border-radius: 4px !important;
   font-weight: 700;
   font-size: 0.92rem;
   text-decoration: none;
@@ -131,11 +138,12 @@ body.admin-body {
 }
 
 .laptop-guard-cta:hover {
-  background: var(--adm-accent-yellow-light);
+  background: #1D4ED8;
 }
 
 /* ==========================================================================
    APP SHELL LAYOUT (Sidebar + Main Viewport)
+   Clean White Background
    ========================================================================== */
 .admin-shell {
   display: flex;
@@ -150,7 +158,7 @@ body.admin-body {
   width: 250px;
   min-width: 250px;
   height: 100vh;
-  background: #171B22;
+  background: #F8FAFC;
   border-right: 1px solid var(--adm-border-subtle);
   display: flex;
   flex-direction: column;
@@ -170,9 +178,9 @@ body.admin-body {
 .admin-logo-box {
   width: 36px;
   height: 36px;
-  border-radius: var(--adm-radius-md);
-  background: rgba(250, 204, 21, 0.12);
-  border: 1px solid rgba(250, 204, 21, 0.3);
+  border-radius: 0px !important;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -209,7 +217,7 @@ body.admin-body {
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  border-radius: var(--adm-radius-sm);
+  border-radius: 0px !important;
   background: transparent;
   border: none;
   color: var(--adm-text-secondary);
@@ -228,12 +236,12 @@ body.admin-body {
 }
 
 .admin-nav-item:hover {
-  background: var(--adm-surface-2);
+  background: #EDF2F7;
   color: var(--adm-text-primary);
 }
 
 .admin-nav-item.active {
-  background: rgba(250, 204, 21, 0.1);
+  background: rgba(37, 99, 235, 0.08);
   color: var(--adm-accent-yellow);
   font-weight: 600;
   border-left: 3px solid var(--adm-accent-yellow);
@@ -243,21 +251,21 @@ body.admin-body {
   font-size: 0.72rem;
   font-weight: 600;
   padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--adm-surface-2);
-  color: var(--adm-text-muted);
+  border-radius: 0px !important;
+  background: #E2E8F0;
+  color: var(--adm-text-secondary);
   font-family: var(--adm-font-mono);
 }
 
 .admin-nav-item.active .admin-nav-badge {
-  background: rgba(250, 204, 21, 0.2);
+  background: rgba(37, 99, 235, 0.15);
   color: var(--adm-accent-yellow);
 }
 
 .admin-sidebar-footer {
   padding: 14px 18px;
   border-top: 1px solid var(--adm-border-subtle);
-  background: #171B22;
+  background: #F8FAFC;
 }
 
 /* Main Content Area */
@@ -275,7 +283,7 @@ body.admin-body {
 .admin-topbar {
   height: 64px;
   min-height: 64px;
-  background: #171B22;
+  background: #FFFFFF;
   border-bottom: 1px solid var(--adm-border-subtle);
   display: flex;
   align-items: center;
@@ -307,9 +315,9 @@ body.admin-body {
   font-family: var(--adm-font-mono);
   font-size: 0.8rem;
   color: var(--adm-text-muted);
-  background: var(--adm-surface-2);
+  background: var(--adm-surface-1);
   padding: 5px 10px;
-  border-radius: var(--adm-radius-sm);
+  border-radius: 0px !important;
   border: 1px solid var(--adm-border-subtle);
 }
 
@@ -324,26 +332,26 @@ body.admin-body {
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border-radius: var(--adm-radius-sm);
+  border-radius: 4px !important;
   font-size: 0.78rem;
   font-weight: 500;
   border: 1px solid var(--adm-border-subtle);
-  background: var(--adm-surface-2);
+  background: var(--adm-surface-1);
   color: var(--adm-text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .admin-sync-pill.online {
-  border-color: rgba(74, 222, 128, 0.3);
-  color: #4ADE80;
-  background: rgba(74, 222, 128, 0.08);
+  border-color: rgba(22, 163, 74, 0.3);
+  color: #16A34A;
+  background: rgba(22, 163, 74, 0.08);
 }
 
 .admin-sync-pill.offline {
-  border-color: rgba(250, 204, 21, 0.3);
-  color: var(--adm-accent-yellow);
-  background: rgba(250, 204, 21, 0.08);
+  border-color: rgba(220, 38, 38, 0.3);
+  color: #DC2626;
+  background: rgba(220, 38, 38, 0.08);
 }
 
 .pulse-dot {
@@ -354,11 +362,11 @@ body.admin-body {
 }
 
 .pulse-dot.green {
-  background: #4ADE80;
+  background: #16A34A;
 }
 
 .pulse-dot.amber {
-  background: var(--adm-accent-yellow);
+  background: #2563EB;
 }
 
 .pulse-dot.slate {
@@ -373,6 +381,8 @@ body.admin-body {
 
 /* ==========================================================================
    BUTTONS & CONTROLS
+   - Buttons have slightly radiused corners (border-radius: 4px)
+   - Primary blue, green, red background colours
    ========================================================================== */
 .admin-btn {
   display: inline-flex;
@@ -382,7 +392,7 @@ body.admin-body {
   padding: 8px 14px;
   font-size: 0.86rem;
   font-weight: 600;
-  border-radius: var(--adm-radius-sm);
+  border-radius: 4px !important;
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -396,53 +406,70 @@ body.admin-body {
   cursor: not-allowed !important;
 }
 
+/* Primary Blue Button */
 .admin-btn-primary {
-  background: var(--adm-accent-yellow);
-  color: #111827;
+  background: #2563EB !important;
+  color: #FFFFFF !important;
   font-weight: 700;
-  border-color: var(--adm-accent-yellow-light);
+  border-color: #2563EB !important;
 }
 
 .admin-btn-primary:hover:not(:disabled) {
-  background: var(--adm-accent-yellow-light);
+  background: #1D4ED8 !important;
+  border-color: #1D4ED8 !important;
 }
 
+/* Secondary Button: clean border */
 .admin-btn-secondary {
-  background: var(--adm-surface-2);
+  background: #FFFFFF;
   color: var(--adm-text-primary);
-  border-color: var(--adm-border-subtle);
+  border-color: var(--adm-border-medium);
 }
 
 .admin-btn-secondary:hover:not(:disabled) {
   background: var(--adm-surface-3);
-  border-color: var(--adm-border-medium);
+  border-color: var(--adm-accent-yellow);
+  color: var(--adm-accent-yellow);
 }
 
 .admin-btn-outline {
   background: transparent;
   color: var(--adm-text-secondary);
-  border-color: var(--adm-border-subtle);
-}
-
-.admin-btn-outline:hover:not(:disabled) {
-  background: var(--adm-surface-2);
-  color: var(--adm-text-primary);
   border-color: var(--adm-border-medium);
 }
 
+.admin-btn-outline:hover:not(:disabled) {
+  background: var(--adm-surface-1);
+  color: var(--adm-text-primary);
+  border-color: var(--adm-accent-yellow);
+}
+
+/* Primary Green Button */
+.admin-btn-success {
+  background: #16A34A !important;
+  color: #FFFFFF !important;
+  border-color: #16A34A !important;
+}
+
+.admin-btn-success:hover:not(:disabled) {
+  background: #15803D !important;
+  border-color: #15803D !important;
+}
+
+/* Primary Red Button */
 .admin-btn-danger {
-  background: rgba(239, 68, 68, 0.15);
-  color: #F87171;
-  border-color: rgba(239, 68, 68, 0.35);
+  background: #DC2626 !important;
+  color: #FFFFFF !important;
+  border-color: #DC2626 !important;
 }
 
 .admin-btn-danger:hover:not(:disabled) {
-  background: #EF4444;
-  color: #FFFFFF;
+  background: #B91C1C !important;
+  border-color: #B91C1C !important;
 }
 
 .admin-btn-sm {
-  padding: 5px 9px;
+  padding: 5px 10px;
   font-size: 0.78rem;
 }
 
@@ -453,11 +480,12 @@ body.admin-body {
 
 /* ==========================================================================
    CARDS & PANELS
+   - Rectangular cards as containers (border-radius: 0px)
    ========================================================================== */
 .admin-card {
-  background: var(--adm-card-bg);
+  background: #FFFFFF;
   border: 1px solid var(--adm-border-subtle);
-  border-radius: var(--adm-radius-md);
+  border-radius: 0px !important;
   padding: 20px;
   box-shadow: var(--adm-shadow-sm);
   margin-bottom: 20px;
@@ -484,12 +512,13 @@ body.admin-body {
 
 /* ==========================================================================
    DATA TABLES
+   - Rectangular containers (border-radius: 0px)
    ========================================================================== */
 .admin-table-container {
   overflow-x: auto;
-  border-radius: var(--adm-radius-sm);
+  border-radius: 0px !important;
   border: 1px solid var(--adm-border-subtle);
-  background: var(--adm-surface-2);
+  background: #FFFFFF;
 }
 
 .admin-table {
@@ -500,7 +529,7 @@ body.admin-body {
 }
 
 .admin-table th {
-  background: #1F242F;
+  background: #F8FAFC;
   color: var(--adm-text-secondary);
   font-weight: 600;
   text-transform: uppercase;
@@ -531,13 +560,13 @@ body.admin-body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Badges: Clean, Subtle, Low Saturation */
+/* Badges: Rectangular (0px radius) */
 .admin-badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 3px 8px;
-  border-radius: var(--adm-radius-sm);
+  border-radius: 0px !important;
   font-size: 0.74rem;
   font-weight: 600;
   font-family: var(--adm-font-mono);
@@ -545,37 +574,38 @@ body.admin-body {
 }
 
 .admin-badge-generator {
-  background: rgba(250, 204, 21, 0.12);
-  color: var(--adm-accent-yellow);
-  border: 1px solid rgba(250, 204, 21, 0.25);
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563EB;
+  border: 1px solid rgba(37, 99, 235, 0.25);
 }
 
 .admin-badge-tank {
-  background: rgba(154, 164, 178, 0.12);
-  color: #E2E8F0;
-  border: 1px solid rgba(154, 164, 178, 0.25);
+  background: #F1F5F9;
+  color: #334155;
+  border: 1px solid #CBD5E1;
 }
 
 .admin-badge-plant {
-  background: rgba(154, 164, 178, 0.12);
-  color: #CBD5E1;
-  border: 1px solid rgba(154, 164, 178, 0.25);
+  background: #F1F5F9;
+  color: #334155;
+  border: 1px solid #CBD5E1;
 }
 
 .admin-badge-running {
-  background: rgba(74, 222, 128, 0.12);
-  color: #4ADE80;
-  border: 1px solid rgba(74, 222, 128, 0.25);
+  background: rgba(22, 163, 74, 0.08);
+  color: #16A34A;
+  border: 1px solid rgba(22, 163, 74, 0.25);
 }
 
 .admin-badge-standby {
-  background: rgba(107, 118, 136, 0.15);
+  background: #F1F5F9;
   color: var(--adm-text-secondary);
-  border: 1px solid rgba(107, 118, 136, 0.25);
+  border: 1px solid #CBD5E1;
 }
 
 /* ==========================================================================
    FORMS & INPUTS
+   - Rectangular containers (border-radius: 0px)
    ========================================================================== */
 .admin-input-group {
   display: flex;
@@ -596,9 +626,9 @@ body.admin-body {
 .admin-select,
 .admin-textarea {
   width: 100%;
-  background: var(--adm-bg);
-  border: 1px solid var(--adm-border-subtle);
-  border-radius: var(--adm-radius-sm);
+  background: #FFFFFF;
+  border: 1px solid var(--adm-border-medium);
+  border-radius: 0px !important;
   padding: 9px 12px;
   color: var(--adm-text-primary);
   font-size: 0.88rem;
@@ -611,7 +641,8 @@ body.admin-body {
 .admin-textarea:focus {
   outline: none;
   border-color: var(--adm-accent-yellow);
-  background: #202530;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  background: #FFFFFF;
 }
 
 .admin-input::placeholder {
@@ -638,12 +669,13 @@ body.admin-body {
 
 /* ==========================================================================
    MODAL OVERLAYS
+   - Rectangular cards as containers (border-radius: 0px)
    ========================================================================== */
 .admin-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(14, 17, 23, 0.75);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -652,9 +684,9 @@ body.admin-body {
 }
 
 .admin-modal-panel {
-  background: var(--adm-surface-2);
+  background: #FFFFFF;
   border: 1px solid var(--adm-border-subtle);
-  border-radius: var(--adm-radius-md);
+  border-radius: 0px !important;
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
@@ -667,7 +699,7 @@ body.admin-body {
 .qr-label-card {
   background: #FFFFFF;
   color: #070A11;
-  border-radius: var(--adm-radius-sm);
+  border-radius: 0px !important;
   padding: 20px;
   border: 2px solid #000000;
   box-shadow: var(--adm-shadow-md);
@@ -765,9 +797,9 @@ body.admin-body {
 }
 
 .admin-toast {
-  background: var(--adm-surface-2);
+  background: #FFFFFF;
   border: 1px solid var(--adm-border-medium);
-  border-radius: var(--adm-radius-sm);
+  border-radius: 4px !important;
   padding: 12px 18px;
   box-shadow: var(--adm-shadow-md);
   display: flex;
@@ -779,11 +811,11 @@ body.admin-body {
 }
 
 .admin-toast.success {
-  border-left: 3px solid #4ADE80;
+  border-left: 3px solid #16A34A;
 }
 
 .admin-toast.error {
-  border-left: 3px solid #F87171;
+  border-left: 3px solid #DC2626;
 }
 
 .admin-toast.info {

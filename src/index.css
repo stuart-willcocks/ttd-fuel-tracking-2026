@@ -1,91 +1,98 @@
 /* ==========================================================================
    TTD FUEL TRACKING — ZEBRA TC26 HANDHELD APPLICATION
-   Design System: Simple, robust, high-contrast rectangular industrial design
+   Design System: Clean, Simple White Background Aesthetic
+   - White background for every view (#FFFFFF)
+   - Orange strictly confined to the Splash Screen (#EC721E)
+   - Rectangular cards as containers (border-radius: 0px)
+   - Buttons have slightly radiused corners (border-radius: 4px)
+   - Primary blue, green, and red for button background colours
    ========================================================================== */
 
 :root {
-  /* Brand Anchors */
+  /* Brand Anchors — Strictly used for Splash Screen */
   --brand-orange: #EC721E;
   --brand-orange-hover: #D46114;
   --brand-orange-active: #BD530E;
-  --brand-light-grey: #F8F9FA;
+  --brand-light-grey: #111827;
 
-  /* Style System: Corner Radii (Modern Rounded Elements) */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-btn: 8px;
-  --radius-input: 8px;
-  --radius-card: 10px;
-  --radius-modal: 12px;
-  --radius-pill: 9999px;
+  /* Corner Radii System:
+     - Cards and containers MUST NOT have radiused corners (0px)
+     - Buttons MUST have slightly radiused corners (4px) */
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-btn: 4px;
+  --radius-input: 0px;
+  --radius-card: 0px;
+  --radius-modal: 0px;
+  --radius-pill: 0px;
 
   /* Modern Sans-Serif Button Typography */
   --font-btn: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --btn-font-weight: 600;
-  --btn-letter-spacing: 0.15px;
+  --btn-letter-spacing: 0.2px;
 
   /* Industrial Fleet DIN Equipment ID Typography */
   --font-equipment-id: 'Barlow Semi Condensed', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-  /* Vibrant Functional Palette (Matched precisely from style specimen) */
-  --btn-blue-bg: #3B66FF;
-  --btn-blue-hover: #2B55EE;
-  --btn-blue-active: #1E44D6;
+  /* Primary Blue, Green, Red Button Palette */
+  --btn-blue-bg: #2563EB;
+  --btn-blue-hover: #1D4ED8;
+  --btn-blue-active: #1E40AF;
   --btn-blue-text: #FFFFFF;
-  --btn-blue-border: #3B66FF;
+  --btn-blue-border: #2563EB;
 
-  --btn-green-bg: #4EA342;
-  --btn-green-hover: #418B37;
-  --btn-green-active: #36752D;
+  --btn-green-bg: #16A34A;
+  --btn-green-hover: #15803D;
+  --btn-green-active: #166534;
   --btn-green-text: #FFFFFF;
-  --btn-green-border: #4EA342;
+  --btn-green-border: #16A34A;
 
-  --btn-orange-bg: #EC721E;
-  --btn-orange-hover: #D46114;
-  --btn-orange-active: #BD530E;
-  --btn-orange-text: #FFFFFF;
-
-  --btn-red-bg: #EA5845;
-  --btn-red-hover: #D84735;
-  --btn-red-active: #C23927;
+  --btn-red-bg: #DC2626;
+  --btn-red-hover: #B91C1C;
+  --btn-red-active: #991B1B;
   --btn-red-text: #FFFFFF;
-  --btn-red-border: #EA5845;
+  --btn-red-border: #DC2626;
 
-  --btn-secondary-border: #3B66FF;
-  --btn-secondary-text: #3B66FF;
+  /* Secondary / Neutral button fallbacks */
+  --btn-secondary-border: #2563EB;
+  --btn-secondary-text: #2563EB;
   --btn-secondary-bg: transparent;
-  --btn-secondary-hover-bg: rgba(59, 102, 255, 0.08);
+  --btn-secondary-hover-bg: rgba(37, 99, 235, 0.08);
 
-  --btn-neutral-bg: #262E3D;
-  --btn-neutral-hover: #313A4D;
-  --btn-neutral-active: #1F2532;
+  --btn-neutral-bg: #2563EB;
+  --btn-neutral-hover: #1D4ED8;
+  --btn-neutral-active: #1E40AF;
   --btn-neutral-text: #FFFFFF;
-  --btn-neutral-border: #374151;
+  --btn-neutral-border: #2563EB;
 
-  --btn-light-bg: #F1F3F5;
-  --btn-light-hover: #E2E8F0;
-  --btn-light-active: #CBD5E1;
-  --btn-light-text: #111827;
-  --btn-light-border: #CBD5E1;
+  --btn-light-bg: #2563EB;
+  --btn-light-hover: #1D4ED8;
+  --btn-light-active: #1E40AF;
+  --btn-light-text: #FFFFFF;
+  --btn-light-border: #2563EB;
 
-  /* Slate Theme Surfaces */
-  --bg-page: #111827;          /* Industrial Deep Slate */
-  --bg-header: #171B22;        /* Sleek Status Bar Slate */
-  --bg-banner: #000000;        /* Pure Black Top Banner */
-  --bg-surface: #1F2937;       /* Clean Steel Gray */
-  --bg-surface-hover: #374151; /* Active Card Slate */
-  --border-subtle: #374151;    /* Hairline Crisp Steel */
-  --border-medium: #4B5563;    /* Focused Border */
+  /* Clean Simple White Background Surfaces */
+  --bg-page: #FFFFFF;
+  --bg-header: #FFFFFF;
+  --bg-banner: #FFFFFF;
+  --bg-surface: #FFFFFF;
+  --bg-surface-hover: #F8FAFC;
+  --bg-surface-alt: #F9FAFB;
+  --border-subtle: #E5E7EB;
+  --border-medium: #D1D5DB;
+  --border-strong: #9CA3AF;
 
   /* High-Contrast Typography */
-  --text-main: #F8F9FA;        /* Pristine Light Grey */
-  --text-muted: #9CA3AF;       /* Cool Mist Silver */
-  --text-dim: #6B7280;         /* Subdued Label Gray */
+  --text-main: #111827;
+  --text-muted: #4B5563;
+  --text-dim: #6B7280;
 
-  /* Signal Accents */
-  --accent-orange: #EC721E;    /* Brand Primary Accent */
-  --accent-yellow: #EC721E;    /* Backward-compatible alias mapped to Brand Orange */
-  --accent-yellow-dark: #D46114;
+  /* Primary Blue Accent across UI */
+  --accent-primary: #2563EB;
+  --accent-blue: #2563EB;
+  --accent-orange: #2563EB; /* Aliased to Primary Blue to eliminate orange across views */
+  --accent-yellow: #2563EB;
+  --accent-yellow-dark: #1D4ED8;
 }
 
 /* Modern Controls Reset */
@@ -107,7 +114,8 @@ textarea {
 
 html, body {
   background-color: var(--bg-page);
-  color-scheme: dark;
+  color-scheme: light;
+  color: var(--text-main);
   height: 100%;
   height: 100dvh;
   width: 100%;
@@ -159,7 +167,7 @@ html.is-desktop-browser body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #07090E;
+  background-color: #F1F5F9;
   margin: 0;
   padding: 0;
   width: 100%;
@@ -172,7 +180,7 @@ html.is-desktop-browser #root {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #07090E;
+  background-color: #F1F5F9;
   width: 100%;
   height: 100%;
   height: 100dvh;
@@ -205,8 +213,10 @@ html.is-desktop-browser .app-root {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--border-medium) !important;
-  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  border-radius: 0px !important;
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
   flex-shrink: 0;
+  background-color: #FFFFFF;
 }
 
 /* Desktop PDA Toolbar */
@@ -235,21 +245,21 @@ html.is-desktop-browser .app-root {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: var(--bg-surface);
+  background: #FFFFFF;
   border: 1px solid var(--border-medium);
-  color: var(--brand-light-grey);
+  color: var(--text-main);
   font-size: 11px;
   font-weight: 600;
   padding: 3px 8px;
   cursor: pointer;
-  border-radius: 0 !important;
+  border-radius: 4px !important;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .desktop-pda-popout-btn:hover {
   background: var(--bg-surface-hover);
-  border-color: var(--brand-orange);
-  color: var(--brand-orange);
+  border-color: var(--btn-blue-bg);
+  color: var(--btn-blue-bg);
 }
 
 @media screen and (max-width: 420px) {
@@ -258,13 +268,12 @@ html.is-desktop-browser .app-root {
   }
 }
 
-/* Media query fallback for fine-pointer desktop browsers */
 @media (hover: hover) and (pointer: fine) {
   html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #07090E;
+    background-color: #F1F5F9;
     margin: 0;
     padding: 0;
     width: 100%;
@@ -276,7 +285,7 @@ html.is-desktop-browser .app-root {
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #07090E;
+    background-color: #F1F5F9;
     width: 100%;
     height: 100%;
     height: 100dvh;
@@ -308,13 +317,16 @@ html.is-desktop-browser .app-root {
     position: relative;
     overflow: hidden;
     border: 1px solid var(--border-medium) !important;
-    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    border-radius: 0px !important;
+    box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
     flex-shrink: 0;
+    background-color: #FFFFFF;
   }
 }
 
 /* ==========================================================================
    APP_HEADER (App Title, Version, Online Indicator, Refresh / Queue Indicator)
+   Clean White Background, High-Contrast Typography
    ========================================================================== */
 
 .app-header {
@@ -322,11 +334,12 @@ html.is-desktop-browser .app-root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
-  background-color: var(--bg-header);
+  padding: 8px 14px;
+  background-color: #FFFFFF;
   color: var(--text-main);
   min-height: 48px;
   border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0px !important;
 }
 
 .header-title-box {
@@ -361,8 +374,8 @@ html.is-desktop-browser .app-root {
 
 .header-app-title {
   font-size: 11px;
-  font-weight: 600;
-  color: var(--brand-orange);
+  font-weight: 700;
+  color: var(--btn-blue-bg);
 }
 
 .header-version-pill {
@@ -370,9 +383,10 @@ html.is-desktop-browser .app-root {
   font-size: 10px;
   font-weight: 600;
   color: var(--text-muted);
-  background: var(--bg-surface);
+  background: var(--bg-surface-hover);
   border: 1px solid var(--border-subtle);
-  padding: 1px 4px;
+  padding: 1px 5px;
+  border-radius: 0px !important;
 }
 
 .header-status-box {
@@ -386,43 +400,45 @@ html.is-desktop-browser .app-root {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-surface);
+  background: var(--bg-surface-hover);
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
   width: 30px;
   height: 30px;
   padding: 0;
   cursor: pointer;
+  border-radius: 4px !important;
 }
 
 .status-pill.online {
   color: var(--btn-green-bg);
-  border-color: rgba(22, 163, 74, 0.4);
-  background: rgba(22, 163, 74, 0.15);
+  border-color: rgba(22, 163, 74, 0.3);
+  background: rgba(22, 163, 74, 0.08);
 }
 
 .status-pill.offline {
-  color: var(--brand-orange);
-  border-color: rgba(236, 114, 30, 0.4);
-  background: rgba(236, 114, 30, 0.15);
+  color: var(--btn-red-bg);
+  border-color: rgba(220, 38, 38, 0.3);
+  background: rgba(220, 38, 38, 0.08);
 }
 
 .pending-pill {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(220, 38, 38, 0.2);
-  color: #EF4444;
-  border: 1px solid rgba(220, 38, 38, 0.4);
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--btn-red-bg);
+  border: 1px solid rgba(220, 38, 38, 0.3);
   padding: 3px 7px;
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
   height: 30px;
+  border-radius: 0px !important;
 }
 
 .icon-btn {
-  background: var(--bg-surface);
+  background: var(--bg-surface-hover);
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
   width: 30px;
@@ -431,48 +447,34 @@ html.is-desktop-browser .app-root {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  border-radius: 4px !important;
 }
 
 .icon-btn:hover {
-  background: var(--bg-surface-hover);
+  background: #F1F5F9;
   color: var(--text-main);
   border-color: var(--border-medium);
 }
 
 .icon-btn.has-update {
-  background-color: var(--brand-orange) !important;
-  border-color: var(--brand-orange) !important;
-  color: var(--brand-light-grey) !important;
+  background-color: var(--btn-blue-bg) !important;
+  border-color: var(--btn-blue-bg) !important;
+  color: #FFFFFF !important;
 }
 
 .icon-btn.has-update svg path {
-  fill: var(--brand-light-grey) !important;
-  stroke: var(--brand-light-grey) !important;
+  fill: #FFFFFF !important;
+  stroke: #FFFFFF !important;
 }
 
 .icon-btn.has-update svg circle {
-  fill: var(--brand-orange) !important;
-  stroke: var(--brand-orange) !important;
+  fill: var(--btn-blue-bg) !important;
+  stroke: var(--btn-blue-bg) !important;
 }
 
 .icon-btn.has-update:hover {
-  background-color: var(--brand-orange-hover) !important;
-  border-color: var(--brand-orange-hover) !important;
-}
-
-.icon-btn.has-update:hover svg circle {
-  fill: var(--brand-orange-hover) !important;
-  stroke: var(--brand-orange-hover) !important;
-}
-
-.icon-btn.has-update:active {
-  background-color: var(--brand-orange-active) !important;
-  border-color: var(--brand-orange-active) !important;
-}
-
-.icon-btn.has-update:active svg circle {
-  fill: var(--brand-orange-active) !important;
-  stroke: var(--brand-orange-active) !important;
+  background-color: var(--btn-blue-hover) !important;
+  border-color: var(--btn-blue-hover) !important;
 }
 
 .spinning {
@@ -487,6 +489,7 @@ html.is-desktop-browser .app-root {
 
 /* ==========================================================================
    MAIN VIEWPORT CONTAINER
+   Clean White Background
    ========================================================================== */
 
 .app-main {
@@ -508,8 +511,8 @@ html.is-desktop-browser .app-root {
 }
 
 /* ==========================================================================
-   SPLASH_SCREEN (Layout based on Screenshot_20261019-112856.png)
-   Background color: #EC721E (matches Technical Department Ltd logo)
+   SPLASH_SCREEN
+   Background color: #EC721E (Strictly permitted only on splash screen)
    ========================================================================== */
 
 .app-root.splash-screen-root {
@@ -519,7 +522,7 @@ html.is-desktop-browser .app-root {
 }
 
 .splash-screen {
-  --splash-grey: #F8F9FA; /* Uniform crisp slightly lighter grey across all splash elements */
+  --splash-grey: #F8F9FA;
   width: 100%;
   height: 100%;
   background-color: #EC721E;
@@ -545,7 +548,6 @@ html.is-desktop-browser .app-root {
   padding: clamp(10px, 2.5vh, 22px) 0 clamp(24px, 6vh, 48px);
 }
 
-/* Upper Block: Logo, The Technical Department Ltd, Fuel Tracking App (moved up by ~1/5 screen height) */
 .splash-top-block {
   width: 100%;
   display: flex;
@@ -593,7 +595,6 @@ html.is-desktop-browser .app-root {
   letter-spacing: -0.2px;
 }
 
-/* Lower Text Block: Version/Update Status line & Device ID line (moved down by ~1/5 screen height, lighter weight) */
 .splash-lower-text-block {
   width: 100%;
   display: flex;
@@ -606,7 +607,7 @@ html.is-desktop-browser .app-root {
 
 .splash-version-status-line {
   font-size: 14px;
-  font-weight: 400; /* Lighter weight */
+  font-weight: 400;
   color: var(--splash-grey);
   min-height: 22px;
   display: flex;
@@ -617,7 +618,7 @@ html.is-desktop-browser .app-root {
 
 .splash-device-line {
   font-size: 13px;
-  font-weight: 400; /* Lighter weight */
+  font-weight: 400;
   color: var(--splash-grey);
   letter-spacing: 0.2px;
 }
@@ -627,7 +628,6 @@ html.is-desktop-browser .app-root {
   color: var(--splash-grey);
 }
 
-/* Bottom Button Block */
 .splash-btn-wrap {
   width: 100%;
   display: flex;
@@ -649,6 +649,7 @@ html.is-desktop-browser .app-root {
   justify-content: center;
   text-align: center;
   letter-spacing: 0.3px;
+  border-radius: 4px !important;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -664,15 +665,17 @@ html.is-desktop-browser .app-root {
 .splash-btn-continue:disabled,
 .splash-btn-continue.disabled {
   background-color: rgba(17, 24, 39, 0.45);
-  color: rgba(248, 249, 250, 0.45); /* Dimmed uniform light grey */
+  color: rgba(248, 249, 250, 0.45);
   border-color: rgba(255, 255, 255, 0.1);
   cursor: not-allowed;
   opacity: 0.65;
 }
 
-
 /* ==========================================================================
-   SCAN_SCREEN (Only QR Code Entry Box and Select Asset From List Button)
+   SCAN_SCREEN
+   - Clean white background
+   - Full width rectangular card container for scan input (no radiused corners)
+   - Primary blue button with slightly radiused corners
    ========================================================================== */
 
 .scan-screen-only {
@@ -688,7 +691,7 @@ html.is-desktop-browser .app-root {
 .scan-top-area {
   flex-shrink: 0;
   width: 100%;
-  padding: 12px 16px 8px 16px;
+  padding: 14px 16px 8px 16px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -699,36 +702,37 @@ html.is-desktop-browser .app-root {
   width: 100%;
 }
 
+/* Rectangular Card Container for Scan Input (no rounded corners) */
 .old-scan-input {
   width: 100%;
   height: 52px;
-  background-color: var(--brand-orange);
-  border: none !important;
-  color: #FFFFFF;
+  background-color: #FFFFFF;
+  border: 2px solid var(--btn-blue-bg) !important;
+  color: #111827;
   font-family: var(--font-equipment-id);
   font-size: 24px;
   font-weight: 800;
   text-align: center;
   padding: 0 12px;
-  caret-color: #FFFFFF;
+  caret-color: var(--btn-blue-bg);
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-input);
-  box-shadow: none !important;
+  border-radius: 0px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
 }
 
 .old-scan-input:focus {
   outline: none;
-  border: none !important;
-  background-color: var(--brand-orange);
-  color: #FFFFFF;
-  box-shadow: none !important;
+  border: 2px solid var(--btn-blue-bg) !important;
+  background-color: #FFFFFF;
+  color: #111827;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18) !important;
 }
 
 .old-scan-input::placeholder {
-  color: rgba(255, 255, 255, 0.9);
+  color: #9CA3AF;
   font-family: var(--font-equipment-id);
   font-size: 22px;
   font-weight: 800;
@@ -736,9 +740,9 @@ html.is-desktop-browser .app-root {
 }
 
 .old-error-message {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #F87171;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: var(--btn-red-bg);
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 600;
@@ -746,7 +750,7 @@ html.is-desktop-browser .app-root {
   align-items: center;
   gap: 8px;
   width: 100%;
-  border-radius: var(--radius-sm);
+  border-radius: 0px !important;
 }
 
 .scan-middle-area {
@@ -757,18 +761,20 @@ html.is-desktop-browser .app-root {
 .scan-bottom-area {
   flex-shrink: 0;
   width: 100%;
-  padding: 8px 12px;
-  background-color: var(--bg-header);
+  padding: 10px 12px;
+  background-color: #FFFFFF;
   border-top: 1px solid var(--border-subtle);
   box-sizing: border-box;
+  border-radius: 0px !important;
 }
 
+/* Choose from list button: Primary Blue with slightly radiused corners */
 .old-btn-select-fleet {
   width: 100%;
-  height: 46px;
-  background-color: var(--btn-green-bg);
-  border: 1px solid var(--btn-green-border);
-  color: var(--btn-green-text);
+  height: 48px;
+  background-color: var(--btn-blue-bg);
+  border: 1px solid var(--btn-blue-border);
+  color: var(--btn-blue-text);
   font-family: var(--font-btn);
   font-size: 15px;
   font-weight: var(--btn-font-weight);
@@ -779,25 +785,28 @@ html.is-desktop-browser .app-root {
   gap: 8px;
   cursor: pointer;
   letter-spacing: var(--btn-letter-spacing);
-  border-radius: var(--radius-btn);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  border-radius: 4px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .old-btn-select-fleet:hover {
-  background-color: var(--btn-green-hover);
-  border-color: var(--btn-green-hover);
+  background-color: var(--btn-blue-hover);
+  border-color: var(--btn-blue-hover);
   color: #FFFFFF;
 }
 
 .old-btn-select-fleet:active {
-  background-color: var(--btn-green-active);
-  border-color: var(--btn-green-active);
+  background-color: var(--btn-blue-active);
+  border-color: var(--btn-blue-active);
   transform: scale(0.985);
 }
 
 /* ==========================================================================
-   ASSET_DETAIL_VIEW (Layout based on Screenshot_20250324-201513.png)
+   ASSET_DETAIL_VIEW
+   - Clean white background
+   - Rectangular card containers (0px radius)
+   - Primary blue, green, red button colors with slightly radiused corners (4px)
    ========================================================================== */
 
 .asset-detail-container {
@@ -809,32 +818,13 @@ html.is-desktop-browser .app-root {
   color: var(--text-main);
 }
 
-/* 1. ASSET ID: Orange text box matching scan view (same font, size, weight, colors, placement) */
+/* 1. ASSET ID: Rectangular card container matching scan view */
 .asset-detail-id-box {
   position: relative;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.asset-detail-id-banner {
-  flex-shrink: 0;
-  width: 100%;
-  height: 52px;
-  background-color: var(--brand-orange);
-  border: none !important;
-  box-shadow: none !important;
-  color: #FFFFFF;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  font-family: var(--font-equipment-id);
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
-  padding: 0 12px;
-  box-sizing: border-box;
-  border-radius: var(--radius-input);
+  background-color: #FFFFFF !important;
+  border: 2px solid var(--btn-blue-bg) !important;
+  border-radius: 0px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
 }
 
 .asset-detail-id-icon {
@@ -843,14 +833,14 @@ html.is-desktop-browser .app-root {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #FFFFFF;
+  color: var(--btn-blue-bg);
 }
 
 .asset-detail-id-text {
   font-family: var(--font-equipment-id);
   font-size: 24px;
   font-weight: 800;
-  color: #FFFFFF;
+  color: #111827;
   letter-spacing: 1.2px;
   text-align: center;
 }
@@ -868,33 +858,34 @@ html.is-desktop-browser .app-root {
   line-height: 1;
 }
 
-/* 2. METADATA SECTION: Non-monospace what3words, all data in light grey, no type text */
+/* 2. METADATA SECTION: Rectangular Card Container (no radiused corners) */
 .asset-detail-meta-box {
   flex-shrink: 0;
-  background-color: var(--bg-surface);
-  padding: 8px 12px;
+  background-color: #FFFFFF;
+  padding: 10px 14px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   border-top: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0px !important;
 }
 
 .asset-detail-w3w {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 15px;
   font-weight: 700;
-  color: var(--brand-light-grey);
+  color: var(--btn-blue-bg);
   letter-spacing: 0.2px;
 }
 
 .asset-detail-spec {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  color: var(--brand-light-grey);
+  color: var(--text-muted);
   letter-spacing: 0.2px;
 }
 
@@ -902,15 +893,22 @@ html.is-desktop-browser .app-root {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 13px;
   font-weight: 600;
-  color: var(--brand-light-grey);
+  color: var(--text-muted);
 }
 
-.asset-detail-area,
-.asset-detail-location {
+.asset-detail-area {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.25;
+}
+
+.asset-detail-location {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13.5px;
   font-weight: 600;
-  color: var(--brand-light-grey);
+  color: var(--text-muted);
   line-height: 1.25;
 }
 
@@ -927,22 +925,23 @@ html.is-desktop-browser .app-root {
   display: flex;
   flex-direction: column;
   padding: 8px 12px;
-  gap: 6px;
+  gap: 8px;
 }
 
+/* Rectangular Card for each transaction row */
 .tx-row-card {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  background-color: var(--bg-surface);
+  background-color: #FFFFFF;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-btn);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border-radius: 0px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .tx-row-card:nth-child(even) {
-  background-color: #171B24;
+  background-color: var(--bg-surface-alt);
 }
 
 .tx-type-icon-col {
@@ -964,7 +963,7 @@ html.is-desktop-browser .app-root {
 .tx-timestamp-line {
   font-size: 13.5px;
   font-weight: 700;
-  color: var(--brand-light-grey);
+  color: var(--text-main);
   line-height: 1.3;
 }
 
@@ -990,15 +989,15 @@ html.is-desktop-browser .app-root {
 }
 
 .icon-fuel {
-  color: #F59E0B; /* Vibrant amber fuel pump icon */
+  color: var(--btn-blue-bg);
 }
 
 .icon-def {
-  color: #3B82F6; /* Vibrant blue DEF droplet icon */
+  color: #0284C7;
 }
 
 .icon-kwh {
-  color: #F97316; /* Electric orange kWh icon */
+  color: var(--btn-blue-bg);
 }
 
 .tx-sync-col {
@@ -1010,7 +1009,7 @@ html.is-desktop-browser .app-root {
 }
 
 .sync-green-tick {
-  color: var(--btn-green-bg) !important; /* Green tick */
+  color: var(--btn-green-bg) !important;
 }
 
 .tx-empty-state {
@@ -1020,16 +1019,17 @@ html.is-desktop-browser .app-root {
   color: var(--text-dim);
 }
 
-/* 4. TRANSACTION BUTTONS: Rendered in a 2x2 grid */
+/* 4. TRANSACTION BUTTONS: 2x2 grid, slightly radiused corners */
 .asset-detail-btn-stack {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   padding: 10px 12px;
-  background-color: var(--bg-header);
+  background-color: #FFFFFF;
   border-top: 1px solid var(--border-subtle);
   box-sizing: border-box;
+  border-radius: 0px !important;
 }
 
 .asset-detail-btn-stack .btn-pda-rect {
@@ -1040,7 +1040,12 @@ html.is-desktop-browser .app-root {
   gap: 6px !important;
 }
 
-/* Standard PDA Button: full width, center justified, height 46px, 8px rounded corners */
+/* ==========================================================================
+   BUTTON SYSTEM
+   - Buttons have slightly radiused corners (border-radius: 4px)
+   - Primary blue, green, red background colours
+   ========================================================================== */
+
 .btn-pda-rect {
   width: 100% !important;
   height: 46px !important;
@@ -1057,9 +1062,9 @@ html.is-desktop-browser .app-root {
   gap: 8px !important;
   cursor: pointer;
   letter-spacing: var(--btn-letter-spacing);
-  border-radius: var(--radius-btn) !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
+  border-radius: 4px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
   user-select: none;
 }
 
@@ -1073,43 +1078,50 @@ html.is-desktop-browser .app-root {
   transform: none;
 }
 
-/* Functional Color Buttons */
-.btn-pda-green {
+/* Primary Green Buttons (Check in, submit, confirm, etc.) */
+.btn-pda-green,
+.btn-modal-confirm {
   background-color: var(--btn-green-bg) !important;
   color: var(--btn-green-text) !important;
   border: 1px solid var(--btn-green-border) !important;
+  border-radius: 4px !important;
+  font-family: var(--font-btn) !important;
+  font-weight: var(--btn-font-weight) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
-.btn-pda-green:hover:not(:disabled) {
+.btn-pda-green:hover:not(:disabled),
+.btn-modal-confirm:hover:not(:disabled) {
   background-color: var(--btn-green-hover) !important;
   border-color: var(--btn-green-hover) !important;
 }
 
-.btn-pda-green:active:not(:disabled) {
+.btn-pda-green:active:not(:disabled),
+.btn-modal-confirm:active:not(:disabled) {
   background-color: var(--btn-green-active) !important;
   border-color: var(--btn-green-active) !important;
+  transform: scale(0.985);
 }
 
-.btn-pda-orange {
-  background-color: var(--btn-orange-bg) !important;
-  color: var(--btn-orange-text) !important;
-  border: 1px solid var(--brand-orange-hover) !important;
-}
-
-.btn-pda-orange:hover:not(:disabled) {
-  background-color: var(--btn-orange-hover) !important;
-  border-color: var(--brand-orange-hover) !important;
-}
-
-.btn-pda-orange:active:not(:disabled) {
-  background-color: var(--btn-orange-active) !important;
-  border-color: var(--brand-orange-active) !important;
-}
-
+/* Primary Blue Buttons (Back, nav, info actions) */
 .btn-pda-blue {
   background-color: var(--btn-blue-bg) !important;
   color: var(--btn-blue-text) !important;
   border: 1px solid var(--btn-blue-border) !important;
+  border-radius: 4px !important;
+  font-family: var(--font-btn) !important;
+  font-weight: var(--btn-font-weight) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .btn-pda-blue:hover:not(:disabled) {
@@ -1120,70 +1132,107 @@ html.is-desktop-browser .app-root {
 .btn-pda-blue:active:not(:disabled) {
   background-color: var(--btn-blue-active) !important;
   border-color: var(--btn-blue-active) !important;
-}
-
-.btn-pda-light {
-  background-color: var(--btn-light-bg) !important;
-  color: var(--btn-light-text) !important;
-  border: 1px solid var(--btn-light-border) !important;
-  font-family: var(--font-btn) !important;
-  font-weight: var(--btn-font-weight) !important;
-}
-
-.btn-pda-light:hover:not(:disabled) {
-  background-color: var(--btn-light-hover) !important;
-}
-
-.btn-pda-light:active:not(:disabled) {
-  background-color: var(--btn-light-active) !important;
   transform: scale(0.985);
 }
 
-.btn-pda-neutral {
-  background-color: var(--btn-neutral-bg) !important;
-  color: var(--btn-neutral-text) !important;
-  border: 1px solid var(--btn-neutral-border) !important;
-  font-family: var(--font-btn) !important;
-  font-weight: var(--btn-font-weight) !important;
-}
-
-.btn-pda-neutral:hover:not(:disabled) {
-  background-color: var(--btn-neutral-hover) !important;
-}
-
-.btn-pda-neutral:active:not(:disabled) {
-  background-color: var(--btn-neutral-active) !important;
-  transform: scale(0.985);
-}
-
+/* Primary Red Buttons (Cancel, delete, back out) */
 .btn-pda-red,
-.btn-danger-cancel {
+.btn-danger-cancel,
+.btn-modal-cancel,
+.old-btn-cancel {
   background-color: var(--btn-red-bg) !important;
   color: var(--btn-red-text) !important;
   border: 1px solid var(--btn-red-border) !important;
-  border-radius: var(--radius-btn) !important;
+  border-radius: 4px !important;
   font-family: var(--font-btn) !important;
+  font-size: 15px !important;
   font-weight: var(--btn-font-weight) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
   gap: 8px !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  letter-spacing: var(--btn-letter-spacing);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .btn-pda-red:hover:not(:disabled),
-.btn-danger-cancel:hover:not(:disabled) {
+.btn-danger-cancel:hover:not(:disabled),
+.btn-modal-cancel:hover:not(:disabled),
+.old-btn-cancel:hover:not(:disabled) {
   background-color: var(--btn-red-hover) !important;
   border-color: var(--btn-red-hover) !important;
 }
 
 .btn-pda-red:active:not(:disabled),
-.btn-danger-cancel:active:not(:disabled) {
+.btn-danger-cancel:active:not(:disabled),
+.btn-modal-cancel:active:not(:disabled),
+.old-btn-cancel:active:not(:disabled) {
   background-color: var(--btn-red-active) !important;
   border-color: var(--btn-red-active) !important;
   transform: scale(0.985);
 }
 
+/* Secondary & Neutral Aliases */
+.btn-secondary {
+  height: 42px;
+  background-color: transparent;
+  border: 1.5px solid var(--btn-blue-bg);
+  color: var(--btn-blue-bg);
+  font-family: var(--font-btn);
+  font-size: 14px;
+  font-weight: var(--btn-font-weight);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 4px !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: rgba(37, 99, 235, 0.08);
+  border-color: var(--btn-blue-hover);
+}
+
+.btn-secondary:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.btn-danger-outline {
+  width: 100%;
+  height: 42px;
+  background-color: transparent;
+  border: 1.5px solid var(--btn-red-bg);
+  color: var(--btn-red-bg);
+  font-family: var(--font-btn);
+  font-size: 14px;
+  font-weight: var(--btn-font-weight);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 4px !important;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.08s ease;
+}
+
+.btn-danger-outline:hover {
+  background-color: var(--btn-red-bg);
+  color: #FFFFFF;
+}
+
+.btn-danger-outline:active {
+  transform: scale(0.985);
+}
+
 /* ==========================================================================
    TRANSACTION FORM VIEW
+   Clean White Background, Rectangular Card Containers
    ========================================================================== */
 
 .old-form-body {
@@ -1203,7 +1252,7 @@ html.is-desktop-browser .app-root {
 .old-form-title {
   font-size: 16px;
   font-weight: 700;
-  color: var(--brand-orange);
+  color: var(--text-main);
   text-align: center;
   margin: 6px 0 20px;
   letter-spacing: 0.3px;
@@ -1245,22 +1294,22 @@ html.is-desktop-browser .app-root {
 .old-form-input {
   width: 110px;
   height: 44px;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-medium);
   color: var(--text-main);
   font-size: 17px;
   font-weight: 700;
   text-align: center;
   font-family: 'JetBrains Mono', monospace;
-  border-radius: var(--radius-input);
+  border-radius: 0px !important;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .old-form-input:focus {
   outline: none;
-  background-color: #2E3443;
+  background-color: #FFFFFF;
   border-color: var(--btn-blue-bg);
-  box-shadow: 0 0 0 2px rgba(59, 102, 255, 0.25);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
 .old-form-unit {
@@ -1282,24 +1331,24 @@ html.is-desktop-browser .app-root {
 .old-btn-step {
   width: 44px;
   height: 44px;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-main);
+  background-color: var(--btn-blue-bg);
+  border: 1px solid var(--btn-blue-border);
+  color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  border-radius: var(--radius-input);
+  border-radius: 4px !important;
   transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .old-btn-step:hover {
-  background-color: var(--bg-surface-hover);
-  border-color: var(--border-medium);
+  background-color: var(--btn-blue-hover);
+  border-color: var(--btn-blue-hover);
 }
 
 .old-btn-step:active {
-  background-color: #2E3443;
+  background-color: var(--btn-blue-active);
   transform: scale(0.96);
 }
 
@@ -1324,22 +1373,22 @@ html.is-desktop-browser .app-root {
   padding: 6px 10px;
   font-size: 12px;
   font-weight: 600;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-medium);
+  color: var(--text-main);
   cursor: pointer;
-  border-radius: var(--radius-sm);
+  border-radius: 0px !important;
   transition: all 0.15s ease;
 }
 
 .old-tank-chip.active {
-  background-color: var(--brand-orange);
-  color: #FFFFFF;
-  border-color: var(--brand-orange);
+  background-color: var(--btn-blue-bg) !important;
+  color: #FFFFFF !important;
+  border-color: var(--btn-blue-border) !important;
   font-weight: 700;
 }
 
-/* Submit & Cancel Buttons: Rendered side by side in one row */
+/* Form Action Buttons: Submit & Cancel in one row */
 .old-form-btn-row {
   display: flex;
   flex-direction: row;
@@ -1369,8 +1418,8 @@ html.is-desktop-browser .app-root {
   text-align: center;
   gap: 8px;
   letter-spacing: var(--btn-letter-spacing);
-  border-radius: var(--radius-btn);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  border-radius: 4px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
@@ -1392,54 +1441,25 @@ html.is-desktop-browser .app-root {
 }
 
 .old-btn-submit.disabled {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  background-color: #E5E7EB;
+  border: 1px solid var(--border-medium);
   color: var(--text-dim);
   cursor: not-allowed;
   box-shadow: none;
 }
 
-.old-btn-cancel {
-  width: 100%;
-  height: 46px;
-  background-color: var(--btn-red-bg);
-  border: 1px solid var(--btn-red-border);
-  color: var(--btn-red-text);
-  font-family: var(--font-btn);
-  font-size: 15px;
-  font-weight: var(--btn-font-weight);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 8px;
-  letter-spacing: var(--btn-letter-spacing);
-  border-radius: var(--radius-btn);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
-}
-
-.old-btn-cancel:hover {
-  background-color: var(--btn-red-hover);
-  border-color: var(--btn-red-hover);
-}
-
-.old-btn-cancel:active {
-  background-color: var(--btn-red-active);
-  border-color: var(--btn-red-active);
-  transform: scale(0.985);
-}
-
 /* ==========================================================================
    MODALS & OVERLAYS
+   - Rectangular cards as containers (border-radius: 0px)
+   - Buttons have slightly radiused corners (border-radius: 4px)
+   - Clean white backgrounds
    ========================================================================== */
 
 .modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(14, 17, 23, 0.75);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1450,11 +1470,11 @@ html.is-desktop-browser .app-root {
 .modal-box {
   width: 100%;
   max-width: 440px;
-  background: var(--bg-surface);
+  background: #FFFFFF;
   color: var(--text-main);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-modal);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  border-radius: 0px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
   padding: 18px;
   max-height: calc(100% - 24px);
   overflow-y: auto;
@@ -1477,18 +1497,17 @@ html.is-desktop-browser .app-root {
   display: flex;
   flex-direction: column;
   padding: 10px 10px 8px;
-  background-color: var(--bg-surface);
+  background-color: #FFFFFF;
   border: none;
-  border-radius: 0;
+  border-radius: 0px !important;
   overflow: hidden;
   box-sizing: border-box;
 }
 
-/* Pinned Top Section: "Select equipment" and Search box are ALWAYS at the top of the screen */
 .picker-pinned-top {
   flex-shrink: 0;
   width: 100%;
-  background-color: var(--bg-surface);
+  background-color: #FFFFFF;
   z-index: 10;
 }
 
@@ -1509,17 +1528,15 @@ html.is-desktop-browser .app-root {
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 4px !important;
   transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .picker-header-close-btn:hover {
-  color: var(--brand-orange);
-  background-color: rgba(236, 114, 30, 0.1);
-  border-color: var(--brand-orange);
+  color: var(--btn-blue-bg);
+  background-color: rgba(37, 99, 235, 0.08);
+  border-color: var(--btn-blue-bg);
 }
-
-
 
 .modal-title {
   font-size: 16px;
@@ -1547,10 +1564,10 @@ html.is-desktop-browser .app-root {
 .picker-asset-count {
   font-size: 11px;
   font-weight: 600;
-  background: var(--bg-page);
+  background: var(--bg-surface-hover);
   color: var(--text-muted);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  border-radius: 0px !important;
   padding: 2px 7px;
   white-space: nowrap;
 }
@@ -1567,12 +1584,11 @@ html.is-desktop-browser .app-root {
 .picker-search-label {
   font-size: 11px;
   font-weight: 700;
-  color: var(--brand-light-grey);
+  color: var(--text-main);
   letter-spacing: 0.4px;
   text-transform: uppercase;
 }
 
-/* Horizontal row containing shortened search input and the green hide-keyboard button */
 .picker-search-row {
   display: flex;
   align-items: center;
@@ -1599,8 +1615,8 @@ html.is-desktop-browser .app-root {
   justify-content: center;
   flex-shrink: 0;
   cursor: pointer;
-  border-radius: var(--radius-btn) !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  border-radius: 4px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
   padding: 0;
 }
@@ -1639,20 +1655,21 @@ html.is-desktop-browser .app-root {
 .picker-search-input {
   width: 100%;
   height: 42px;
-  background-color: var(--bg-page);
+  background-color: #FFFFFF;
   border: 1px solid var(--border-medium);
   color: var(--text-main);
   padding: 0 40px 0 34px;
   font-size: 14px;
   font-weight: 600;
-  border-radius: var(--radius-input) !important;
+  border-radius: 0px !important;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .picker-search-input:focus {
   outline: none;
-  border-color: var(--brand-orange);
-  background-color: #171B24;
+  border-color: var(--btn-blue-bg);
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
 .picker-search-input::placeholder {
@@ -1678,12 +1695,12 @@ html.is-desktop-browser .app-root {
 }
 
 .picker-search-clear-btn:hover {
-  color: var(--brand-orange);
-  background-color: rgba(236, 114, 30, 0.1);
+  color: var(--btn-blue-bg);
+  background-color: rgba(37, 99, 235, 0.08);
 }
 
 .picker-search-clear-btn:active {
-  color: #FFFFFF;
+  color: var(--text-main);
 }
 
 .picker-search-clear-btn.picker-search-clear-empty {
@@ -1704,9 +1721,10 @@ html.is-desktop-browser .app-root {
   min-height: 0;
   overflow-y: auto;
   border: 1px solid var(--border-subtle);
-  background: var(--bg-page);
+  background: #FFFFFF;
   margin-bottom: 8px;
   width: 100%;
+  border-radius: 0px !important;
 }
 
 .picker-row {
@@ -1716,11 +1734,12 @@ html.is-desktop-browser .app-root {
   padding: 10px 10px;
   border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
-  background: var(--bg-surface);
+  background: #FFFFFF;
   transition: background-color 0.1s ease;
   white-space: nowrap;
   gap: 10px;
   width: 100%;
+  border-radius: 0px !important;
 }
 
 .picker-row:last-child {
@@ -1743,7 +1762,7 @@ html.is-desktop-browser .app-root {
   font-family: var(--font-equipment-id);
   font-size: 15px;
   font-weight: 800;
-  color: var(--brand-orange);
+  color: var(--btn-blue-bg);
   letter-spacing: 0.6px;
   white-space: nowrap;
   flex-shrink: 0;
@@ -1791,177 +1810,11 @@ html.is-desktop-browser .app-root {
   margin-top: 10px;
 }
 
-.btn-danger-cancel,
-.btn-modal-cancel {
-  width: 100%;
-  height: 46px;
-  background-color: var(--btn-red-bg);
-  border: 1px solid var(--btn-red-border);
-  color: var(--btn-red-text);
-  font-family: var(--font-btn);
-  font-size: 15px;
-  font-weight: var(--btn-font-weight);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 8px;
-  letter-spacing: var(--btn-letter-spacing);
-  border-radius: var(--radius-btn);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
-}
-
-.btn-danger-cancel:hover,
-.btn-modal-cancel:hover {
-  background-color: var(--btn-red-hover);
-  border-color: var(--btn-red-hover);
-}
-
-.btn-danger-cancel:active,
-.btn-modal-cancel:active {
-  background-color: var(--btn-red-active);
-  border-color: var(--btn-red-active);
-  transform: scale(0.985);
-}
-
-.btn-modal-confirm {
-  width: 100%;
-  height: 46px;
-  background-color: var(--btn-green-bg);
-  color: var(--btn-green-text);
-  border: 1px solid var(--btn-green-border);
-  font-family: var(--font-btn);
-  font-size: 15px;
-  font-weight: var(--btn-font-weight);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 8px;
-  letter-spacing: var(--btn-letter-spacing);
-  border-radius: var(--radius-btn);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
-}
-
-.btn-modal-confirm:hover {
-  background-color: var(--btn-green-hover);
-  border-color: var(--btn-green-hover);
-}
-
-.btn-modal-confirm:active {
-  background-color: var(--btn-green-active);
-  border-color: var(--btn-green-active);
-  transform: scale(0.985);
-}
-
-.btn-secondary {
-  height: 42px;
-  background-color: transparent;
-  border: 1.5px solid var(--btn-secondary-border);
-  color: var(--btn-secondary-text);
-  font-family: var(--font-btn);
-  font-size: 14px;
-  font-weight: var(--btn-font-weight);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 16px;
-  border-radius: var(--radius-btn);
-  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: var(--btn-secondary-hover-bg);
-  border-color: var(--btn-blue-hover);
-}
-
-.btn-secondary:active:not(:disabled) {
-  transform: scale(0.985);
-}
-
-.btn-danger-outline {
-  width: 100%;
-  height: 42px;
-  background-color: transparent;
-  border: 1.5px solid var(--btn-red-bg);
-  color: var(--btn-red-bg);
-  font-family: var(--font-btn);
-  font-size: 14px;
-  font-weight: var(--btn-font-weight);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-radius: var(--radius-btn);
-  transition: background-color 0.15s ease, color 0.15s ease, transform 0.08s ease;
-}
-
-.btn-danger-outline:hover {
-  background-color: var(--btn-red-bg);
-  color: var(--btn-red-text);
-}
-
-.btn-danger-outline:active {
-  transform: scale(0.985);
-}
-
-/* Settings Modal Clean Layout */
-.settings-modal-box {
-  max-width: 380px;
-}
-
-.settings-version-card {
-  background-color: var(--bg-page);
-  border: 1px solid var(--border-subtle);
-  padding: 20px 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.settings-version-status-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.settings-version-text {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--brand-light-grey);
-  letter-spacing: 0.2px;
-}
-
-.update-available-icon {
-  color: var(--brand-orange);
-  flex-shrink: 0;
-}
-
-.update-latest-icon {
-  color: var(--btn-green-bg);
-  flex-shrink: 0;
-}
-
-.settings-update-btn {
-  width: 100% !important;
-  margin-top: 4px;
-}
-
 .values-table-wrap {
   margin-bottom: 16px;
-  background: var(--bg-page);
+  background: #FFFFFF;
   border: 1px solid var(--border-subtle);
+  border-radius: 0px !important;
   padding: 8px 12px;
 }
 
@@ -1974,6 +1827,7 @@ html.is-desktop-browser .app-root {
 .values-table td {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-main);
 }
 
 .values-table tr:last-child td {
@@ -1991,7 +1845,6 @@ html.is-desktop-browser .app-root {
   color: var(--text-main);
 }
 
-/* Modal action buttons: When 2 buttons, render side by side in one row */
 .modal-buttons-row {
   display: flex;
   flex-direction: row;
@@ -2016,6 +1869,55 @@ html.is-desktop-browser .app-root {
   color: var(--text-main);
 }
 
+/* Settings Modal Clean Layout */
+.settings-modal-box {
+  max-width: 380px;
+  border-radius: 0px !important;
+}
+
+.settings-version-card {
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0px !important;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.settings-version-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.settings-version-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 0.2px;
+}
+
+.update-available-icon {
+  color: var(--btn-blue-bg);
+  flex-shrink: 0;
+}
+
+.update-latest-icon {
+  color: var(--btn-green-bg);
+  flex-shrink: 0;
+}
+
+.settings-update-btn {
+  width: 100% !important;
+  margin-top: 4px;
+}
+
+/* Outbox Modal */
 .queue-list-simple {
   display: flex;
   flex-direction: column;
@@ -2027,9 +1929,9 @@ html.is-desktop-browser .app-root {
 
 .queue-row {
   padding: 10px 12px;
-  background: var(--bg-page);
+  background: #FFFFFF;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  border-radius: 0px !important;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2039,13 +1941,14 @@ html.is-desktop-browser .app-root {
 .pending-tag {
   font-size: 10px;
   font-weight: 700;
-  background: rgba(236, 114, 30, 0.15);
-  color: var(--brand-orange);
-  border: 1px solid rgba(236, 114, 30, 0.3);
-  border-radius: var(--radius-xs);
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--btn-blue-bg);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: 0px !important;
   padding: 2px 6px;
 }
 
+/* Edit Form */
 .edit-form {
   display: flex;
   flex-direction: column;
@@ -2066,24 +1969,24 @@ html.is-desktop-browser .app-root {
 
 .edit-form .text-input {
   height: 42px;
-  background-color: var(--bg-page);
-  border: 1px solid var(--border-subtle);
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-medium);
   color: var(--text-main);
   padding: 0 12px;
   font-size: 14px;
-  border-radius: var(--radius-input);
+  border-radius: 0px !important;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .edit-form .text-input:focus {
   outline: none;
   border-color: var(--btn-blue-bg);
-  box-shadow: 0 0 0 2px rgba(59, 102, 255, 0.25);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
 }
 
 /* ==========================================================================
    DESKTOP LAUNCHPAD COMPANION SCREEN
-   Shown when opening the app in a standard desktop browser tab
+   Clean White Background Aesthetic
    ========================================================================== */
 
 .desktop-launchpad-wrap {
@@ -2093,18 +1996,18 @@ html.is-desktop-browser .app-root {
   min-height: 100vh;
   width: 100%;
   padding: 24px;
-  background-color: #07090E;
+  background-color: #F1F5F9;
   box-sizing: border-box;
 }
 
 .desktop-launchpad-card {
   width: 100%;
   max-width: 440px;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-modal);
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0px !important;
   padding: 32px 28px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2123,13 +2026,13 @@ html.is-desktop-browser .app-root {
 .desktop-launchpad-icon-ring {
   width: 72px;
   height: 72px;
-  background: rgba(236, 114, 30, 0.1);
-  border: 1px solid rgba(236, 114, 30, 0.3);
-  border-radius: var(--radius-card);
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 0px !important;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--brand-orange);
+  color: var(--btn-blue-bg);
 }
 
 .desktop-launchpad-status-pill {
@@ -2141,19 +2044,19 @@ html.is-desktop-browser .app-root {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-radius: var(--radius-pill);
+  border-radius: 0px !important;
 }
 
 .desktop-launchpad-status-pill.status-ready {
-  background: rgba(236, 114, 30, 0.12);
-  color: var(--brand-orange);
-  border: 1px solid rgba(236, 114, 30, 0.25);
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--btn-blue-bg);
+  border: 1px solid rgba(37, 99, 235, 0.2);
 }
 
 .desktop-launchpad-status-pill.status-active {
-  background: rgba(22, 163, 74, 0.12);
-  color: #22C55E;
-  border: 1px solid rgba(22, 163, 74, 0.25);
+  background: rgba(22, 163, 74, 0.08);
+  color: var(--btn-green-bg);
+  border: 1px solid rgba(22, 163, 74, 0.2);
 }
 
 .desktop-launchpad-status-pill .status-dot {
@@ -2166,7 +2069,7 @@ html.is-desktop-browser .app-root {
 .desktop-launchpad-title {
   font-size: 20px;
   font-weight: 700;
-  color: var(--brand-light-grey);
+  color: var(--text-main);
   margin: 0 0 8px 0;
   letter-spacing: -0.3px;
 }
@@ -2194,21 +2097,21 @@ html.is-desktop-browser .app-root {
   gap: 8px;
   width: 100%;
   height: 46px;
-  background-color: var(--brand-orange);
+  background-color: var(--btn-blue-bg);
   color: #FFFFFF;
   font-family: var(--font-btn);
   font-size: 15px;
   font-weight: var(--btn-font-weight);
   letter-spacing: var(--btn-letter-spacing);
   border: none;
-  border-radius: var(--radius-btn);
+  border-radius: 4px !important;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   transition: background-color 0.15s ease, transform 0.08s ease;
 }
 
 .desktop-launchpad-primary-btn:hover {
-  background-color: var(--brand-orange-hover);
+  background-color: var(--btn-blue-hover);
 }
 
 .desktop-launchpad-primary-btn:active {
@@ -2230,15 +2133,15 @@ html.is-desktop-browser .app-root {
   font-weight: var(--btn-font-weight);
   text-decoration: none;
   cursor: pointer;
-  border-radius: var(--radius-btn);
+  border-radius: 4px !important;
   transition: all 0.15s ease;
   box-sizing: border-box;
 }
 
 .desktop-launchpad-secondary-btn:hover {
   background-color: var(--bg-surface-hover);
-  border-color: var(--brand-orange);
-  color: var(--brand-orange);
+  border-color: var(--btn-blue-bg);
+  color: var(--btn-blue-bg);
 }
 
 .desktop-launchpad-secondary-btn:active {
@@ -2258,9 +2161,9 @@ html.is-desktop-browser .app-root {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-surface-hover);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-btn);
+  border-radius: 0px !important;
   padding: 10px 12px;
   margin-bottom: 18px;
   text-align: left;
@@ -2269,7 +2172,7 @@ html.is-desktop-browser .app-root {
 }
 
 .launchpad-notice-icon {
-  color: #38BDF8;
+  color: var(--btn-blue-bg);
   flex-shrink: 0;
   margin-top: 1px;
 }
@@ -2285,7 +2188,7 @@ html.is-desktop-browser .app-root {
 }
 
 .launchpad-notice-text em {
-  color: var(--brand-orange);
+  color: var(--btn-blue-bg);
   font-style: normal;
 }
 
@@ -2307,4 +2210,3 @@ html.is-desktop-browser .app-root {
 .desktop-launchpad-link-btn:hover {
   color: var(--text-main);
 }
-

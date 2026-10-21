@@ -83,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({
           {syncState.isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}
         </button>
 
-        {/* Settings Button: Gear icon (rendered in orange if update is available) */}
+        {/* Settings Button: Gear icon (rendered in primary blue if update is available) */}
         {onOpenSettings && (
           <button
             type="button"
