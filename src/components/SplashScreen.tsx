@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getDeviceName } from '../services/device';
 import { APP_VERSION, BUILD_NUMBER } from '../version';
 
@@ -8,36 +8,85 @@ interface SplashScreenProps {
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
   const deviceName = getDeviceName();
-  const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(true);
-  const [updateStatus, setUpdateStatus] = useState<string>('Checking for updates...');
+  const [versionText, setVersionText] = useState<string>('Checking for updates...');
+  const [isContinueEnabled, setIsContinueEnabled] = useState<boolean>(false);
+  const needsReloadRef = useRef<boolean>(false);
 
   const checkForUpdates = useCallback(async () => {
+    // 1. Check if we just updated and reloaded
     try {
-      // 1. Service Worker update check
+      const justUpdatedVersion = sessionStorage.getItem('ttd_just_updated_to');
+      if (justUpdatedVersion) {
+        sessionStorage.removeItem('ttd_just_updated_to');
+        setVersionText(`Updated to version ${justUpdatedVersion}`);
+        setIsContinueEnabled(true);
+        return;
+      }
+    } catch {
+      // Ignore sessionStorage error
+    }
+
+    try {
+      let updateFound = false;
+      let targetVersion = '';
+
+      // 2. Fetch remote version.json with timeout
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(`/version.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const remoteData = await res.json();
+          const remoteBuild = Number(remoteData.build);
+          if (remoteBuild && remoteBuild > BUILD_NUMBER) {
+            updateFound = true;
+            targetVersion = String(remoteData.version || remoteData.build);
+            setVersionText('Fetching update');
+          }
+        }
+      } catch {
+        // Offline or network error
+      }
+
+      // 3. Service Worker check & asset download
       if ('serviceWorker' in navigator) {
         try {
           const reg = await navigator.serviceWorker.getRegistration();
           if (reg) {
-            await reg.update();
             if (reg.waiting) {
-              setUpdateStatus('Applying update...');
+              updateFound = true;
+              if (!targetVersion) targetVersion = String(BUILD_NUMBER + 1);
+              setVersionText('Fetching update');
               reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-              navigator.serviceWorker.addEventListener('controllerchange', () => {
-                window.location.reload();
-              });
-              return;
             }
 
-            if (reg.installing) {
-              setUpdateStatus('Applying update...');
-              const worker = reg.installing;
-              worker.addEventListener('statechange', () => {
-                if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-                  worker.postMessage({ type: 'SKIP_WAITING' });
-                  navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    window.location.reload();
-                  });
-                }
+            await reg.update();
+
+            if (reg.waiting) {
+              updateFound = true;
+              if (!targetVersion) targetVersion = String(BUILD_NUMBER + 1);
+              setVersionText('Fetching update');
+              reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            } else if (reg.installing) {
+              updateFound = true;
+              if (!targetVersion) targetVersion = String(BUILD_NUMBER + 1);
+              setVersionText('Fetching update');
+
+              await new Promise<void>((resolve) => {
+                const worker = reg.installing!;
+                const onStateChange = () => {
+                  if (worker.state === 'installed') {
+                    worker.removeEventListener('statechange', onStateChange);
+                    worker.postMessage({ type: 'SKIP_WAITING' });
+                    resolve();
+                  }
+                };
+                worker.addEventListener('statechange', onStateChange);
+                setTimeout(resolve, 6000);
               });
             }
           }
@@ -46,34 +95,23 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
         }
       }
 
-      // 2. Remote version.json check
-      try {
-        const res = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' });
-        if (res.ok) {
-          const remoteVersionData = await res.json();
-          if (remoteVersionData.build && remoteVersionData.build > BUILD_NUMBER) {
-            setUpdateStatus('Applying update...');
-            if ('serviceWorker' in navigator) {
-              const reg = await navigator.serviceWorker.getRegistration();
-              if (reg && reg.waiting) {
-                reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-              }
-            }
-            window.location.reload();
-            return;
-          }
-        }
-      } catch {
-        // Ignore network errors for version check
+      if (updateFound) {
+        // Give service worker cache a moment to finalize
+        await new Promise((r) => setTimeout(r, 600));
+        const finalVersion = targetVersion || String(BUILD_NUMBER + 1);
+        needsReloadRef.current = true;
+        setVersionText(`Updated to version ${finalVersion}`);
+        setIsContinueEnabled(true);
+      } else {
+        // App is already the latest version
+        await new Promise((r) => setTimeout(r, 600));
+        setVersionText(`Version ${APP_VERSION}`);
+        setIsContinueEnabled(true);
       }
-
-      // Brief pause so user visibly sees the update check
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setUpdateStatus('App is up to date');
     } catch {
-      setUpdateStatus('App is ready');
-    } finally {
-      setIsCheckingUpdate(false);
+      // Offline fallback
+      setVersionText(`Version ${APP_VERSION}`);
+      setIsContinueEnabled(true);
     }
   }, []);
 
@@ -81,11 +119,24 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
     checkForUpdates();
   }, [checkForUpdates]);
 
+  const handleContinueClick = () => {
+    if (needsReloadRef.current) {
+      try {
+        sessionStorage.setItem('ttd_initial_view', 'SCAN_SCREEN');
+      } catch {
+        // Ignore
+      }
+      window.location.reload();
+    } else {
+      onContinue();
+    }
+  };
+
   return (
     <div className="splash-screen">
       <div className="splash-container">
-        <div className="splash-top-content">
-          {/* Technical Department Ltd Logo */}
+        {/* Upper Block: Logo and Title (moved up by ~1/5 screen height) */}
+        <div className="splash-top-block">
           <div className="splash-logo-wrap">
             <img
               src="/logo-01.png"
@@ -94,40 +145,29 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
             />
           </div>
 
-          {/* Title Block: The Technical Department Ltd <newline> Fuel Tracking App */}
           <div className="splash-title-block">
             <h1 className="splash-main-title">The Technical Department Ltd</h1>
             <h2 className="splash-sub-title">Fuel Tracking App</h2>
-            {/* Version number shown ONLY beneath "Fuel Tracking App" */}
-            <div className="splash-version">Version {APP_VERSION}</div>
-          </div>
-
-          {/* Device ID & Update Status Indication */}
-          <div className="splash-status-block">
-            <div className="splash-device-line">
-              Device ID: <strong>{deviceName}</strong>
-            </div>
-            <div className="splash-update-line">
-              {isCheckingUpdate ? (
-                <span className="splash-checking-text">
-                  <span className="splash-spinner" /> Checking for updates...
-                </span>
-              ) : (
-                <span className="splash-ready-text">
-                  {updateStatus}
-                </span>
-              )}
-            </div>
           </div>
         </div>
 
-        {/* Continue Button */}
+        {/* Lower Text Block: Version/Update Status line & Device ID line (moved down by ~1/5 screen height, lighter weight) */}
+        <div className="splash-lower-text-block">
+          <div className="splash-version-status-line">
+            {versionText}
+          </div>
+          <div className="splash-device-line">
+            Device ID: <strong>{deviceName}</strong>
+          </div>
+        </div>
+
+        {/* Bottom Button Block: enabled only when all update activity is completed */}
         <div className="splash-btn-wrap">
           <button
             type="button"
-            className={`splash-btn-continue ${isCheckingUpdate ? 'disabled' : ''}`}
-            disabled={isCheckingUpdate}
-            onClick={onContinue}
+            className={`splash-btn-continue ${!isContinueEnabled ? 'disabled' : ''}`}
+            disabled={!isContinueEnabled}
+            onClick={handleContinueClick}
           >
             Continue
           </button>

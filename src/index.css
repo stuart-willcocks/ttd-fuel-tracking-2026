@@ -264,7 +264,7 @@ html, body {
   height: 100%;
   height: 100dvh;
   background-color: #EC721E;
-  color: #111827;
+  color: #E5E7EB;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -283,10 +283,11 @@ html, body {
   align-items: center;
   justify-content: space-between;
   text-align: center;
-  padding: clamp(16px, 3.5vh, 28px) 0 clamp(32px, 8vh, 60px);
+  padding: clamp(10px, 2.5vh, 22px) 0 clamp(24px, 6vh, 48px);
 }
 
-.splash-top-content {
+/* Upper Block: Logo, The Technical Department Ltd, Fuel Tracking App (moved up by ~1/5 screen height) */
+.splash-top-block {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -303,8 +304,8 @@ html, body {
 }
 
 .splash-logo {
-  width: 210px;
-  max-width: 62vw;
+  width: 195px;
+  max-width: 60vw;
   height: auto;
   aspect-ratio: 1013 / 1012;
   object-fit: contain;
@@ -312,13 +313,13 @@ html, body {
 }
 
 .splash-title-block {
-  margin-bottom: 18px;
+  margin: 0;
 }
 
 .splash-main-title {
-  font-size: clamp(16px, 4.7vw, 19px);
-  font-weight: 800;
-  color: #111827;
+  font-size: clamp(15px, 4.6vw, 18px);
+  font-weight: 700;
+  color: #F3F4F6; /* Crisp light grey */
   line-height: 1.25;
   margin: 0;
   letter-spacing: -0.2px;
@@ -326,81 +327,48 @@ html, body {
 }
 
 .splash-sub-title {
-  font-size: clamp(15px, 4.2vw, 18px);
-  font-weight: 800;
-  color: #111827;
+  font-size: clamp(14px, 4vw, 17px);
+  font-weight: 700;
+  color: #E5E7EB; /* Light grey */
   margin: 4px 0 0;
   letter-spacing: -0.2px;
 }
 
-.splash-version {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1F2937;
-  margin-top: 8px;
-  letter-spacing: 0.2px;
-}
-
-.splash-status-block {
+/* Lower Text Block: Version/Update Status line & Device ID line (moved down by ~1/5 screen height, lighter weight) */
+.splash-lower-text-block {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-top: clamp(28px, 10vh, 70px);
+  margin-bottom: auto;
+}
+
+.splash-version-status-line {
   font-size: 14px;
-  color: #111827;
-}
-
-.splash-device-line {
-  font-size: 15px;
-  font-weight: 600;
-  color: #111827;
-}
-
-.splash-device-line strong {
-  font-weight: 800;
-  color: #000000;
-}
-
-.splash-update-line {
+  font-weight: 400; /* Lighter weight */
+  color: #E5E7EB;   /* Light grey */
+  min-height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 24px;
-  font-size: 14px;
-  font-weight: 600;
+  letter-spacing: 0.2px;
 }
 
-.splash-checking-text {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #1E3A8A;
-  font-weight: 700;
+.splash-device-line {
+  font-size: 13px;
+  font-weight: 400; /* Lighter weight */
+  color: #D1D5DB;   /* Light grey */
+  letter-spacing: 0.2px;
 }
 
-.splash-ready-text {
-  color: #064E3B;
-  font-weight: 700;
+.splash-device-line strong {
+  font-weight: 500; /* Lighter/medium weight */
+  color: #F3F4F6;   /* Light grey */
 }
 
-.splash-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(30, 58, 138, 0.35);
-  border-top-color: #1E3A8A;
-  border-radius: 50% !important;
-  animation: splash-spin 0.7s linear infinite;
-  display: inline-block;
-}
-
-@keyframes splash-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
+/* Bottom Button Block */
 .splash-btn-wrap {
   width: 100%;
   display: flex;
@@ -411,11 +379,11 @@ html, body {
   min-width: 170px;
   height: 46px;
   padding: 0 28px;
-  background-color: #D4D4D8;
-  color: #111827;
-  border: 1px solid #A1A1AA;
+  background-color: #111827;
+  color: #F3F4F6; /* Light grey text */
+  border: 1px solid rgba(255, 255, 255, 0.2);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -426,19 +394,19 @@ html, body {
 }
 
 .splash-btn-continue:hover:not(:disabled) {
-  background-color: #E4E4E7;
-  border-color: #71717A;
+  background-color: #1F2937;
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .splash-btn-continue:active:not(:disabled) {
-  background-color: #A1A1AA;
+  background-color: #374151;
 }
 
 .splash-btn-continue:disabled,
 .splash-btn-continue.disabled {
-  background-color: #E4E4E7;
-  color: #9CA3AF;
-  border-color: #D1D5DB;
+  background-color: rgba(17, 24, 39, 0.45);
+  color: rgba(243, 244, 246, 0.45); /* Dimmed light grey */
+  border-color: rgba(255, 255, 255, 0.1);
   cursor: not-allowed;
   opacity: 0.65;
 }

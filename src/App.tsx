@@ -104,7 +104,18 @@ export const App: React.FC = () => {
     activeAssetIdRef.current = activeAssetId;
   }, [activeAssetId]);
 
-  const [currentView, setCurrentView] = useState<AppView>('SPLASH_SCREEN');
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    try {
+      const saved = sessionStorage.getItem('ttd_initial_view');
+      if (saved === 'SCAN_SCREEN' || saved === 'ASSET_DETAIL_VIEW') {
+        sessionStorage.removeItem('ttd_initial_view');
+        return saved as AppView;
+      }
+    } catch {
+      // Ignore sessionStorage access errors
+    }
+    return 'SPLASH_SCREEN';
+  });
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
   const [isEditingAsset, setIsEditingAsset] = useState<boolean>(false);
 
