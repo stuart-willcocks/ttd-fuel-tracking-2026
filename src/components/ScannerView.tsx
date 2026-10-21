@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { AlertCircle, List, Search, X } from 'lucide-react';
+import { AlertCircle, List, Search, X, Keyboard, ChevronDown } from 'lucide-react';
 import type { Equipment } from '../types';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 
@@ -18,6 +18,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -151,20 +153,72 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     }, 60);
   };
 
+  // Track visualViewport resizing to accurately detect when software keyboard is open on mobile
+  useEffect(() => {
+    if (!isAssetModalOpen) {
+      setIsKeyboardVisible(false);
+      setIsSearchFocused(false);
+      return;
+    }
+
+    const checkViewport = () => {
+      if (typeof window !== 'undefined' && window.visualViewport) {
+        // Virtual keyboard on mobile devices reduces visualViewport.height by > 120px
+        const isShrunk = (window.innerHeight - window.visualViewport.height) > 120;
+        setIsKeyboardVisible(isShrunk || isSearchFocused);
+      } else {
+        setIsKeyboardVisible(isSearchFocused);
+      }
+    };
+
+    checkViewport();
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    if (vv) {
+      vv.addEventListener('resize', checkViewport);
+    }
+    window.addEventListener('resize', checkViewport);
+
+    return () => {
+      if (vv) {
+        vv.removeEventListener('resize', checkViewport);
+      }
+      window.removeEventListener('resize', checkViewport);
+    };
+  }, [isAssetModalOpen, isSearchFocused]);
+
+  const handleHideKeyboard = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    searchInputRef.current?.blur();
+    if (document.activeElement && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    setIsSearchFocused(false);
+    setIsKeyboardVisible(false);
+  };
+
   const handleOpenModal = () => {
     setSearchQuery('');
+    setIsSearchFocused(false);
+    setIsKeyboardVisible(false);
     setIsAssetModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsAssetModalOpen(false);
     setSearchQuery('');
+    setIsSearchFocused(false);
+    setIsKeyboardVisible(false);
     setTimeout(focusInput, 80);
   };
 
   const handleSelectAsset = (equipmentId: string) => {
     setIsAssetModalOpen(false);
     setSearchQuery('');
+    setIsSearchFocused(false);
+    setIsKeyboardVisible(false);
     setBarcodeInput('');
     setErrorMessage(null);
     onAssetSelected(equipmentId);
@@ -232,44 +286,90 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             className="modal-box asset-picker-modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="modal-header-simple">
-              <h3 className="modal-title">Select Equipment</h3>
-              <span className="picker-asset-count">
-                {filteredAssets.length} {filteredAssets.length === availableAssets.length ? 'assets' : `of ${availableAssets.length}`}
-              </span>
-            </div>
+            {/* Pinned Top Section: "Select equipment" and Search box are ALWAYS at the top of the screen */}
+            <div className="picker-pinned-top">
+              <div className="modal-header-simple">
+                <h3 className="modal-title">Select Equipment</h3>
+                <div className="picker-header-right">
+                  <span className="picker-asset-count">
+                    {filteredAssets.length} {filteredAssets.length === availableAssets.length ? 'assets' : `of ${availableAssets.length}`}
+                  </span>
+                  <button
+                    type="button"
+                    className="picker-header-close-btn"
+                    onClick={handleCloseModal}
+                    title="Close"
+                    aria-label="Close"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              </div>
 
-            {/* Search Box labeled "Search" with "X" clear button */}
-            <div className="picker-search-container">
-              <label htmlFor="picker-search-input" className="picker-search-label">
-                Search
-              </label>
-              <div className="picker-search-input-wrap">
-                <Search size={16} className="picker-search-icon" />
-                <input
-                  ref={searchInputRef}
-                  id="picker-search-input"
-                  type="text"
-                  className="picker-search-input"
-                  placeholder="Search by ID, area, location, type..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck="false"
-                />
-                <button
-                  type="button"
-                  className={`picker-search-clear-btn ${!searchQuery ? 'picker-search-clear-empty' : ''}`}
-                  onClick={() => {
-                    setSearchQuery('');
-                    searchInputRef.current?.focus();
-                  }}
-                  title="Clear search"
-                  aria-label="Clear search"
-                >
-                  <X size={16} />
-                </button>
+              {/* Search Box labeled "Search" with "X" clear button and "Hide keyboard" button */}
+              <div className="picker-search-container">
+                <div className="picker-search-label-row">
+                  <label htmlFor="picker-search-input" className="picker-search-label">
+                    Search
+                  </label>
+                  {(isSearchFocused || isKeyboardVisible) && (
+                    <button
+                      type="button"
+                      className="picker-hide-keyboard-btn"
+                      onClick={handleHideKeyboard}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onTouchStart={(e) => e.preventDefault()}
+                      title="Hide keyboard"
+                      aria-label="Hide keyboard"
+                    >
+                      <Keyboard size={13} />
+                      <span>Hide keyboard</span>
+                      <ChevronDown size={13} />
+                    </button>
+                  )}
+                </div>
+                <div className="picker-search-input-wrap">
+                  <Search size={16} className="picker-search-icon" />
+                  <input
+                    ref={searchInputRef}
+                    id="picker-search-input"
+                    type="text"
+                    className="picker-search-input"
+                    placeholder="Search by ID, area, location, type..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => {
+                      setIsSearchFocused(true);
+                      setIsKeyboardVisible(true);
+                    }}
+                    onBlur={() => {
+                      setIsSearchFocused(false);
+                      setTimeout(() => {
+                        if (typeof window !== 'undefined' && window.visualViewport) {
+                          const isShrunk = (window.innerHeight - window.visualViewport.height) > 100;
+                          setIsKeyboardVisible(isShrunk);
+                        } else {
+                          setIsKeyboardVisible(false);
+                        }
+                      }, 150);
+                    }}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck="false"
+                  />
+                  <button
+                    type="button"
+                    className={`picker-search-clear-btn ${!searchQuery ? 'picker-search-clear-empty' : ''}`}
+                    onClick={() => {
+                      setSearchQuery('');
+                      searchInputRef.current?.focus();
+                    }}
+                    title="Clear search"
+                    aria-label="Clear search"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
             </div>
 
