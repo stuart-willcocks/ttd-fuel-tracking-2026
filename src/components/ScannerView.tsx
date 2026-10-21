@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { AlertCircle, List } from 'lucide-react';
+import { AlertCircle, List, Search, X } from 'lucide-react';
 import type { Equipment } from '../types';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 
@@ -17,7 +17,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const [barcodeInput, setBarcodeInput] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const isModalActive = isAssetModalOpen || isAnyModalOpen;
 
@@ -150,20 +152,38 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   };
 
   const handleOpenModal = () => {
+    setSearchQuery('');
     setIsAssetModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsAssetModalOpen(false);
+    setSearchQuery('');
     setTimeout(focusInput, 80);
   };
 
   const handleSelectAsset = (equipmentId: string) => {
     setIsAssetModalOpen(false);
+    setSearchQuery('');
     setBarcodeInput('');
     setErrorMessage(null);
     onAssetSelected(equipmentId);
   };
+
+  // Real-time filtering across all text fields
+  const filteredAssets = availableAssets.filter((asset) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (asset.equipmentId && asset.equipmentId.toLowerCase().includes(q)) ||
+      (asset.type && asset.type.toLowerCase().includes(q)) ||
+      (asset.location && asset.location.toLowerCase().includes(q)) ||
+      (asset.area && asset.area.toLowerCase().includes(q)) ||
+      (asset.what3words && asset.what3words.toLowerCase().includes(q)) ||
+      (asset.rentalSerialNumber && asset.rentalSerialNumber.toLowerCase().includes(q)) ||
+      (asset.capacity !== undefined && String(asset.capacity).toLowerCase().includes(q))
+    );
+  });
 
   return (
     <div className="old-screen-container scan-screen-only">
@@ -215,15 +235,51 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             <div className="modal-header-simple">
               <h3 className="modal-title">Select Equipment</h3>
               <span className="picker-asset-count">
-                {availableAssets.length} assets
+                {filteredAssets.length} {filteredAssets.length === availableAssets.length ? 'assets' : `of ${availableAssets.length}`}
               </span>
             </div>
 
+            {/* Search Box labeled "Search" with "X" clear button */}
+            <div className="picker-search-container">
+              <label htmlFor="picker-search-input" className="picker-search-label">
+                Search
+              </label>
+              <div className="picker-search-input-wrap">
+                <Search size={16} className="picker-search-icon" />
+                <input
+                  ref={searchInputRef}
+                  id="picker-search-input"
+                  type="text"
+                  className="picker-search-input"
+                  placeholder="Search by ID, area, location, type..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck="false"
+                />
+                <button
+                  type="button"
+                  className={`picker-search-clear-btn ${!searchQuery ? 'picker-search-clear-empty' : ''}`}
+                  onClick={() => {
+                    setSearchQuery('');
+                    searchInputRef.current?.focus();
+                  }}
+                  title="Clear search"
+                  aria-label="Clear search"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
             <div className="asset-picker-list">
-              {availableAssets.length === 0 ? (
-                <div className="empty-picker-notice">No assets available</div>
+              {filteredAssets.length === 0 ? (
+                <div className="empty-picker-notice">
+                  {searchQuery ? `No equipment matching "${searchQuery}"` : 'No assets available'}
+                </div>
               ) : (
-                availableAssets.map((asset) => (
+                filteredAssets.map((asset) => (
                   <div
                     key={asset.equipmentId}
                     className="asset-compact-row picker-row"
