@@ -175,7 +175,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       <div className="asset-detail-btn-stack">
         <button
           type="button"
-          className="btn-pda-rect btn-pda-orange"
+          className="btn-pda-rect btn-pda-green"
           onClick={() => onSelectAction('check-in')}
         >
           Check In
@@ -183,7 +183,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
         <button
           type="button"
-          className="btn-pda-rect btn-pda-orange"
+          className="btn-pda-rect btn-pda-green"
           onClick={() => onSelectAction('record-fuel')}
         >
           Record Fuel Transfer
@@ -191,7 +191,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
         <button
           type="button"
-          className="btn-pda-rect btn-pda-orange"
+          className="btn-pda-rect btn-pda-green"
           onClick={() => onSelectAction('check-out')}
         >
           Check Out
