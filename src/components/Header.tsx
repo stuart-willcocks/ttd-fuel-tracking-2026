@@ -6,6 +6,7 @@ import { APP_VERSION } from '../version';
 interface HeaderProps {
   syncState: SyncState;
   isFullscreen?: boolean;
+  hasUpdate?: boolean;
   onToggleSimulatedOffline: () => void;
   onTriggerSync: () => void;
   onToggleFullscreen?: () => void;
@@ -16,6 +17,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   syncState,
+  hasUpdate = false,
   onToggleSimulatedOffline,
   onTriggerSync,
   onOpenOutbox,
@@ -35,7 +37,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="header-company-name">The Technical Department Ltd</div>
           <div className="header-sub-row">
             <span className="header-app-title">Fuel Tracking</span>
-            <span className="header-version-pill">V{APP_VERSION}</span>
+            <span className="header-version-pill">
+              V{APP_VERSION}{hasUpdate ? '*' : ''}
+            </span>
           </div>
         </div>
       </div>

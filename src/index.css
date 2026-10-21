@@ -1253,6 +1253,52 @@ html, body {
   color: var(--btn-red-text);
 }
 
+/* Settings Modal Clean Layout */
+.settings-modal-box {
+  max-width: 380px;
+}
+
+.settings-version-card {
+  background-color: var(--bg-page);
+  border: 1px solid var(--border-subtle);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.settings-version-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.settings-version-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--brand-light-grey);
+  letter-spacing: 0.2px;
+}
+
+.update-available-icon {
+  color: var(--brand-orange);
+  flex-shrink: 0;
+}
+
+.update-latest-icon {
+  color: var(--btn-green-bg);
+  flex-shrink: 0;
+}
+
+.settings-update-btn {
+  width: 100% !important;
+  margin-top: 4px;
+}
+
 .values-table-wrap {
   margin-bottom: 16px;
   background: var(--bg-page);

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db, initializeDatabase } from './db/indexedDB';
 import { syncEngine, type SyncState } from './services/syncEngine';
-import { resetRemoteData } from './services/api';
 import { type Equipment, type Transaction, type ActionType, generateUUID } from './types';
+import { BUILD_NUMBER } from './version';
 import { Header } from './components/Header';
 import { ScannerView } from './components/ScannerView';
 import { AssetDetailView } from './components/AssetDetailView';
@@ -136,6 +136,56 @@ export const App: React.FC = () => {
     lastSyncTime: null,
     lastError: null,
   });
+
+  // App Update Polling State
+  const [hasUpdate, setHasUpdate] = useState<boolean>(false);
+  const [availableVersion, setAvailableVersion] = useState<string | null>(null);
+
+  const checkForAppUpdate = useCallback(async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(`/version.json?t=${Date.now()}`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const remoteData = await res.json();
+        const remoteBuild = Number(remoteData.build);
+        if (remoteBuild && remoteBuild > BUILD_NUMBER) {
+          const remoteVer = String(remoteData.version || remoteData.build);
+          setAvailableVersion(remoteVer);
+          setHasUpdate(true);
+          return;
+        }
+      }
+    } catch {
+      // Offline / network failure
+    }
+
+    // Check service worker for waiting updates
+    if ('serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          await reg.update();
+          if (reg.waiting || reg.installing) {
+            setHasUpdate(true);
+            setAvailableVersion((prev) => prev || String(BUILD_NUMBER + 1));
+          }
+        }
+      } catch {
+        // Ignore SW check error
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    checkForAppUpdate();
+    const interval = setInterval(checkForAppUpdate, 15000);
+    return () => clearInterval(interval);
+  }, [checkForAppUpdate]);
 
   const getLocalFormattedTimestamp = (): string => {
     const d = new Date();
@@ -280,22 +330,6 @@ export const App: React.FC = () => {
     await syncEngine.syncWithRemote();
   };
 
-  const handleResetData = async () => {
-    if (window.confirm('Reset all equipment and transactions back to factory defaults?')) {
-      await resetRemoteData();
-      await db.equipments.clear();
-      await db.transactions.clear();
-      await db.outbox.clear();
-      await initializeDatabase();
-      await syncEngine.syncWithRemote();
-      await refreshAssetsList();
-      if (activeAssetId) {
-        await loadAssetDetails(activeAssetId);
-      }
-      setIsSettingsModalOpen(false);
-    }
-  };
-
   // 1. SPLASH SCREEN
   if (currentView === 'SPLASH_SCREEN') {
     return (
@@ -311,6 +345,7 @@ export const App: React.FC = () => {
       <Header
         syncState={syncState}
         isFullscreen={isFullscreen}
+        hasUpdate={hasUpdate}
         onToggleSimulatedOffline={() => syncEngine.toggleSimulatedOffline()}
         onTriggerSync={() => syncEngine.syncWithRemote()}
         onToggleFullscreen={toggleFullscreen}
@@ -385,9 +420,9 @@ export const App: React.FC = () => {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
-        onResetData={handleResetData}
-        onTriggerSync={() => syncEngine.syncWithRemote()}
-        onShowSplash={() => {
+        hasUpdate={hasUpdate}
+        availableVersion={availableVersion}
+        onUpdate={() => {
           setIsSettingsModalOpen(false);
           setCurrentView('SPLASH_SCREEN');
         }}
