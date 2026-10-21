@@ -119,6 +119,7 @@ export const App: React.FC = () => {
   }, [isMobileDevice]);
 
   // Detect desktop browser to constrain UI to PDA screen display and handle window dimensions
+  const hasAttemptedResizeRef = useRef(false);
   useEffect(() => {
     const updateDesktopState = () => {
       const isMobile = isMobileDevice();
@@ -132,10 +133,21 @@ export const App: React.FC = () => {
           document.exitFullscreen?.().catch(() => {});
         }
         // Attempt to resize window to match PDA display dimension if browser allows
-        try {
-          window.resizeTo(380, 720);
-        } catch {
-          // Normal security restriction on primary tabs
+        if (!hasAttemptedResizeRef.current) {
+          hasAttemptedResizeRef.current = true;
+          try {
+            const chromeW = (window.outerWidth && window.innerWidth && window.outerWidth > window.innerWidth)
+              ? (window.outerWidth - window.innerWidth)
+              : 16;
+            const chromeH = (window.outerHeight && window.innerHeight && window.outerHeight > window.innerHeight)
+              ? (window.outerHeight - window.innerHeight)
+              : 60;
+            const targetW = Math.max(430, 410 + chromeW);
+            const targetH = Math.max(800, 720 + chromeH);
+            window.resizeTo(targetW, targetH);
+          } catch {
+            // Normal security restriction on primary tabs
+          }
         }
       } else {
         document.documentElement.classList.remove('is-desktop-browser');
@@ -394,7 +406,7 @@ export const App: React.FC = () => {
             window.open(
               window.location.href,
               'TTD_PDA_WINDOW',
-              'width=380,height=720,menubar=no,toolbar=no,location=no,status=no,resizable=yes'
+              'width=430,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=yes'
             );
           }}
           title="Open in dedicated PDA-sized window"
@@ -408,108 +420,120 @@ export const App: React.FC = () => {
 
   // 1. SPLASH SCREEN
   if (currentView === 'SPLASH_SCREEN') {
-    return (
-      <>
+    const splashContent = (
+      <div className="app-root splash-screen-root">
+        <SplashScreen onContinue={() => setCurrentView('SCAN_SCREEN')} />
+      </div>
+    );
+
+    return isDesktop ? (
+      <div className="desktop-pda-frame">
         {renderDesktopToolbar()}
-        <div className="app-root splash-screen-root">
-          <SplashScreen onContinue={() => setCurrentView('SCAN_SCREEN')} />
-        </div>
-      </>
+        {splashContent}
+      </div>
+    ) : (
+      splashContent
     );
   }
 
   // 2. MAIN APP CONTAINER (SCAN_SCREEN or ASSET_DETAIL_VIEW)
-  return (
-    <>
-      {renderDesktopToolbar()}
-      <div className="app-root">
-        <Header
-          syncState={syncState}
-          isFullscreen={isFullscreen}
-          hasUpdate={hasUpdate}
-          onToggleSimulatedOffline={() => syncEngine.toggleSimulatedOffline()}
-          onTriggerSync={() => syncEngine.syncWithRemote()}
-          onToggleFullscreen={toggleFullscreen}
-          onOpenOutbox={() => setIsOutboxModalOpen(true)}
-          onOpenSettings={() => setIsSettingsModalOpen(true)}
-          onShowSplash={() => setCurrentView('SPLASH_SCREEN')}
-        />
+  const mainContent = (
+    <div className="app-root">
+      <Header
+        syncState={syncState}
+        isFullscreen={isFullscreen}
+        hasUpdate={hasUpdate}
+        onToggleSimulatedOffline={() => syncEngine.toggleSimulatedOffline()}
+        onTriggerSync={() => syncEngine.syncWithRemote()}
+        onToggleFullscreen={toggleFullscreen}
+        onOpenOutbox={() => setIsOutboxModalOpen(true)}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onShowSplash={() => setCurrentView('SPLASH_SCREEN')}
+      />
 
-        <main className="app-main">
-          {currentView === 'SCAN_SCREEN' ? (
-            <ScannerView
-              availableAssets={availableAssets}
-              onAssetSelected={handleAssetScannedOrSelected}
-              isAnyModalOpen={
-                isSettingsModalOpen ||
-                isOutboxModalOpen ||
-                isConfirmModalOpen ||
-                isEditingAsset
-              }
-            />
-          ) : (
-            /* ASSET_DETAIL_VIEW */
-            currentAsset && (
-              !activeAction ? (
-                <AssetDetailView
-                  asset={currentAsset}
-                  transactions={currentAssetTransactions}
-                  onSelectAction={(action) => setActiveAction(action)}
-                  onBack={handleBackToScanner}
-                />
-              ) : (
-                <TransactionForm
-                  asset={currentAsset}
-                  action={activeAction}
-                  onCancel={() => setActiveAction(null)}
-                  onSubmitValues={handleFormSubmitValues}
-                />
-              )
+      <main className="app-main">
+        {currentView === 'SCAN_SCREEN' ? (
+          <ScannerView
+            availableAssets={availableAssets}
+            onAssetSelected={handleAssetScannedOrSelected}
+            isAnyModalOpen={
+              isSettingsModalOpen ||
+              isOutboxModalOpen ||
+              isConfirmModalOpen ||
+              isEditingAsset
+            }
+          />
+        ) : (
+          /* ASSET_DETAIL_VIEW */
+          currentAsset && (
+            !activeAction ? (
+              <AssetDetailView
+                asset={currentAsset}
+                transactions={currentAssetTransactions}
+                onSelectAction={(action) => setActiveAction(action)}
+                onBack={handleBackToScanner}
+              />
+            ) : (
+              <TransactionForm
+                asset={currentAsset}
+                action={activeAction}
+                onCancel={() => setActiveAction(null)}
+                onSubmitValues={handleFormSubmitValues}
+              />
             )
-          )}
-        </main>
-
-        {/* Confirmation Modal */}
-        {currentAsset && pendingTxData && (
-          <ConfirmationModal
-            asset={currentAsset}
-            transactionData={pendingTxData}
-            isOpen={isConfirmModalOpen}
-            onCancel={() => setIsConfirmModalOpen(false)}
-            onConfirm={handleConfirmTransaction}
-          />
+          )
         )}
+      </main>
 
-        {/* Edit Equipment Modal */}
-        {currentAsset && (
-          <EditAssetModal
-            asset={currentAsset}
-            isOpen={isEditingAsset}
-            onClose={() => setIsEditingAsset(false)}
-            onSave={handleSaveEditedAsset}
-          />
-        )}
-
-        {/* Offline Outbox Modal */}
-        <OutboxModal
-          isOpen={isOutboxModalOpen}
-          onClose={() => setIsOutboxModalOpen(false)}
-          syncState={syncState}
+      {/* Confirmation Modal */}
+      {currentAsset && pendingTxData && (
+        <ConfirmationModal
+          asset={currentAsset}
+          transactionData={pendingTxData}
+          isOpen={isConfirmModalOpen}
+          onCancel={() => setIsConfirmModalOpen(false)}
+          onConfirm={handleConfirmTransaction}
         />
+      )}
 
-        {/* Settings Modal */}
-        <SettingsModal
-          isOpen={isSettingsModalOpen}
-          onClose={() => setIsSettingsModalOpen(false)}
-          hasUpdate={hasUpdate}
-          availableVersion={availableVersion}
-          onUpdate={() => {
-            setIsSettingsModalOpen(false);
-            setCurrentView('SPLASH_SCREEN');
-          }}
+      {/* Edit Equipment Modal */}
+      {currentAsset && (
+        <EditAssetModal
+          asset={currentAsset}
+          isOpen={isEditingAsset}
+          onClose={() => setIsEditingAsset(false)}
+          onSave={handleSaveEditedAsset}
         />
-      </div>
-    </>
+      )}
+
+      {/* Offline Outbox Modal */}
+      <OutboxModal
+        isOpen={isOutboxModalOpen}
+        onClose={() => setIsOutboxModalOpen(false)}
+        syncState={syncState}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        hasUpdate={hasUpdate}
+        availableVersion={availableVersion}
+        onUpdate={() => {
+          setIsSettingsModalOpen(false);
+          setCurrentView('SPLASH_SCREEN');
+        }}
+      />
+    </div>
+  );
+
+  return isDesktop ? (
+    <div className="desktop-pda-frame">
+      {renderDesktopToolbar()}
+      {mainContent}
+    </div>
+  ) : (
+    mainContent
   );
 };
 

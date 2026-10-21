@@ -428,7 +428,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <button
               type="button"
               onClick={() => {
-                window.open('/', 'TTD_PDA_WINDOW', 'width=380,height=720,menubar=no,toolbar=no,location=no,status=no,resizable=yes');
+                window.open('/', 'TTD_PDA_WINDOW', 'width=430,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=yes');
               }}
               className="admin-btn admin-btn-outline"
               style={{ width: '100%', gap: '8px' }}
