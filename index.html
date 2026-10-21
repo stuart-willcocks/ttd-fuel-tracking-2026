@@ -7,6 +7,23 @@
         var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Zebra|TC26/i.test(navigator.userAgent);
         if (!isMobile) {
           document.documentElement.classList.add('is-desktop-browser');
+          var isDetached = window.name === 'TTD_PDA_WINDOW' || window.location.search.indexOf('pda_window=1') !== -1;
+          if (!isDetached) {
+            try {
+              if (sessionStorage.getItem('ttd_stay_in_tab') !== '1') {
+                var pdaUrl = new URL(window.location.href);
+                pdaUrl.searchParams.set('pda_window', '1');
+                var pop = window.open(
+                  pdaUrl.toString(),
+                  'TTD_PDA_WINDOW',
+                  'width=430,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=no'
+                );
+                if (pop && !pop.closed) {
+                  window.__TTD_POPUP_LAUNCHED__ = true;
+                }
+              }
+            } catch (e) {}
+          }
         }
       })();
     </script>

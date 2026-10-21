@@ -1834,3 +1834,215 @@ html.is-desktop-browser .app-root {
   outline: none;
   border-color: var(--brand-orange);
 }
+
+/* ==========================================================================
+   DESKTOP LAUNCHPAD COMPANION SCREEN
+   Shown when opening the app in a standard desktop browser tab
+   ========================================================================== */
+
+.desktop-launchpad-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+  padding: 24px;
+  background-color: #07090E;
+  box-sizing: border-box;
+}
+
+.desktop-launchpad-card {
+  width: 100%;
+  max-width: 440px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  padding: 32px 28px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.desktop-launchpad-icon-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.desktop-launchpad-icon-ring {
+  width: 72px;
+  height: 72px;
+  background: rgba(236, 114, 30, 0.1);
+  border: 1px solid rgba(236, 114, 30, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-orange);
+}
+
+.desktop-launchpad-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.desktop-launchpad-status-pill.status-ready {
+  background: rgba(236, 114, 30, 0.12);
+  color: var(--brand-orange);
+  border: 1px solid rgba(236, 114, 30, 0.25);
+}
+
+.desktop-launchpad-status-pill.status-active {
+  background: rgba(22, 163, 74, 0.12);
+  color: #22C55E;
+  border: 1px solid rgba(22, 163, 74, 0.25);
+}
+
+.desktop-launchpad-status-pill .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.desktop-launchpad-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--brand-light-grey);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.3px;
+}
+
+.desktop-launchpad-subtitle {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0 0 24px 0;
+  max-width: 380px;
+}
+
+.desktop-launchpad-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.desktop-launchpad-primary-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 46px;
+  background-color: var(--brand-orange);
+  color: var(--brand-light-grey);
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.desktop-launchpad-primary-btn:hover {
+  background-color: var(--brand-orange-hover);
+}
+
+.desktop-launchpad-secondary-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 42px;
+  background-color: transparent;
+  color: var(--text-main);
+  border: 1px solid var(--border-medium);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.desktop-launchpad-secondary-btn:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--brand-orange);
+  color: var(--brand-orange);
+}
+
+.desktop-launchpad-secondary-btn .launchpad-arrow {
+  margin-left: 2px;
+  transition: transform 0.15s ease;
+}
+
+.desktop-launchpad-secondary-btn:hover .launchpad-arrow {
+  transform: translateX(3px);
+}
+
+.desktop-launchpad-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  padding: 10px 12px;
+  margin-bottom: 18px;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.launchpad-notice-icon {
+  color: #38BDF8;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.launchpad-notice-text {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.launchpad-notice-text strong {
+  color: var(--text-main);
+}
+
+.launchpad-notice-text em {
+  color: var(--brand-orange);
+  font-style: normal;
+}
+
+.desktop-launchpad-footer {
+  margin-top: 4px;
+}
+
+.desktop-launchpad-link-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 4px;
+}
+
+.desktop-launchpad-link-btn:hover {
+  color: var(--text-main);
+}
+

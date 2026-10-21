@@ -14,6 +14,7 @@ import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
 import { getDeviceName } from './services/device';
 import { Smartphone, ExternalLink } from 'lucide-react';
+import { DesktopLaunchpad } from './components/DesktopLaunchpad';
 
 export type AppView = 'SPLASH_SCREEN' | 'SCAN_SCREEN' | 'ASSET_DETAIL_VIEW';
 
@@ -29,6 +30,51 @@ export const App: React.FC = () => {
     if (typeof window === 'undefined') return false;
     return !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Zebra|TC26/i.test(navigator.userAgent);
   });
+
+  // Check if this window is the dedicated detached PDA popup
+  const [isDetachedWindow] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.name === 'TTD_PDA_WINDOW' ||
+      new URLSearchParams(window.location.search).get('pda_window') === '1'
+    );
+  });
+
+  const [stayInTab, setStayInTab] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return sessionStorage.getItem('ttd_stay_in_tab') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const [popupState, setPopupState] = useState<'launched' | 'blocked' | 'idle'>(() => {
+    if (typeof window === 'undefined') return 'idle';
+    const anyWindow = window as unknown as { __TTD_POPUP_LAUNCHED__?: boolean };
+    return anyWindow.__TTD_POPUP_LAUNCHED__ ? 'launched' : 'idle';
+  });
+
+  const openDetachedWindow = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const pdaUrl = new URL(window.location.href);
+    pdaUrl.searchParams.set('pda_window', '1');
+    try {
+      const pop = window.open(
+        pdaUrl.toString(),
+        'TTD_PDA_WINDOW',
+        'width=430,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=no'
+      );
+      if (pop && !pop.closed) {
+        setPopupState('launched');
+        pop.focus?.();
+      } else {
+        setPopupState('blocked');
+      }
+    } catch {
+      setPopupState('blocked');
+    }
+  }, []);
 
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
@@ -185,6 +231,14 @@ export const App: React.FC = () => {
       window.removeEventListener('resize', handleResize);
     };
   }, [isMobileDevice]);
+
+  // On desktop workstations in a normal browser tab, attempt to launch detached window automatically
+  useEffect(() => {
+    if (!isDesktop || isDetachedWindow || stayInTab) return;
+    if (popupState === 'idle') {
+      openDetachedWindow();
+    }
+  }, [isDesktop, isDetachedWindow, stayInTab, popupState, openDetachedWindow]);
 
   const [activeAssetId, setActiveAssetId] = useState<string | null>(null);
   const activeAssetIdRef = useRef<string | null>(null);
@@ -426,24 +480,47 @@ export const App: React.FC = () => {
           <Smartphone size={13} />
           <span>Zebra TC26 Display Locked (360 × 640)</span>
         </span>
-        <button
-          type="button"
-          className="desktop-pda-popout-btn"
-          onClick={() => {
-            window.open(
-              window.location.href,
-              'TTD_PDA_WINDOW',
-              'width=430,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=no'
-            );
-          }}
-          title="Open in dedicated locked PDA window"
-        >
-          <ExternalLink size={12} />
-          <span>Open in Locked PDA Window</span>
-        </button>
+        {!isDetachedWindow ? (
+          <button
+            type="button"
+            className="desktop-pda-popout-btn"
+            onClick={openDetachedWindow}
+            title="Open in dedicated locked PDA window"
+          >
+            <ExternalLink size={12} />
+            <span>Open in Locked PDA Window</span>
+          </button>
+        ) : (
+          <a
+            href="/admin.html"
+            target="_blank"
+            rel="noreferrer"
+            className="desktop-pda-popout-btn"
+            title="Open Fleet Admin Portal in new tab"
+          >
+            <ExternalLink size={12} />
+            <span>Admin Portal</span>
+          </a>
+        )}
       </div>
     );
   };
+
+  // If viewing on desktop workstation in standard browser tab and not detached or opted to stay, show launchpad
+  if (isDesktop && !isDetachedWindow && !stayInTab) {
+    return (
+      <DesktopLaunchpad
+        popupState={popupState}
+        onLaunch={openDetachedWindow}
+        onContinueInTab={() => {
+          try {
+            sessionStorage.setItem('ttd_stay_in_tab', '1');
+          } catch {}
+          setStayInTab(true);
+        }}
+      />
+    );
+  }
 
   // 1. SPLASH SCREEN
   if (currentView === 'SPLASH_SCREEN') {
