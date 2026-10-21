@@ -118,45 +118,72 @@ export const App: React.FC = () => {
     };
   }, [isMobileDevice]);
 
-  // Detect desktop browser to constrain UI to PDA screen display and handle window dimensions
-  const hasAttemptedResizeRef = useRef(false);
+  // Detect desktop browser to constrain UI to PDA screen display and lock window dimensions
   useEffect(() => {
-    const updateDesktopState = () => {
-      const isMobile = isMobileDevice();
-      const isDesk = !isMobile;
-      setIsDesktop(isDesk);
+    const isMobile = isMobileDevice();
+    const isDesk = !isMobile;
+    setIsDesktop(isDesk);
 
-      if (isDesk) {
-        document.documentElement.classList.add('is-desktop-browser');
-        // Ensure browser never stays in fullscreen on desktop
-        if (document.fullscreenElement) {
-          document.exitFullscreen?.().catch(() => {});
-        }
-        // Attempt to resize window to match PDA display dimension if browser allows
-        if (!hasAttemptedResizeRef.current) {
-          hasAttemptedResizeRef.current = true;
-          try {
-            const chromeW = (window.outerWidth && window.innerWidth && window.outerWidth > window.innerWidth)
-              ? (window.outerWidth - window.innerWidth)
-              : 16;
-            const chromeH = (window.outerHeight && window.innerHeight && window.outerHeight > window.innerHeight)
-              ? (window.outerHeight - window.innerHeight)
-              : 60;
-            const targetW = Math.max(430, 410 + chromeW);
-            const targetH = Math.max(800, 720 + chromeH);
-            window.resizeTo(targetW, targetH);
-          } catch {
-            // Normal security restriction on primary tabs
-          }
-        }
-      } else {
-        document.documentElement.classList.remove('is-desktop-browser');
+    if (isDesk) {
+      document.documentElement.classList.add('is-desktop-browser');
+      // Ensure browser never stays in fullscreen on desktop
+      if (document.fullscreenElement) {
+        document.exitFullscreen?.().catch(() => {});
       }
+    } else {
+      document.documentElement.classList.remove('is-desktop-browser');
+      return;
+    }
+
+    const LOCK_WIDTH = 430;
+    const LOCK_HEIGHT = 800;
+
+    const getLockedDimensions = () => {
+      const chromeW = (window.outerWidth && window.innerWidth && window.outerWidth > window.innerWidth)
+        ? (window.outerWidth - window.innerWidth)
+        : 16;
+      const chromeH = (window.outerHeight && window.innerHeight && window.outerHeight > window.innerHeight)
+        ? (window.outerHeight - window.innerHeight)
+        : 60;
+      return {
+        targetW: Math.max(LOCK_WIDTH, 410 + chromeW),
+        targetH: Math.max(LOCK_HEIGHT, 720 + chromeH),
+      };
     };
 
-    updateDesktopState();
-    window.addEventListener('resize', updateDesktopState);
-    return () => window.removeEventListener('resize', updateDesktopState);
+    // Attempt initial resize to locked dimensions
+    try {
+      const { targetW, targetH } = getLockedDimensions();
+      window.resizeTo(targetW, targetH);
+    } catch {
+      // Normal security restriction on primary tabs
+    }
+
+    // Actively snap window dimensions back if resized by user (supported in popup windows)
+    let lockTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleResize = () => {
+      const isStillDesk = !isMobileDevice();
+      setIsDesktop(isStillDesk);
+      if (!isStillDesk) return;
+
+      if (lockTimer) clearTimeout(lockTimer);
+      lockTimer = setTimeout(() => {
+        try {
+          const { targetW, targetH } = getLockedDimensions();
+          if (Math.abs(window.outerWidth - targetW) > 6 || Math.abs(window.outerHeight - targetH) > 6) {
+            window.resizeTo(targetW, targetH);
+          }
+        } catch {
+          // Normal security restriction on primary tabs
+        }
+      }, 80);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      if (lockTimer) clearTimeout(lockTimer);
+      window.removeEventListener('resize', handleResize);
+    };
   }, [isMobileDevice]);
 
   const [activeAssetId, setActiveAssetId] = useState<string | null>(null);
@@ -397,7 +424,7 @@ export const App: React.FC = () => {
       <div className="desktop-pda-toolbar">
         <span className="desktop-pda-badge">
           <Smartphone size={13} />
-          <span>Zebra TC26 Display (360 × 640)</span>
+          <span>Zebra TC26 Display Locked (360 × 640)</span>
         </span>
         <button
           type="button"
@@ -406,13 +433,13 @@ export const App: React.FC = () => {
             window.open(
               window.location.href,
               'TTD_PDA_WINDOW',
-              'width=430,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=yes'
+              'width=430,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=no'
             );
           }}
-          title="Open in dedicated PDA-sized window"
+          title="Open in dedicated locked PDA window"
         >
           <ExternalLink size={12} />
-          <span>Open in PDA Window</span>
+          <span>Open in Locked PDA Window</span>
         </button>
       </div>
     );

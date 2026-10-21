@@ -428,12 +428,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <button
               type="button"
               onClick={() => {
-                window.open('/', 'TTD_PDA_WINDOW', 'width=430,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=yes');
+                window.open('/', 'TTD_PDA_WINDOW', 'width=430,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=no');
               }}
               className="admin-btn admin-btn-outline"
               style={{ width: '100%', gap: '8px' }}
             >
-              <span>Open Field Scanner App (PDA Window)</span>
+              <span>Open Field Scanner App (Locked PDA Window)</span>
               <ExternalLink size={14} />
             </button>
           </div>
