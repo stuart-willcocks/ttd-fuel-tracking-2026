@@ -109,12 +109,14 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
   return (
     <div className="old-screen-container asset-detail-container">
-      {/* 1. ASSET ID: Orange banner matching scan view with equipment type icon on the left */}
-      <div className="asset-detail-id-banner">
-        <span className="asset-detail-id-icon">
-          <EquipmentTypeIcon type={asset.type} size={20} />
-        </span>
-        <span className="asset-detail-id-text">{asset.equipmentId}</span>
+      {/* 1. ASSET ID: Matches placement and styling of scan view text box */}
+      <div className="scan-top-area">
+        <div className="old-scan-input asset-detail-id-box">
+          <span className="asset-detail-id-icon">
+            <EquipmentTypeIcon type={asset.type} size={20} />
+          </span>
+          <span className="asset-detail-id-text">{asset.equipmentId}</span>
+        </div>
       </div>
 
       {/* 2. METADATA SECTION: Non-monospace what3words, light grey asset data, no equipment type text */}

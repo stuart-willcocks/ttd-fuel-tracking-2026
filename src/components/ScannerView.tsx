@@ -241,8 +241,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
 
   return (
     <div className="old-screen-container scan-screen-only">
-      <div className="old-scanner-middle-area">
-        {/* Full width rectangular scan input box */}
+      {/* Top: Full width rectangular scan input box */}
+      <div className="scan-top-area">
         <div className="scan-input-wrapper">
           <input
             ref={inputRef}
@@ -267,8 +267,13 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             <span>{errorMessage}</span>
           </div>
         )}
+      </div>
 
-        {/* Full width rectangular "Choose from list" button */}
+      {/* Middle: Flexible space */}
+      <div className="scan-middle-area" />
+
+      {/* Bottom: Full width rectangular "Choose from list" button */}
+      <div className="scan-bottom-area">
         <button
           type="button"
           className="old-btn-select-fleet"

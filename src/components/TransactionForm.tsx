@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import type { Equipment, ActionType, Transaction, TransactionType } from '../types';
+import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 
 interface TransactionFormProps {
   asset: Equipment;
@@ -175,9 +176,14 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
   return (
     <div className="old-screen-container" onClick={handleContainerClick}>
-      {/* 1. TOP BANNER: Solid Black Banner with Asset ID */}
-      <div className="old-top-banner">
-        <span className="old-banner-title">{asset.equipmentId}</span>
+      {/* 1. TOP: Matches placement and styling of scan view text box */}
+      <div className="scan-top-area">
+        <div className="old-scan-input asset-detail-id-box">
+          <span className="asset-detail-id-icon">
+            <EquipmentTypeIcon type={asset.type} size={20} />
+          </span>
+          <span className="asset-detail-id-text">{asset.equipmentId}</span>
+        </div>
       </div>
 
       {/* 2. FORM BODY */}
