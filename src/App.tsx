@@ -288,7 +288,7 @@ export const App: React.FC = () => {
   // 1. SPLASH SCREEN
   if (currentView === 'SPLASH_SCREEN') {
     return (
-      <div className="app-root">
+      <div className="app-root splash-screen-root">
         <SplashScreen onContinue={() => setCurrentView('SCAN_SCREEN')} />
       </div>
     );

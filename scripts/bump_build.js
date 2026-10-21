@@ -27,8 +27,14 @@ if (fs.existsSync(versionJsonPath)) {
   }
 }
 
-// Write version.json
+// Write version.json and public/version.json
 fs.writeFileSync(versionJsonPath, JSON.stringify(versionData, null, 2) + '\n', 'utf-8');
+const publicVersionJsonPath = path.join(rootDir, 'public', 'version.json');
+try {
+  fs.writeFileSync(publicVersionJsonPath, JSON.stringify(versionData, null, 2) + '\n', 'utf-8');
+} catch {
+  // Ignore if public directory not found
+}
 
 // Write src/version.ts
 const tsContent = `// Auto-generated build version - DO NOT EDIT MANUALLY
