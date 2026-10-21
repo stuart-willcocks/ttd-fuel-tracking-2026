@@ -698,13 +698,13 @@ html.is-desktop-browser .app-root {
 
 .old-scan-input {
   width: 100%;
-  height: 48px;
+  height: 52px;
   background-color: var(--brand-orange);
-  border: 2px solid var(--brand-orange-hover);
+  border: none !important;
   color: #FFFFFF;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 800;
   text-align: center;
   padding: 0 12px;
   caret-color: #FFFFFF;
@@ -713,22 +713,22 @@ html.is-desktop-browser .app-root {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-input);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: none !important;
 }
 
 .old-scan-input:focus {
   outline: none;
-  border-color: var(--brand-orange-active);
+  border: none !important;
   background-color: var(--brand-orange);
   color: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(236, 114, 30, 0.35);
+  box-shadow: none !important;
 }
 
 .old-scan-input::placeholder {
-  color: rgba(255, 255, 255, 0.85);
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
 }
 
 .old-error-message {
@@ -808,25 +808,29 @@ html.is-desktop-browser .app-root {
 /* 1. ASSET ID: Orange text box matching scan view (same font, size, weight, colors, placement) */
 .asset-detail-id-box {
   position: relative;
-  letter-spacing: 0.5px;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .asset-detail-id-banner {
   flex-shrink: 0;
   width: 100%;
-  height: 48px;
+  height: 52px;
   background-color: var(--brand-orange);
-  border: 2px solid var(--brand-orange-hover);
-  color: var(--brand-light-grey);
+  border: none !important;
+  box-shadow: none !important;
+  color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1px;
   padding: 0 12px;
   box-sizing: border-box;
+  border-radius: var(--radius-input);
 }
 
 .asset-detail-id-icon {
@@ -835,15 +839,15 @@ html.is-desktop-browser .app-root {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--brand-light-grey);
+  color: #FFFFFF;
 }
 
 .asset-detail-id-text {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--brand-light-grey);
-  letter-spacing: 0.5px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #FFFFFF;
+  letter-spacing: 1px;
   text-align: center;
 }
 
@@ -1006,15 +1010,24 @@ html.is-desktop-browser .app-root {
   color: var(--text-dim);
 }
 
-/* 4. TRANSACTION BUTTONS STACK (Check In, Record Fuel Transfer, Check Out, Back) */
+/* 4. TRANSACTION BUTTONS: Rendered in a 2x2 grid */
 .asset-detail-btn-stack {
   flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 12px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 10px 12px;
   background-color: var(--bg-header);
   border-top: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+}
+
+.asset-detail-btn-stack .btn-pda-rect {
+  width: 100% !important;
+  height: 48px !important;
+  font-size: 13.5px !important;
+  padding: 0 4px !important;
+  gap: 6px !important;
 }
 
 /* Standard PDA Button: full width, center justified, height 46px, 8px rounded corners */
@@ -1316,13 +1329,20 @@ html.is-desktop-browser .app-root {
   font-weight: 700;
 }
 
-/* Submit & Cancel Buttons */
+/* Submit & Cancel Buttons: Rendered side by side in one row */
 .old-form-btn-row {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  gap: 10px;
   width: 100%;
-  margin-top: 12px;
+  margin-top: 14px;
+}
+
+.old-form-btn-row .old-btn-submit,
+.old-form-btn-row .old-btn-cancel {
+  flex: 1;
+  width: auto !important;
+  min-width: 0;
 }
 
 .old-btn-submit {
@@ -1960,12 +1980,18 @@ html.is-desktop-browser .app-root {
   color: var(--text-main);
 }
 
+/* Modal action buttons: When 2 buttons, render side by side in one row */
 .modal-buttons-row {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  gap: 10px;
   width: 100%;
   margin-top: 14px;
+}
+
+.modal-buttons-row > button {
+  flex: 1;
+  min-width: 0;
 }
 
 .btn-close {

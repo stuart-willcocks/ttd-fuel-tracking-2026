@@ -180,7 +180,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       <div className="scan-top-area">
         <div className="old-scan-input asset-detail-id-box">
           <span className="asset-detail-id-icon">
-            <EquipmentTypeIcon type={asset.type} size={20} />
+            <EquipmentTypeIcon type={asset.type} size={24} />
           </span>
           <span className="asset-detail-id-text">{asset.equipmentId}</span>
         </div>
