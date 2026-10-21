@@ -90,11 +90,11 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
           </div>
 
           <div className="modal-buttons-row">
-            <button type="button" className="btn-modal-cancel" onClick={onClose}>
-              Cancel
-            </button>
             <button type="submit" className="btn-modal-confirm">
               Save Changes
+            </button>
+            <button type="button" className="btn-modal-cancel" onClick={onClose}>
+              Cancel
             </button>
           </div>
         </form>

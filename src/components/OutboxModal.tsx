@@ -88,7 +88,7 @@ export const OutboxModal: React.FC<OutboxModalProps> = ({
 
         <div className="modal-buttons-row">
           <button
-            className="btn-secondary"
+            className="btn-pda-rect btn-pda-blue"
             onClick={handleForceSync}
             disabled={!syncState.isOnline || syncState.isSyncing}
           >

@@ -4,23 +4,57 @@
    ========================================================================== */
 
 :root {
+  /* Brand Anchors */
+  --brand-orange: #EC721E;
+  --brand-orange-hover: #D46114;
+  --brand-orange-active: #BD530E;
+  --brand-light-grey: #F8F9FA;
+
+  /* Functional Button Palette */
+  --btn-green-bg: #16A34A;
+  --btn-green-hover: #15803D;
+  --btn-green-active: #166534;
+  --btn-green-text: #F8F9FA;
+
+  --btn-orange-bg: #EC721E;
+  --btn-orange-hover: #D46114;
+  --btn-orange-active: #BD530E;
+  --btn-orange-text: #F8F9FA;
+
+  --btn-blue-bg: #2563EB;
+  --btn-blue-hover: #1D4ED8;
+  --btn-blue-active: #1E40AF;
+  --btn-blue-text: #F8F9FA;
+
+  --btn-red-bg: #DC2626;
+  --btn-red-hover: #B91C1C;
+  --btn-red-active: #991B1B;
+  --btn-red-text: #F8F9FA;
+
+  --btn-light-bg: #F1F3F5;
+  --btn-light-hover: #E2E8F0;
+  --btn-light-active: #CBD5E1;
+  --btn-light-text: #111827;
+  --btn-light-border: #CBD5E1;
+
   /* Slate Theme Surfaces */
-  --bg-page: #1E222B;          /* Solid Deep Slate */
+  --bg-page: #111827;          /* Industrial Deep Slate */
   --bg-header: #171B22;        /* Sleek Status Bar Slate */
   --bg-banner: #000000;        /* Pure Black Top Banner */
-  --bg-surface: #272C38;       /* Clean Steel Gray */
-  --bg-surface-hover: #323846; /* Active Card Slate */
-  --border-subtle: #373E4F;    /* Hairline Crisp Steel */
-  --border-medium: #485165;    /* Focused Border */
+  --bg-surface: #1F2937;       /* Clean Steel Gray */
+  --bg-surface-hover: #374151; /* Active Card Slate */
+  --border-subtle: #374151;    /* Hairline Crisp Steel */
+  --border-medium: #4B5563;    /* Focused Border */
 
   /* High-Contrast Typography */
-  --text-main: #FFFFFF;        /* Crisp Ice White */
-  --text-muted: #9AA4B2;       /* Cool Mist Silver */
-  --text-dim: #6B7688;         /* Subdued Label Gray */
+  --text-main: #F8F9FA;        /* Pristine Light Grey */
+  --text-muted: #9CA3AF;       /* Cool Mist Silver */
+  --text-dim: #6B7280;         /* Subdued Label Gray */
 
   /* Signal Accents */
-  --accent-yellow: #FACC15;    /* Primary Action Yellow */
-  --accent-yellow-dark: #EAB308;
+  --accent-orange: #EC721E;    /* Brand Primary Accent */
+  --accent-yellow: #EC721E;    /* Backward-compatible alias mapped to Brand Orange */
+  --accent-yellow-dark: #D46114;
 }
 
 /* Strict Rectangular Controls: ZERO corner radii, ZERO drop shadows across all PDA elements */
@@ -136,7 +170,7 @@ html, body {
 .header-app-title {
   font-size: 11px;
   font-weight: 600;
-  color: var(--accent-yellow);
+  color: var(--brand-orange);
 }
 
 .header-version-pill {
@@ -170,24 +204,24 @@ html, body {
 }
 
 .status-pill.online {
-  color: #4ADE80;
-  border-color: rgba(74, 222, 128, 0.4);
-  background: rgba(74, 222, 128, 0.1);
+  color: var(--btn-green-bg);
+  border-color: rgba(22, 163, 74, 0.4);
+  background: rgba(22, 163, 74, 0.15);
 }
 
 .status-pill.offline {
-  color: var(--accent-yellow);
-  border-color: rgba(250, 204, 21, 0.4);
-  background: rgba(250, 204, 21, 0.1);
+  color: var(--brand-orange);
+  border-color: rgba(236, 114, 30, 0.4);
+  background: rgba(236, 114, 30, 0.15);
 }
 
 .pending-pill {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(239, 68, 68, 0.2);
-  color: #F87171;
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(220, 38, 38, 0.2);
+  color: #EF4444;
+  border: 1px solid rgba(220, 38, 38, 0.4);
   padding: 3px 7px;
   font-size: 11px;
   font-weight: 700;
@@ -449,7 +483,7 @@ html, body {
 
 .old-scan-input:focus {
   outline: none;
-  border-color: var(--accent-yellow);
+  border-color: var(--brand-orange);
   background-color: #2E3443;
 }
 
@@ -476,9 +510,9 @@ html, body {
 .old-btn-select-fleet {
   width: 100%;
   height: 46px;
-  background-color: #EC721E;
-  border: 1px solid #D46114;
-  color: #F8F9FA;
+  background-color: var(--brand-orange);
+  border: 1px solid var(--brand-orange-hover);
+  color: var(--brand-light-grey);
   font-size: 15px;
   font-weight: 700;
   display: flex;
@@ -491,12 +525,12 @@ html, body {
 }
 
 .old-btn-select-fleet:hover {
-  background-color: #D46114;
+  background-color: var(--brand-orange-hover);
   color: #FFFFFF;
 }
 
 .old-btn-select-fleet:active {
-  background-color: #BD530E;
+  background-color: var(--brand-orange-active);
 }
 
 /* ==========================================================================
@@ -508,8 +542,8 @@ html, body {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background-color: #FFFFFF; /* High contrast daylight white */
-  color: #000000;
+  background-color: var(--bg-page);
+  color: var(--text-main);
 }
 
 /* 1. ASSET ID: Solid black banner across top */
@@ -517,7 +551,7 @@ html, body {
   flex-shrink: 0;
   width: 100%;
   background-color: #000000;
-  color: #FFFFFF;
+  color: var(--brand-light-grey);
   height: 48px;
   display: flex;
   align-items: center;
@@ -526,47 +560,48 @@ html, body {
   font-weight: 800;
   letter-spacing: 0.5px;
   font-family: 'JetBrains Mono', monospace;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 /* 2. METADATA SECTION */
 .asset-detail-meta-box {
   flex-shrink: 0;
-  background-color: #FFFFFF;
+  background-color: var(--bg-surface);
   padding: 8px 12px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  border-bottom: 1px solid #E5E7EB;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .asset-detail-w3w {
   font-family: 'JetBrains Mono', monospace;
   font-size: 15px;
   font-weight: 700;
-  color: #DC2626; /* Red centered */
+  color: #EF4444; /* Crisp red */
   letter-spacing: 0.2px;
 }
 
 .asset-detail-spec {
   font-size: 14px;
   font-weight: 700;
-  color: #1D4ED8; /* Blue centered uppercase */
+  color: #60A5FA; /* Crisp bright blue for dark surfaces */
   letter-spacing: 0.2px;
 }
 
 .asset-detail-serial {
   font-size: 13px;
   font-weight: 700;
-  color: #1D4ED8;
+  color: #60A5FA;
 }
 
 .asset-detail-area,
 .asset-detail-location {
   font-size: 14px;
   font-weight: 700;
-  color: #1D4ED8; /* Blue centered uppercase */
+  color: #93C5FD;
   line-height: 1.25;
 }
 
@@ -576,7 +611,7 @@ html, body {
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  background-color: #F3F4F6;
+  background-color: var(--bg-page);
 }
 
 .tx-list-stack {
@@ -589,12 +624,12 @@ html, body {
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  background-color: #FFFFFF;
-  border-bottom: 1px solid #E5E7EB;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .tx-row-card:nth-child(even) {
-  background-color: #F9FAFB;
+  background-color: #171B24;
 }
 
 .tx-type-icon-col {
@@ -616,7 +651,7 @@ html, body {
 .tx-timestamp-line {
   font-size: 13.5px;
   font-weight: 700;
-  color: #111827;
+  color: var(--brand-light-grey);
   line-height: 1.3;
 }
 
@@ -626,7 +661,7 @@ html, body {
   flex-wrap: wrap;
   gap: 8px;
   font-size: 12.5px;
-  color: #374151;
+  color: var(--text-muted);
   font-weight: 600;
 }
 
@@ -642,15 +677,15 @@ html, body {
 }
 
 .icon-fuel {
-  color: #D97706; /* Amber fuel pump icon */
+  color: #F59E0B; /* Vibrant amber fuel pump icon */
 }
 
 .icon-def {
-  color: #2563EB; /* Blue DEF droplet icon */
+  color: #3B82F6; /* Vibrant blue DEF droplet icon */
 }
 
 .icon-kwh {
-  color: #EA580C; /* Electric orange kWh icon */
+  color: #F97316; /* Electric orange kWh icon */
 }
 
 .tx-sync-col {
@@ -662,14 +697,14 @@ html, body {
 }
 
 .sync-green-tick {
-  color: #16A34A !important; /* Green tick */
+  color: var(--btn-green-bg) !important; /* Green tick */
 }
 
 .tx-empty-state {
   padding: 36px 16px;
   text-align: center;
   font-size: 13px;
-  color: #6B7280;
+  color: var(--text-dim);
 }
 
 /* 4. TRANSACTION BUTTONS STACK (Check In, Record Fuel Transfer, Check Out, Back) */
@@ -679,17 +714,17 @@ html, body {
   flex-direction: column;
   gap: 6px;
   padding: 8px 12px;
-  background-color: #FFFFFF;
-  border-top: 1px solid #E5E7EB;
+  background-color: var(--bg-header);
+  border-top: 1px solid var(--border-subtle);
 }
 
 /* Standard PDA Rectangular Button: full width, center justified, height 44px, no corner radii or drop shadows */
 .btn-pda-rect {
   width: 100% !important;
   height: 44px !important;
-  background-color: #000000 !important;
-  color: #FFFFFF !important;
-  border: 1px solid #000000 !important;
+  background-color: #000000;
+  color: var(--brand-light-grey);
+  border: 1px solid #000000;
   font-size: 15px !important;
   font-weight: 700 !important;
   display: flex !important;
@@ -698,11 +733,91 @@ html, body {
   text-align: center !important;
   cursor: pointer;
   letter-spacing: 0.3px;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.btn-pda-rect:hover,
-.btn-pda-rect:active {
-  background-color: #1F2937 !important;
+/* Functional Color Buttons */
+.btn-pda-green {
+  background-color: var(--btn-green-bg) !important;
+  color: var(--btn-green-text) !important;
+  border: 1px solid var(--btn-green-bg) !important;
+}
+
+.btn-pda-green:hover:not(:disabled) {
+  background-color: var(--btn-green-hover) !important;
+  border-color: var(--btn-green-hover) !important;
+}
+
+.btn-pda-green:active:not(:disabled) {
+  background-color: var(--btn-green-active) !important;
+  border-color: var(--btn-green-active) !important;
+}
+
+.btn-pda-orange {
+  background-color: var(--btn-orange-bg) !important;
+  color: var(--btn-orange-text) !important;
+  border: 1px solid var(--brand-orange-hover) !important;
+}
+
+.btn-pda-orange:hover:not(:disabled) {
+  background-color: var(--btn-orange-hover) !important;
+  border-color: var(--brand-orange-hover) !important;
+}
+
+.btn-pda-orange:active:not(:disabled) {
+  background-color: var(--btn-orange-active) !important;
+  border-color: var(--brand-orange-active) !important;
+}
+
+.btn-pda-blue {
+  background-color: var(--btn-blue-bg) !important;
+  color: var(--btn-blue-text) !important;
+  border: 1px solid var(--btn-blue-bg) !important;
+}
+
+.btn-pda-blue:hover:not(:disabled) {
+  background-color: var(--btn-blue-hover) !important;
+  border-color: var(--btn-blue-hover) !important;
+}
+
+.btn-pda-blue:active:not(:disabled) {
+  background-color: var(--btn-blue-active) !important;
+  border-color: var(--btn-blue-active) !important;
+}
+
+.btn-pda-light {
+  background-color: var(--btn-light-bg) !important;
+  color: var(--btn-light-text) !important;
+  border: 1px solid var(--btn-light-border) !important;
+}
+
+.btn-pda-light:hover:not(:disabled) {
+  background-color: var(--btn-light-hover) !important;
+}
+
+.btn-pda-light:active:not(:disabled) {
+  background-color: var(--btn-light-active) !important;
+}
+
+.btn-pda-red,
+.btn-danger-cancel {
+  background-color: var(--btn-red-bg) !important;
+  color: var(--btn-red-text) !important;
+  border: 1px solid var(--btn-red-bg) !important;
+}
+
+.btn-pda-red:hover:not(:disabled),
+.btn-danger-cancel:hover:not(:disabled) {
+  background-color: var(--btn-red-hover) !important;
+  border-color: var(--btn-red-hover) !important;
+}
+
+.btn-pda-red:active:not(:disabled),
+.btn-danger-cancel:active:not(:disabled) {
+  background-color: var(--btn-red-active) !important;
+  border-color: var(--btn-red-active) !important;
 }
 
 /* ==========================================================================
@@ -725,7 +840,7 @@ html, body {
 .old-form-title {
   font-size: 16px;
   font-weight: 700;
-  color: var(--accent-yellow);
+  color: var(--brand-orange);
   text-align: center;
   margin: 6px 0 20px;
   letter-spacing: 0.3px;
@@ -779,7 +894,7 @@ html, body {
 .old-form-input:focus {
   outline: none;
   background-color: #2E3443;
-  border-color: var(--accent-yellow);
+  border-color: var(--brand-orange);
 }
 
 .old-form-unit {
@@ -838,9 +953,9 @@ html, body {
 }
 
 .old-tank-chip.active {
-  background-color: var(--accent-yellow);
-  color: #111827;
-  border-color: var(--accent-yellow);
+  background-color: var(--brand-orange);
+  color: var(--brand-light-grey);
+  border-color: var(--brand-orange);
   font-weight: 700;
 }
 
@@ -865,11 +980,21 @@ html, body {
   justify-content: center;
   text-align: center;
   letter-spacing: 0.2px;
+  transition: background-color 0.15s ease;
 }
 
 .old-btn-submit.valid {
-  background-color: #16A34A;
-  color: #FFFFFF;
+  background-color: var(--btn-green-bg);
+  color: var(--btn-green-text);
+  border: 1px solid var(--btn-green-bg);
+}
+
+.old-btn-submit.valid:hover {
+  background-color: var(--btn-green-hover);
+}
+
+.old-btn-submit.valid:active {
+  background-color: var(--btn-green-active);
 }
 
 .old-btn-submit.disabled {
@@ -882,9 +1007,9 @@ html, body {
 .old-btn-cancel {
   width: 100%;
   height: 44px;
-  background-color: #DC2626;
-  border: 1px solid #DC2626;
-  color: #FFFFFF;
+  background-color: var(--btn-red-bg);
+  border: 1px solid var(--btn-red-bg);
+  color: var(--btn-red-text);
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
@@ -892,6 +1017,17 @@ html, body {
   align-items: center;
   justify-content: center;
   text-align: center;
+  transition: background-color 0.15s ease;
+}
+
+.old-btn-cancel:hover {
+  background-color: var(--btn-red-hover);
+  border-color: var(--btn-red-hover);
+}
+
+.old-btn-cancel:active {
+  background-color: var(--btn-red-active);
+  border-color: var(--btn-red-active);
 }
 
 /* ==========================================================================
@@ -1025,9 +1161,9 @@ html, body {
 .btn-modal-cancel {
   width: 100%;
   height: 44px;
-  background-color: #374151;
-  border: 1px solid #4B5563;
-  color: #FFFFFF;
+  background-color: var(--btn-red-bg);
+  border: 1px solid var(--btn-red-bg);
+  color: var(--btn-red-text);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -1035,14 +1171,27 @@ html, body {
   align-items: center;
   justify-content: center;
   text-align: center;
+  transition: background-color 0.15s ease;
+}
+
+.btn-danger-cancel:hover,
+.btn-modal-cancel:hover {
+  background-color: var(--btn-red-hover);
+  border-color: var(--btn-red-hover);
+}
+
+.btn-danger-cancel:active,
+.btn-modal-cancel:active {
+  background-color: var(--btn-red-active);
+  border-color: var(--btn-red-active);
 }
 
 .btn-modal-confirm {
   width: 100%;
   height: 44px;
-  background-color: var(--accent-yellow);
-  color: #111827;
-  border: 1px solid var(--accent-yellow);
+  background-color: var(--btn-green-bg);
+  color: var(--btn-green-text);
+  border: 1px solid var(--btn-green-bg);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -1050,6 +1199,58 @@ html, body {
   align-items: center;
   justify-content: center;
   text-align: center;
+  transition: background-color 0.15s ease;
+}
+
+.btn-modal-confirm:hover {
+  background-color: var(--btn-green-hover);
+  border-color: var(--btn-green-hover);
+}
+
+.btn-modal-confirm:active {
+  background-color: var(--btn-green-active);
+  border-color: var(--btn-green-active);
+}
+
+.btn-secondary {
+  height: 40px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--brand-orange);
+}
+
+.btn-danger-outline {
+  width: 100%;
+  height: 40px;
+  background-color: transparent;
+  border: 1px solid var(--btn-red-bg);
+  color: var(--btn-red-bg);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-danger-outline:hover {
+  background-color: var(--btn-red-bg);
+  color: var(--btn-red-text);
 }
 
 .values-table-wrap {
@@ -1126,9 +1327,9 @@ html, body {
 .pending-tag {
   font-size: 10px;
   font-weight: 700;
-  background: rgba(250, 204, 21, 0.15);
-  color: var(--accent-yellow);
-  border: 1px solid rgba(250, 204, 21, 0.3);
+  background: rgba(236, 114, 30, 0.15);
+  color: var(--brand-orange);
+  border: 1px solid rgba(236, 114, 30, 0.3);
   padding: 2px 6px;
 }
 
@@ -1161,5 +1362,5 @@ html, body {
 
 .edit-form .text-input:focus {
   outline: none;
-  border-color: var(--accent-yellow);
+  border-color: var(--brand-orange);
 }
