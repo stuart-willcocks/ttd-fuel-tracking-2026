@@ -84,38 +84,40 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
   return (
     <div className="splash-screen">
       <div className="splash-container">
-        {/* Technical Department Ltd Logo */}
-        <div className="splash-logo-wrap">
-          <img
-            src="/logo-01.png"
-            alt="The Technical Department Ltd"
-            className="splash-logo"
-          />
-        </div>
-
-        {/* Title Block: The Technical Department Ltd <newline> Fuel Tracking App */}
-        <div className="splash-title-block">
-          <h1 className="splash-main-title">The Technical Department Ltd</h1>
-          <h2 className="splash-sub-title">Fuel Tracking App</h2>
-          {/* Version number shown ONLY beneath "Fuel Tracking App" */}
-          <div className="splash-version">Version {APP_VERSION}</div>
-        </div>
-
-        {/* Device ID & Update Status Indication */}
-        <div className="splash-status-block">
-          <div className="splash-device-line">
-            Device ID: <strong>{deviceName}</strong>
+        <div className="splash-top-content">
+          {/* Technical Department Ltd Logo */}
+          <div className="splash-logo-wrap">
+            <img
+              src="/logo-01.png"
+              alt="The Technical Department Ltd"
+              className="splash-logo"
+            />
           </div>
-          <div className="splash-update-line">
-            {isCheckingUpdate ? (
-              <span className="splash-checking-text">
-                <span className="splash-spinner" /> Checking for updates...
-              </span>
-            ) : (
-              <span className="splash-ready-text">
-                {updateStatus}
-              </span>
-            )}
+
+          {/* Title Block: The Technical Department Ltd <newline> Fuel Tracking App */}
+          <div className="splash-title-block">
+            <h1 className="splash-main-title">The Technical Department Ltd</h1>
+            <h2 className="splash-sub-title">Fuel Tracking App</h2>
+            {/* Version number shown ONLY beneath "Fuel Tracking App" */}
+            <div className="splash-version">Version {APP_VERSION}</div>
+          </div>
+
+          {/* Device ID & Update Status Indication */}
+          <div className="splash-status-block">
+            <div className="splash-device-line">
+              Device ID: <strong>{deviceName}</strong>
+            </div>
+            <div className="splash-update-line">
+              {isCheckingUpdate ? (
+                <span className="splash-checking-text">
+                  <span className="splash-spinner" /> Checking for updates...
+                </span>
+              ) : (
+                <span className="splash-ready-text">
+                  {updateStatus}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
