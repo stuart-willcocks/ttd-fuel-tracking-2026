@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, Cylinder, Wrench } from 'lucide-react';
+import { IconGenerator, IconTank, IconPlant } from './icons/AppIcons';
 
 interface EquipmentTypeIconProps {
   type: string;
@@ -17,7 +17,7 @@ export const EquipmentTypeIcon: React.FC<EquipmentTypeIconProps> = ({
   if (normalized === 'GENERATOR' || normalized.includes('GEN')) {
     return (
       <span className={`eq-icon-wrap eq-generator ${className}`} title="Generator">
-        <Zap size={size} />
+        <IconGenerator size={size} />
       </span>
     );
   }
@@ -25,15 +25,15 @@ export const EquipmentTypeIcon: React.FC<EquipmentTypeIconProps> = ({
   if (normalized === 'TANK' || normalized.includes('TNK')) {
     return (
       <span className={`eq-icon-wrap eq-tank ${className}`} title="Fuel Tank">
-        <Cylinder size={size} />
+        <IconTank size={size} />
       </span>
     );
   }
 
-  // Plant machinery / vehicles (telehandler, light tower, etc.)
+  // Plant machinery / vehicles (forklift, telehandler, etc.)
   return (
     <span className={`eq-icon-wrap eq-plant ${className}`} title="Plant Equipment">
-      <Wrench size={size} />
+      <IconPlant size={size} />
     </span>
   );
 };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Power, PowerOff, Clock } from 'lucide-react';
+import { IconCheckIn, IconCheckOut, IconFuel } from './icons/AppIcons';
 import type { TransactionType } from '../types';
 
 interface TransactionTypeIconProps {
@@ -19,27 +20,17 @@ export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({
 
   if (t.includes('CheckIn') || t === 'check-in') {
     return (
-      <img
-        src="/assets/checkin-6.png"
-        alt="Check In"
-        width={size}
-        height={size}
-        className={`tx-png-icon ${className}`}
-        title={title || 'Check In'}
-      />
+      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Check In'}>
+        <IconCheckIn size={size} className="tx-type-icon" />
+      </span>
     );
   }
 
   if (t.includes('CheckOut') || t === 'check-out') {
     return (
-      <img
-        src="/assets/checkout-6.png"
-        alt="Check Out"
-        width={size}
-        height={size}
-        className={`tx-png-icon ${className}`}
-        title={title || 'Check Out'}
-      />
+      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Check Out'}>
+        <IconCheckOut size={size} className="tx-type-icon" />
+      </span>
     );
   }
 
@@ -61,14 +52,9 @@ export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({
 
   if (t.includes('FuelTransfer') || t.includes('Fuel') || t === 'record-fuel') {
     return (
-      <img
-        src="/assets/refuel-6.png"
-        alt="Fuel Transfer"
-        width={size}
-        height={size}
-        className={`tx-png-icon ${className}`}
-        title={title || 'Fuel Transfer'}
-      />
+      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Fuel Transfer'}>
+        <IconFuel size={size} className="tx-type-icon" />
+      </span>
     );
   }
 

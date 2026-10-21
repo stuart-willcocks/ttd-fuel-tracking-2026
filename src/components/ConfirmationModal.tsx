@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X } from 'lucide-react';
+import { IconSubmit, IconCancel } from './icons/AppIcons';
 import type { Equipment, Transaction } from '../types';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
@@ -112,11 +112,11 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         {/* Cancel and Confirm buttons */}
         <div className="modal-buttons-row">
           <button className="btn-modal-confirm" onClick={onConfirm}>
-            <Check size={18} />
+            <IconSubmit size={18} />
             <span>Confirm & Save</span>
           </button>
           <button className="btn-modal-cancel" onClick={onCancel}>
-            <X size={18} />
+            <IconCancel size={18} />
             <span>Cancel</span>
           </button>
         </div>

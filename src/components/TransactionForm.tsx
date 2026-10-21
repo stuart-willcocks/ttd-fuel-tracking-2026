@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Minus, Plus, Check, X } from 'lucide-react';
+import { Minus, Plus } from 'lucide-react';
+import { IconSubmit, IconCancel } from './icons/AppIcons';
 import type { Equipment, ActionType, Transaction, TransactionType } from '../types';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 
@@ -370,7 +371,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               disabled={!isValid}
               className={`old-btn-submit ${isValid ? 'valid' : 'disabled'}`}
             >
-              <Check size={18} />
+              <IconSubmit size={18} />
               <span>Submit</span>
             </button>
 
@@ -379,7 +380,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               className="old-btn-cancel"
               onClick={onCancel}
             >
-              <X size={18} />
+              <IconCancel size={18} />
               <span>Cancel</span>
             </button>
           </div>
