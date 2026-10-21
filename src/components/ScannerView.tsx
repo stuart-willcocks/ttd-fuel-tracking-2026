@@ -194,20 +194,20 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           </div>
         )}
 
-        {/* Full width rectangular "select asset from list" button */}
+        {/* Full width rectangular "Choose from list" button */}
         <button
           type="button"
           className="old-btn-select-fleet"
           onClick={handleOpenModal}
         >
           <List size={16} />
-          <span>Select asset from list</span>
+          <span>Choose from list</span>
         </button>
       </div>
 
       {/* Asset Picker Modal */}
       {isAssetModalOpen && (
-        <div className="modal-backdrop" onClick={handleCloseModal}>
+        <div className="modal-backdrop asset-picker-backdrop" onClick={handleCloseModal}>
           <div
             className="modal-box asset-picker-modal"
             onClick={(e) => e.stopPropagation()}
@@ -230,8 +230,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     onClick={() => handleSelectAsset(asset.equipmentId)}
                   >
                     <div className="row-left">
+                      <EquipmentTypeIcon type={asset.type} size={16} />
                       <span className="row-id">{asset.equipmentId}</span>
-                      <EquipmentTypeIcon type={asset.type} size={15} />
                     </div>
                     <div className="row-right">
                       <span className="row-location">{asset.location}</span>

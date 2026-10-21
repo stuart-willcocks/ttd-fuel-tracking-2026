@@ -1069,17 +1069,30 @@ html, body {
   overflow-y: auto;
 }
 
+/* Modal backdrop specifically for asset picker to maximize available screen width */
+.asset-picker-backdrop {
+  padding: 8px 6px;
+}
+
+.modal-box.asset-picker-modal {
+  width: 100%;
+  max-width: 480px;
+  padding: 14px 10px;
+}
+
 .modal-title {
   font-size: 16px;
   font-weight: 700;
   color: var(--text-main);
   margin-bottom: 4px;
+  white-space: nowrap;
 }
 
 .modal-subtitle {
   font-size: 12px;
   color: var(--text-muted);
   margin-bottom: 14px;
+  white-space: nowrap;
 }
 
 .modal-header-simple {
@@ -1087,6 +1100,7 @@ html, body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  white-space: nowrap;
 }
 
 .picker-asset-count {
@@ -1096,27 +1110,32 @@ html, body {
   color: var(--text-muted);
   border: 1px solid var(--border-subtle);
   padding: 2px 7px;
+  white-space: nowrap;
 }
 
 .asset-picker-list {
   display: flex;
   flex-direction: column;
-  max-height: 48vh;
+  max-height: 56vh;
   overflow-y: auto;
   border: 1px solid var(--border-subtle);
   background: var(--bg-page);
   margin-bottom: 14px;
+  width: 100%;
 }
 
 .picker-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
+  padding: 10px 10px;
   border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
   background: var(--bg-surface);
   transition: background-color 0.1s ease;
+  white-space: nowrap;
+  gap: 10px;
+  width: 100%;
 }
 
 .picker-row:last-child {
@@ -1131,13 +1150,17 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .row-id {
   font-family: 'JetBrains Mono', monospace;
   font-size: 14px;
   font-weight: 700;
-  color: var(--accent-yellow);
+  color: var(--brand-orange);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .row-right {
@@ -1145,16 +1168,28 @@ html, body {
   flex-direction: column;
   align-items: flex-end;
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: right;
+  min-width: 0;
 }
 
 .row-location {
   font-weight: 600;
   color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .row-area {
   color: var(--text-muted);
   font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .empty-picker-notice {
@@ -1162,6 +1197,7 @@ html, body {
   text-align: center;
   color: var(--text-muted);
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .modal-single-button-row {
