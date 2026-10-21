@@ -279,7 +279,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           className="old-btn-select-fleet"
           onClick={handleOpenModal}
         >
-          <List size={16} />
+          <List size={18} />
           <span>Choose from list</span>
         </button>
       </div>
@@ -409,7 +409,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 className="btn-modal-cancel"
                 onClick={handleCloseModal}
               >
-                Cancel
+                <X size={18} />
+                <span>Cancel</span>
               </button>
             </div>
           </div>

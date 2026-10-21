@@ -10,26 +10,54 @@
   --brand-orange-active: #BD530E;
   --brand-light-grey: #F8F9FA;
 
-  /* Functional Button Palette */
-  --btn-green-bg: #16A34A;
-  --btn-green-hover: #15803D;
-  --btn-green-active: #166534;
-  --btn-green-text: #F8F9FA;
+  /* Style System: Corner Radii (Modern Rounded Elements) */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-btn: 8px;
+  --radius-input: 8px;
+  --radius-card: 10px;
+  --radius-modal: 12px;
+  --radius-pill: 9999px;
+
+  /* Modern Sans-Serif Button Typography */
+  --font-btn: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --btn-font-weight: 600;
+  --btn-letter-spacing: 0.15px;
+
+  /* Vibrant Functional Palette (Matched precisely from style specimen) */
+  --btn-blue-bg: #3B66FF;
+  --btn-blue-hover: #2B55EE;
+  --btn-blue-active: #1E44D6;
+  --btn-blue-text: #FFFFFF;
+  --btn-blue-border: #3B66FF;
+
+  --btn-green-bg: #4EA342;
+  --btn-green-hover: #418B37;
+  --btn-green-active: #36752D;
+  --btn-green-text: #FFFFFF;
+  --btn-green-border: #4EA342;
 
   --btn-orange-bg: #EC721E;
   --btn-orange-hover: #D46114;
   --btn-orange-active: #BD530E;
-  --btn-orange-text: #F8F9FA;
+  --btn-orange-text: #FFFFFF;
 
-  --btn-blue-bg: #2563EB;
-  --btn-blue-hover: #1D4ED8;
-  --btn-blue-active: #1E40AF;
-  --btn-blue-text: #F8F9FA;
+  --btn-red-bg: #EA5845;
+  --btn-red-hover: #D84735;
+  --btn-red-active: #C23927;
+  --btn-red-text: #FFFFFF;
+  --btn-red-border: #EA5845;
 
-  --btn-red-bg: #DC2626;
-  --btn-red-hover: #B91C1C;
-  --btn-red-active: #991B1B;
-  --btn-red-text: #F8F9FA;
+  --btn-secondary-border: #3B66FF;
+  --btn-secondary-text: #3B66FF;
+  --btn-secondary-bg: transparent;
+  --btn-secondary-hover-bg: rgba(59, 102, 255, 0.08);
+
+  --btn-neutral-bg: #262E3D;
+  --btn-neutral-hover: #313A4D;
+  --btn-neutral-active: #1F2532;
+  --btn-neutral-text: #FFFFFF;
+  --btn-neutral-border: #374151;
 
   --btn-light-bg: #F1F3F5;
   --btn-light-hover: #E2E8F0;
@@ -57,15 +85,13 @@
   --accent-yellow-dark: #D46114;
 }
 
-/* Strict Rectangular Controls: ZERO corner radii, ZERO drop shadows across all PDA elements */
+/* Modern Controls Reset */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  border-radius: 0 !important;
-  box-shadow: none !important;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -73,8 +99,6 @@ button,
 input,
 select,
 textarea {
-  border-radius: 0 !important;
-  box-shadow: none !important;
   font-family: inherit;
 }
 
@@ -677,7 +701,7 @@ html.is-desktop-browser .app-root {
   height: 48px;
   background-color: var(--brand-orange);
   border: 2px solid var(--brand-orange-hover);
-  color: var(--brand-light-grey);
+  color: #FFFFFF;
   font-family: 'JetBrains Mono', monospace;
   font-size: 16px;
   font-weight: 700;
@@ -688,18 +712,21 @@ html.is-desktop-browser .app-root {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0;
+  border-radius: var(--radius-input);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .old-scan-input:focus {
   outline: none;
   border-color: var(--brand-orange-active);
   background-color: var(--brand-orange);
-  color: var(--brand-light-grey);
+  color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(236, 114, 30, 0.35);
 }
 
 .old-scan-input::placeholder {
-  color: rgba(248, 249, 250, 0.85);
+  color: rgba(255, 255, 255, 0.85);
   font-weight: 600;
   letter-spacing: 0.5px;
 }
@@ -715,6 +742,7 @@ html.is-desktop-browser .app-root {
   align-items: center;
   gap: 8px;
   width: 100%;
+  border-radius: var(--radius-sm);
 }
 
 .scan-middle-area {
@@ -735,27 +763,33 @@ html.is-desktop-browser .app-root {
   width: 100%;
   height: 46px;
   background-color: var(--btn-green-bg);
-  border: 1px solid var(--btn-green-hover);
+  border: 1px solid var(--btn-green-border);
   color: var(--btn-green-text);
+  font-family: var(--font-btn);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: var(--btn-font-weight);
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   gap: 8px;
   cursor: pointer;
-  border-radius: 0;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  letter-spacing: var(--btn-letter-spacing);
+  border-radius: var(--radius-btn);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .old-btn-select-fleet:hover {
   background-color: var(--btn-green-hover);
+  border-color: var(--btn-green-hover);
   color: #FFFFFF;
 }
 
 .old-btn-select-fleet:active {
   background-color: var(--btn-green-active);
+  border-color: var(--btn-green-active);
+  transform: scale(0.985);
 }
 
 /* ==========================================================================
@@ -878,6 +912,8 @@ html.is-desktop-browser .app-root {
 .tx-list-stack {
   display: flex;
   flex-direction: column;
+  padding: 8px 12px;
+  gap: 6px;
 }
 
 .tx-row-card {
@@ -886,7 +922,9 @@ html.is-desktop-browser .app-root {
   gap: 12px;
   padding: 10px 14px;
   background-color: var(--bg-surface);
-  border-bottom: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-btn);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .tx-row-card:nth-child(even) {
@@ -979,31 +1017,44 @@ html.is-desktop-browser .app-root {
   border-top: 1px solid var(--border-subtle);
 }
 
-/* Standard PDA Rectangular Button: full width, center justified, height 44px, no corner radii or drop shadows */
+/* Standard PDA Button: full width, center justified, height 46px, 8px rounded corners */
 .btn-pda-rect {
   width: 100% !important;
-  height: 44px !important;
-  background-color: #000000;
-  color: var(--brand-light-grey);
-  border: 1px solid #000000;
+  height: 46px !important;
+  background-color: var(--btn-blue-bg);
+  color: var(--btn-blue-text);
+  border: 1px solid var(--btn-blue-border);
+  font-family: var(--font-btn) !important;
   font-size: 15px !important;
-  font-weight: 700 !important;
+  font-weight: var(--btn-font-weight) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   text-align: center !important;
+  gap: 8px !important;
   cursor: pointer;
-  letter-spacing: 0.3px;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  letter-spacing: var(--btn-letter-spacing);
+  border-radius: var(--radius-btn) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.btn-pda-rect:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.btn-pda-rect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Functional Color Buttons */
 .btn-pda-green {
   background-color: var(--btn-green-bg) !important;
   color: var(--btn-green-text) !important;
-  border: 1px solid var(--btn-green-bg) !important;
+  border: 1px solid var(--btn-green-border) !important;
 }
 
 .btn-pda-green:hover:not(:disabled) {
@@ -1035,7 +1086,7 @@ html.is-desktop-browser .app-root {
 .btn-pda-blue {
   background-color: var(--btn-blue-bg) !important;
   color: var(--btn-blue-text) !important;
-  border: 1px solid var(--btn-blue-bg) !important;
+  border: 1px solid var(--btn-blue-border) !important;
 }
 
 .btn-pda-blue:hover:not(:disabled) {
@@ -1052,6 +1103,8 @@ html.is-desktop-browser .app-root {
   background-color: var(--btn-light-bg) !important;
   color: var(--btn-light-text) !important;
   border: 1px solid var(--btn-light-border) !important;
+  font-family: var(--font-btn) !important;
+  font-weight: var(--btn-font-weight) !important;
 }
 
 .btn-pda-light:hover:not(:disabled) {
@@ -1060,13 +1113,37 @@ html.is-desktop-browser .app-root {
 
 .btn-pda-light:active:not(:disabled) {
   background-color: var(--btn-light-active) !important;
+  transform: scale(0.985);
+}
+
+.btn-pda-neutral {
+  background-color: var(--btn-neutral-bg) !important;
+  color: var(--btn-neutral-text) !important;
+  border: 1px solid var(--btn-neutral-border) !important;
+  font-family: var(--font-btn) !important;
+  font-weight: var(--btn-font-weight) !important;
+}
+
+.btn-pda-neutral:hover:not(:disabled) {
+  background-color: var(--btn-neutral-hover) !important;
+}
+
+.btn-pda-neutral:active:not(:disabled) {
+  background-color: var(--btn-neutral-active) !important;
+  transform: scale(0.985);
 }
 
 .btn-pda-red,
 .btn-danger-cancel {
   background-color: var(--btn-red-bg) !important;
   color: var(--btn-red-text) !important;
-  border: 1px solid var(--btn-red-bg) !important;
+  border: 1px solid var(--btn-red-border) !important;
+  border-radius: var(--radius-btn) !important;
+  font-family: var(--font-btn) !important;
+  font-weight: var(--btn-font-weight) !important;
+  gap: 8px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .btn-pda-red:hover:not(:disabled),
@@ -1079,6 +1156,7 @@ html.is-desktop-browser .app-root {
 .btn-danger-cancel:active:not(:disabled) {
   background-color: var(--btn-red-active) !important;
   border-color: var(--btn-red-active) !important;
+  transform: scale(0.985);
 }
 
 /* ==========================================================================
@@ -1151,12 +1229,15 @@ html.is-desktop-browser .app-root {
   font-weight: 700;
   text-align: center;
   font-family: 'JetBrains Mono', monospace;
+  border-radius: var(--radius-input);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .old-form-input:focus {
   outline: none;
   background-color: #2E3443;
-  border-color: var(--brand-orange);
+  border-color: var(--btn-blue-bg);
+  box-shadow: 0 0 0 2px rgba(59, 102, 255, 0.25);
 }
 
 .old-form-unit {
@@ -1185,6 +1266,18 @@ html.is-desktop-browser .app-root {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  border-radius: var(--radius-input);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+}
+
+.old-btn-step:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--border-medium);
+}
+
+.old-btn-step:active {
+  background-color: #2E3443;
+  transform: scale(0.96);
 }
 
 .old-tank-val {
@@ -1212,11 +1305,13 @@ html.is-desktop-browser .app-root {
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
   cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
 }
 
 .old-tank-chip.active {
   background-color: var(--brand-orange);
-  color: var(--brand-light-grey);
+  color: #FFFFFF;
   border-color: var(--brand-orange);
   font-weight: 700;
 }
@@ -1232,31 +1327,38 @@ html.is-desktop-browser .app-root {
 
 .old-btn-submit {
   width: 100%;
-  height: 44px;
+  height: 46px;
   border: none;
+  font-family: var(--font-btn);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: var(--btn-font-weight);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  letter-spacing: 0.2px;
-  transition: background-color 0.15s ease;
+  gap: 8px;
+  letter-spacing: var(--btn-letter-spacing);
+  border-radius: var(--radius-btn);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .old-btn-submit.valid {
   background-color: var(--btn-green-bg);
   color: var(--btn-green-text);
-  border: 1px solid var(--btn-green-bg);
+  border: 1px solid var(--btn-green-border);
 }
 
 .old-btn-submit.valid:hover {
   background-color: var(--btn-green-hover);
+  border-color: var(--btn-green-hover);
 }
 
 .old-btn-submit.valid:active {
   background-color: var(--btn-green-active);
+  border-color: var(--btn-green-active);
+  transform: scale(0.985);
 }
 
 .old-btn-submit.disabled {
@@ -1264,22 +1366,28 @@ html.is-desktop-browser .app-root {
   border: 1px solid var(--border-subtle);
   color: var(--text-dim);
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .old-btn-cancel {
   width: 100%;
-  height: 44px;
+  height: 46px;
   background-color: var(--btn-red-bg);
-  border: 1px solid var(--btn-red-bg);
+  border: 1px solid var(--btn-red-border);
   color: var(--btn-red-text);
+  font-family: var(--font-btn);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: var(--btn-font-weight);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  transition: background-color 0.15s ease;
+  gap: 8px;
+  letter-spacing: var(--btn-letter-spacing);
+  border-radius: var(--radius-btn);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .old-btn-cancel:hover {
@@ -1290,6 +1398,7 @@ html.is-desktop-browser .app-root {
 .old-btn-cancel:active {
   background-color: var(--btn-red-active);
   border-color: var(--btn-red-active);
+  transform: scale(0.985);
 }
 
 /* ==========================================================================
@@ -1314,6 +1423,8 @@ html.is-desktop-browser .app-root {
   background: var(--bg-surface);
   color: var(--text-main);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-modal);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   padding: 18px;
   max-height: calc(100% - 24px);
   overflow-y: auto;
@@ -1338,6 +1449,7 @@ html.is-desktop-browser .app-root {
   padding: 10px 10px 8px;
   background-color: var(--bg-surface);
   border: none;
+  border-radius: 0;
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -1360,13 +1472,14 @@ html.is-desktop-browser .app-root {
   background: transparent;
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  border-radius: var(--radius-sm);
   transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -1407,6 +1520,7 @@ html.is-desktop-browser .app-root {
   background: var(--bg-page);
   color: var(--text-muted);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   padding: 2px 7px;
   white-space: nowrap;
 }
@@ -1448,25 +1562,28 @@ html.is-desktop-browser .app-root {
   width: 44px;
   height: 42px;
   background-color: var(--btn-green-bg);
-  border: 1px solid var(--btn-green-hover);
+  border: 1px solid var(--btn-green-border);
   color: var(--btn-green-text);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   cursor: pointer;
-  border-radius: 0 !important;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  border-radius: var(--radius-btn) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
   padding: 0;
 }
 
 .picker-hide-keyboard-btn:hover {
   background-color: var(--btn-green-hover);
-  border-color: var(--btn-green-active);
+  border-color: var(--btn-green-hover);
 }
 
 .picker-hide-keyboard-btn:active {
   background-color: var(--btn-green-active);
+  border-color: var(--btn-green-active);
+  transform: scale(0.96);
 }
 
 .picker-hide-kb-icon-wrap {
@@ -1498,7 +1615,7 @@ html.is-desktop-browser .app-root {
   padding: 0 40px 0 34px;
   font-size: 14px;
   font-weight: 600;
-  border-radius: 0 !important;
+  border-radius: var(--radius-input) !important;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
@@ -1646,18 +1763,23 @@ html.is-desktop-browser .app-root {
 .btn-danger-cancel,
 .btn-modal-cancel {
   width: 100%;
-  height: 44px;
+  height: 46px;
   background-color: var(--btn-red-bg);
-  border: 1px solid var(--btn-red-bg);
+  border: 1px solid var(--btn-red-border);
   color: var(--btn-red-text);
-  font-size: 14px;
-  font-weight: 700;
+  font-family: var(--font-btn);
+  font-size: 15px;
+  font-weight: var(--btn-font-weight);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  transition: background-color 0.15s ease;
+  gap: 8px;
+  letter-spacing: var(--btn-letter-spacing);
+  border-radius: var(--radius-btn);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .btn-danger-cancel:hover,
@@ -1670,22 +1792,28 @@ html.is-desktop-browser .app-root {
 .btn-modal-cancel:active {
   background-color: var(--btn-red-active);
   border-color: var(--btn-red-active);
+  transform: scale(0.985);
 }
 
 .btn-modal-confirm {
   width: 100%;
-  height: 44px;
+  height: 46px;
   background-color: var(--btn-green-bg);
   color: var(--btn-green-text);
-  border: 1px solid var(--btn-green-bg);
-  font-size: 14px;
-  font-weight: 700;
+  border: 1px solid var(--btn-green-border);
+  font-family: var(--font-btn);
+  font-size: 15px;
+  font-weight: var(--btn-font-weight);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  transition: background-color 0.15s ease;
+  gap: 8px;
+  letter-spacing: var(--btn-letter-spacing);
+  border-radius: var(--radius-btn);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .btn-modal-confirm:hover {
@@ -1696,47 +1824,61 @@ html.is-desktop-browser .app-root {
 .btn-modal-confirm:active {
   background-color: var(--btn-green-active);
   border-color: var(--btn-green-active);
+  transform: scale(0.985);
 }
 
 .btn-secondary {
-  height: 40px;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-medium);
-  color: var(--text-main);
-  font-size: 13px;
-  font-weight: 600;
+  height: 42px;
+  background-color: transparent;
+  border: 1.5px solid var(--btn-secondary-border);
+  color: var(--btn-secondary-text);
+  font-family: var(--font-btn);
+  font-size: 14px;
+  font-weight: var(--btn-font-weight);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 0 14px;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  padding: 0 16px;
+  border-radius: var(--radius-btn);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: var(--bg-surface-hover);
-  border-color: var(--brand-orange);
+  background-color: var(--btn-secondary-hover-bg);
+  border-color: var(--btn-blue-hover);
+}
+
+.btn-secondary:active:not(:disabled) {
+  transform: scale(0.985);
 }
 
 .btn-danger-outline {
   width: 100%;
-  height: 40px;
+  height: 42px;
   background-color: transparent;
-  border: 1px solid var(--btn-red-bg);
+  border: 1.5px solid var(--btn-red-bg);
   color: var(--btn-red-bg);
-  font-size: 13px;
-  font-weight: 700;
+  font-family: var(--font-btn);
+  font-size: 14px;
+  font-weight: var(--btn-font-weight);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  gap: 8px;
+  border-radius: var(--radius-btn);
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.08s ease;
 }
 
 .btn-danger-outline:hover {
   background-color: var(--btn-red-bg);
   color: var(--btn-red-text);
+}
+
+.btn-danger-outline:active {
+  transform: scale(0.985);
 }
 
 /* Settings Modal Clean Layout */
@@ -1850,6 +1992,7 @@ html.is-desktop-browser .app-root {
   padding: 10px 12px;
   background: var(--bg-page);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1862,6 +2005,7 @@ html.is-desktop-browser .app-root {
   background: rgba(236, 114, 30, 0.15);
   color: var(--brand-orange);
   border: 1px solid rgba(236, 114, 30, 0.3);
+  border-radius: var(--radius-xs);
   padding: 2px 6px;
 }
 
@@ -1890,11 +2034,14 @@ html.is-desktop-browser .app-root {
   color: var(--text-main);
   padding: 0 12px;
   font-size: 14px;
+  border-radius: var(--radius-input);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .edit-form .text-input:focus {
   outline: none;
-  border-color: var(--brand-orange);
+  border-color: var(--btn-blue-bg);
+  box-shadow: 0 0 0 2px rgba(59, 102, 255, 0.25);
 }
 
 /* ==========================================================================
@@ -1918,6 +2065,7 @@ html.is-desktop-browser .app-root {
   max-width: 440px;
   background-color: var(--bg-surface);
   border: 1px solid var(--border-medium);
+  border-radius: var(--radius-modal);
   padding: 32px 28px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
   display: flex;
@@ -1940,6 +2088,7 @@ html.is-desktop-browser .app-root {
   height: 72px;
   background: rgba(236, 114, 30, 0.1);
   border: 1px solid rgba(236, 114, 30, 0.3);
+  border-radius: var(--radius-card);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1955,6 +2104,7 @@ html.is-desktop-browser .app-root {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border-radius: var(--radius-pill);
 }
 
 .desktop-launchpad-status-pill.status-ready {
@@ -2008,18 +2158,24 @@ html.is-desktop-browser .app-root {
   width: 100%;
   height: 46px;
   background-color: var(--brand-orange);
-  color: var(--brand-light-grey);
-  font-size: 14px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  color: #FFFFFF;
+  font-family: var(--font-btn);
+  font-size: 15px;
+  font-weight: var(--btn-font-weight);
+  letter-spacing: var(--btn-letter-spacing);
   border: none;
+  border-radius: var(--radius-btn);
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.15s ease, transform 0.08s ease;
 }
 
 .desktop-launchpad-primary-btn:hover {
   background-color: var(--brand-orange-hover);
+}
+
+.desktop-launchpad-primary-btn:active {
+  transform: scale(0.985);
 }
 
 .desktop-launchpad-secondary-btn {
@@ -2028,14 +2184,16 @@ html.is-desktop-browser .app-root {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  height: 42px;
+  height: 44px;
   background-color: transparent;
   color: var(--text-main);
-  border: 1px solid var(--border-medium);
-  font-size: 13px;
-  font-weight: 600;
+  border: 1.5px solid var(--border-medium);
+  font-family: var(--font-btn);
+  font-size: 14px;
+  font-weight: var(--btn-font-weight);
   text-decoration: none;
   cursor: pointer;
+  border-radius: var(--radius-btn);
   transition: all 0.15s ease;
   box-sizing: border-box;
 }
@@ -2044,6 +2202,10 @@ html.is-desktop-browser .app-root {
   background-color: var(--bg-surface-hover);
   border-color: var(--brand-orange);
   color: var(--brand-orange);
+}
+
+.desktop-launchpad-secondary-btn:active {
+  transform: scale(0.985);
 }
 
 .desktop-launchpad-secondary-btn .launchpad-arrow {
@@ -2061,6 +2223,7 @@ html.is-desktop-browser .app-root {
   gap: 10px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-btn);
   padding: 10px 12px;
   margin-bottom: 18px;
   text-align: left;

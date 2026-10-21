@@ -1,5 +1,5 @@
 import React from 'react';
-import { Fuel, Droplet, Zap, Check } from 'lucide-react';
+import { Fuel, Droplet, Zap, Check, LogIn, LogOut, ArrowLeft } from 'lucide-react';
 import type { Equipment, Transaction, ActionType } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
@@ -173,14 +173,15 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
         )}
       </div>
 
-      {/* 4. TRANSACTION BUTTONS: Consistent height, width 100%, center justified, rectangular */}
+      {/* 4. TRANSACTION BUTTONS: Consistent height, width 100%, center justified, modern 8px rounded corners with icons */}
       <div className="asset-detail-btn-stack">
         <button
           type="button"
           className="btn-pda-rect btn-pda-green"
           onClick={() => onSelectAction('check-in')}
         >
-          Check In
+          <LogIn size={18} />
+          <span>Check In</span>
         </button>
 
         <button
@@ -188,7 +189,8 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           className="btn-pda-rect btn-pda-green"
           onClick={() => onSelectAction('record-fuel')}
         >
-          Record Fuel Transfer
+          <Fuel size={18} />
+          <span>Record Fuel Transfer</span>
         </button>
 
         <button
@@ -196,7 +198,8 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           className="btn-pda-rect btn-pda-green"
           onClick={() => onSelectAction('check-out')}
         >
-          Check Out
+          <LogOut size={18} />
+          <span>Check Out</span>
         </button>
 
         <button
@@ -204,7 +207,8 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           className="btn-pda-rect btn-pda-blue"
           onClick={onBack}
         >
-          Back
+          <ArrowLeft size={18} />
+          <span>Back</span>
         </button>
       </div>
     </div>

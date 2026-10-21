@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Check, X } from 'lucide-react';
 import type { Equipment } from '../types';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 
@@ -91,10 +92,12 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
 
           <div className="modal-buttons-row">
             <button type="submit" className="btn-modal-confirm">
-              Save Changes
+              <Check size={18} />
+              <span>Save Changes</span>
             </button>
             <button type="button" className="btn-modal-cancel" onClick={onClose}>
-              Cancel
+              <X size={18} />
+              <span>Cancel</span>
             </button>
           </div>
         </form>

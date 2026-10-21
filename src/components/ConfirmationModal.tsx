@@ -1,4 +1,5 @@
 import React from 'react';
+import { Check, X } from 'lucide-react';
 import type { Equipment, Transaction } from '../types';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
@@ -111,10 +112,12 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         {/* Cancel and Confirm buttons */}
         <div className="modal-buttons-row">
           <button className="btn-modal-confirm" onClick={onConfirm}>
-            Confirm & Save
+            <Check size={18} />
+            <span>Confirm & Save</span>
           </button>
           <button className="btn-modal-cancel" onClick={onCancel}>
-            Cancel
+            <X size={18} />
+            <span>Cancel</span>
           </button>
         </div>
       </div>
