@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AlertCircle, List, Search, X, Keyboard, ChevronDown } from 'lucide-react';
+import { IconCancel } from './icons/AppIcons';
 import type { Equipment } from '../types';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 
@@ -406,10 +407,10 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             <div className="modal-single-button-row">
               <button
                 type="button"
-                className="btn-modal-cancel"
+                className="btn-pda-rect btn-pda-red btn-modal-cancel"
                 onClick={handleCloseModal}
               >
-                <X size={18} />
+                <IconCancel size={24} />
                 <span>Cancel</span>
               </button>
             </div>

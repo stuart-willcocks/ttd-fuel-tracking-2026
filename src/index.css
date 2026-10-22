@@ -1086,11 +1086,14 @@ html.is-desktop-browser .app-root {
 /* Primary Green Buttons (Check in, submit, confirm, etc.) */
 .btn-pda-green,
 .btn-modal-confirm {
+  height: 46px !important;
+  padding: 0 16px !important;
   background-color: var(--btn-green-bg) !important;
   color: var(--btn-green-text) !important;
   border: 1px solid var(--btn-green-border) !important;
   border-radius: 4px !important;
   font-family: var(--font-btn) !important;
+  font-size: 15px !important;
   font-weight: var(--btn-font-weight) !important;
   display: flex !important;
   align-items: center !important;
@@ -1145,6 +1148,8 @@ html.is-desktop-browser .app-root {
 .btn-danger-cancel,
 .btn-modal-cancel,
 .old-btn-cancel {
+  height: 46px !important;
+  padding: 0 16px !important;
   background-color: var(--btn-red-bg) !important;
   color: var(--btn-red-text) !important;
   border: 1px solid var(--btn-red-border) !important;
@@ -1889,6 +1894,14 @@ html.is-desktop-browser .app-root {
 .modal-single-button-row {
   width: 100%;
   margin-top: 10px;
+  flex-shrink: 0;
+}
+
+.modal-single-button-row > button {
+  width: 100% !important;
+  height: 46px !important;
+  font-size: 15px !important;
+  padding: 0 16px !important;
 }
 
 .values-table-wrap {
@@ -1937,6 +1950,8 @@ html.is-desktop-browser .app-root {
 .modal-buttons-row > button {
   flex: 1;
   min-width: 0;
+  height: 46px !important;
+  font-size: 15px !important;
 }
 
 .btn-close {
