@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { AlertCircle, List, Search, X, Keyboard, ChevronDown } from 'lucide-react';
+import { AlertCircle, List, Search, X } from 'lucide-react';
 import { IconCancel } from './icons/AppIcons';
 import type { Equipment } from '../types';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
@@ -19,8 +19,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -154,72 +152,20 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     }, 60);
   };
 
-  // Track visualViewport resizing to accurately detect when software keyboard is open on mobile
-  useEffect(() => {
-    if (!isAssetModalOpen) {
-      setIsKeyboardVisible(false);
-      setIsSearchFocused(false);
-      return;
-    }
-
-    const checkViewport = () => {
-      if (typeof window !== 'undefined' && window.visualViewport) {
-        // Virtual keyboard on mobile devices reduces visualViewport.height by > 120px
-        const isShrunk = (window.innerHeight - window.visualViewport.height) > 120;
-        setIsKeyboardVisible(isShrunk || isSearchFocused);
-      } else {
-        setIsKeyboardVisible(isSearchFocused);
-      }
-    };
-
-    checkViewport();
-    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
-    if (vv) {
-      vv.addEventListener('resize', checkViewport);
-    }
-    window.addEventListener('resize', checkViewport);
-
-    return () => {
-      if (vv) {
-        vv.removeEventListener('resize', checkViewport);
-      }
-      window.removeEventListener('resize', checkViewport);
-    };
-  }, [isAssetModalOpen, isSearchFocused]);
-
-  const handleHideKeyboard = (e?: React.SyntheticEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    searchInputRef.current?.blur();
-    if (document.activeElement && document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    setIsSearchFocused(false);
-    setIsKeyboardVisible(false);
-  };
-
   const handleOpenModal = () => {
     setSearchQuery('');
-    setIsSearchFocused(false);
-    setIsKeyboardVisible(false);
     setIsAssetModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsAssetModalOpen(false);
     setSearchQuery('');
-    setIsSearchFocused(false);
-    setIsKeyboardVisible(false);
     setTimeout(focusInput, 80);
   };
 
   const handleSelectAsset = (equipmentId: string) => {
     setIsAssetModalOpen(false);
     setSearchQuery('');
-    setIsSearchFocused(false);
-    setIsKeyboardVisible(false);
     setBarcodeInput('');
     setErrorMessage(null);
     onAssetSelected(equipmentId);
@@ -314,7 +260,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                 </div>
               </div>
 
-              {/* Search Box labeled "Search" with shortened input and green hide-keyboard button */}
+              {/* Search Box labeled "Search" */}
               <div className="picker-search-container">
                 <label htmlFor="picker-search-input" className="picker-search-label">
                   Search
@@ -330,21 +276,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       placeholder="Search by ID, area, location, type..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      onFocus={() => {
-                        setIsSearchFocused(true);
-                        setIsKeyboardVisible(true);
-                      }}
-                      onBlur={() => {
-                        setIsSearchFocused(false);
-                        setTimeout(() => {
-                          if (typeof window !== 'undefined' && window.visualViewport) {
-                            const isShrunk = (window.innerHeight - window.visualViewport.height) > 100;
-                            setIsKeyboardVisible(isShrunk);
-                          } else {
-                            setIsKeyboardVisible(false);
-                          }
-                        }, 150);
-                      }}
                       autoComplete="off"
                       autoCorrect="off"
                       autoCapitalize="off"
@@ -365,21 +296,6 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       <X size={16} />
                     </button>
                   </div>
-
-                  <button
-                    type="button"
-                    className={`picker-hide-keyboard-btn ${isKeyboardVisible ? 'kb-active' : ''}`}
-                    onClick={handleHideKeyboard}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onTouchStart={(e) => e.preventDefault()}
-                    title="Hide keyboard"
-                    aria-label="Hide keyboard"
-                  >
-                    <div className="picker-hide-kb-icon-wrap">
-                      <Keyboard size={18} />
-                      <ChevronDown size={11} className="picker-hide-kb-arrow" />
-                    </div>
-                  </button>
                 </div>
               </div>
             </div>

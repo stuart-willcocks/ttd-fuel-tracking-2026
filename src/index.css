@@ -1884,46 +1884,6 @@ html.is-desktop-browser .app-root {
   min-width: 0;
 }
 
-.picker-hide-keyboard-btn {
-  width: 44px;
-  height: 42px;
-  background-color: var(--btn-green-bg);
-  border: 1px solid var(--btn-green-border);
-  color: var(--btn-green-text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  cursor: pointer;
-  border-radius: 4px !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
-  padding: 0;
-}
-
-.picker-hide-keyboard-btn:hover {
-  background-color: var(--btn-green-hover);
-  border-color: var(--btn-green-hover);
-}
-
-.picker-hide-keyboard-btn:active {
-  background-color: var(--btn-green-active);
-  border-color: var(--btn-green-active);
-  transform: scale(0.96);
-}
-
-.picker-hide-kb-icon-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  gap: 1px;
-}
-
-.picker-hide-kb-arrow {
-  margin-top: -3px;
-}
 
 .picker-search-icon {
   position: absolute;
