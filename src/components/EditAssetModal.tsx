@@ -41,7 +41,7 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
         <h3 className="modal-title">Edit Equipment Details</h3>
         <p className="modal-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span className="font-equipment-id">{asset.equipmentId}</span>
-          <EquipmentTypeIcon type={asset.type} size={15} />
+          <EquipmentTypeIcon type={asset.type} size={24} />
         </p>
 
         <form onSubmit={handleSave} className="edit-form">

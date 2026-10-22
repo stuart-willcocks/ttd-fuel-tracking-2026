@@ -9,7 +9,7 @@ interface EquipmentTypeIconProps {
 
 export const EquipmentTypeIcon: React.FC<EquipmentTypeIconProps> = ({
   type,
-  size = 16,
+  size = 24,
   className = '',
 }) => {
   const normalized = (type || '').toUpperCase();

@@ -371,7 +371,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               disabled={!isValid}
               className={`old-btn-submit ${isValid ? 'valid' : 'disabled'}`}
             >
-              <IconSubmit size={18} />
+              <IconSubmit size={24} />
               <span>Submit</span>
             </button>
 
@@ -380,7 +380,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               className="old-btn-cancel"
               onClick={onCancel}
             >
-              <IconCancel size={18} />
+              <IconCancel size={24} />
               <span>Cancel</span>
             </button>
           </div>

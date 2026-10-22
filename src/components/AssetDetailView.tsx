@@ -36,7 +36,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       return (
         <div className="tx-data-row">
           <span className="tx-data-item">
-            <IconFuel size={13} className="data-icon icon-fuel" />
+            <IconFuel size={24} className="data-icon icon-fuel" />
             <span>
               Fuel{' '}
               {tx.fuelTransferLitres !== undefined
@@ -86,7 +86,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       <div className="tx-data-row">
         {(fuelPct !== undefined || fuelEighths !== undefined) && (
           <span className="tx-data-item">
-            <IconFuel size={13} className="data-icon icon-fuel" />
+            <IconFuel size={24} className="data-icon icon-fuel" />
             <span>
               Fuel {fuelPct !== undefined ? `${fuelPct}%` : `${fuelEighths}/8`}
             </span>
@@ -153,7 +153,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
               <div key={tx.id} className="tx-row-card">
                 {/* Transaction Type Icon */}
                 <div className="tx-type-icon-col">
-                  <TransactionTypeIcon type={tx.transactionType} size={30} />
+                  <TransactionTypeIcon type={tx.transactionType} size={24} />
                 </div>
 
                 {/* Details: Timestamp & Data Values with Type Icons */}
@@ -181,7 +181,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           className="btn-pda-rect btn-pda-green"
           onClick={() => onSelectAction('check-in')}
         >
-          <IconCheckIn size={18} />
+          <IconCheckIn size={24} />
           <span>Check In</span>
         </button>
 
@@ -190,7 +190,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           className="btn-pda-rect btn-pda-green"
           onClick={() => onSelectAction('record-fuel')}
         >
-          <IconFuel size={18} />
+          <IconFuel size={24} />
           <span>Record Fuel Transfer</span>
         </button>
 
@@ -199,7 +199,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           className="btn-pda-rect btn-pda-green"
           onClick={() => onSelectAction('check-out')}
         >
-          <IconCheckOut size={18} />
+          <IconCheckOut size={24} />
           <span>Check Out</span>
         </button>
 
@@ -208,7 +208,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           className="btn-pda-rect btn-pda-blue"
           onClick={onBack}
         >
-          <IconBack size={18} />
+          <IconBack size={24} />
           <span>Back</span>
         </button>
       </div>

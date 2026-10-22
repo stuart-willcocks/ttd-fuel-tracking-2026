@@ -391,7 +391,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                     onClick={() => handleSelectAsset(asset.equipmentId)}
                   >
                     <div className="row-left">
-                      <EquipmentTypeIcon type={asset.type} size={16} />
+                      <EquipmentTypeIcon type={asset.type} size={24} />
                       <span className="row-id">{asset.equipmentId}</span>
                     </div>
                     <div className="row-right">

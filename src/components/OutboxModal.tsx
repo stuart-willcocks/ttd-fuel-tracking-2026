@@ -70,7 +70,7 @@ export const OutboxModal: React.FC<OutboxModalProps> = ({
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <strong>{item.equipmentId}</strong>
-                    <TransactionTypeIcon type={item.tx?.transactionType} size={15} />
+                    <TransactionTypeIcon type={item.tx?.transactionType} size={24} />
                   </div>
                   <div className="queue-time">{formatPdaTimestamp(item.tx?.transactionTimestamp)}</div>
                   {item.error && (

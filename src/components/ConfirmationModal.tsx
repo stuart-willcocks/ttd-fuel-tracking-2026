@@ -36,13 +36,13 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 <td className="lbl">Asset</td>
                 <td className="val font-equipment-id" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span>{asset.equipmentId}</span>
-                  <EquipmentTypeIcon type={asset.type} size={15} />
+                  <EquipmentTypeIcon type={asset.type} size={24} />
                 </td>
               </tr>
               <tr>
                 <td className="lbl">Type</td>
                 <td className="val">
-                  <TransactionTypeIcon type={transactionData.transactionType} size={18} />
+                  <TransactionTypeIcon type={transactionData.transactionType} size={24} />
                 </td>
               </tr>
               {transactionData.checkInFuelPercentage !== undefined && (
@@ -112,11 +112,11 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         {/* Cancel and Confirm buttons */}
         <div className="modal-buttons-row">
           <button className="btn-modal-confirm" onClick={onConfirm}>
-            <IconSubmit size={18} />
+            <IconSubmit size={24} />
             <span>Confirm & Save</span>
           </button>
           <button className="btn-modal-cancel" onClick={onCancel}>
-            <IconCancel size={18} />
+            <IconCancel size={24} />
             <span>Cancel</span>
           </button>
         </div>
