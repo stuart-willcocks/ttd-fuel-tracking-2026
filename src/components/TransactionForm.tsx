@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Minus, Plus, Keyboard, ChevronDown } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Minus, Plus } from 'lucide-react';
 import { IconSubmit, IconCancel } from './icons/AppIcons';
 import type { Equipment, ActionType, Transaction, TransactionType } from '../types';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
+import { InAppNumpad } from './InAppNumpad';
 
 interface TransactionFormProps {
   asset: Equipment;
@@ -10,6 +11,8 @@ interface TransactionFormProps {
   onCancel: () => void;
   onSubmitValues: (transactionData: Partial<Transaction>) => void;
 }
+
+type FormField = 'fuelPercentage' | 'defPercentage' | 'kwh' | 'fuelLitres' | 'defLitres';
 
 export const TransactionForm: React.FC<TransactionFormProps> = ({
   asset,
@@ -21,7 +24,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const isTank = asset.type === 'TANK';
   const isPlant = asset.type === 'PLANT';
 
-  // State
+  // Form field state
   const [fuelPercentage, setFuelPercentage] = useState<string>('');
   const [defPercentage, setDefPercentage] = useState<string>('');
   const [kwh, setKwh] = useState<string>('');
@@ -29,22 +32,34 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [tankSpinnerInteracted, setTankSpinnerInteracted] = useState<boolean>(false);
   const [fuelLitres, setFuelLitres] = useState<string>('');
   const [defLitres, setDefLitres] = useState<string>('');
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState<boolean>(false);
-  const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
 
-  const firstInputRef = useRef<HTMLInputElement>(null);
+  // Determine active form fields for current action & asset
+  const formFields = useMemo<FormField[]>(() => {
+    if (action === 'check-in' || action === 'check-out') {
+      if (isGen) return ['fuelPercentage', 'defPercentage', 'kwh'];
+      if (isPlant) return ['fuelPercentage'];
+      return []; // Tank uses eighths touch spinner
+    }
+    if (action === 'record-fuel') {
+      if (isGen) return ['fuelLitres', 'defLitres'];
+      return ['fuelLitres'];
+    }
+    return [];
+  }, [action, isGen, isPlant]);
 
-  // Ensure the uppermost text box receives focus when any transaction view is opened
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (firstInputRef.current) {
-        firstInputRef.current.focus();
-      }
-    }, 60);
-    return () => clearTimeout(timer);
-  }, []);
+  // Active field for in-app keypad entry
+  const [activeField, setActiveField] = useState<FormField | null>(() => {
+    if (action === 'check-in' || action === 'check-out') {
+      if (isGen || isPlant) return 'fuelPercentage';
+      return null;
+    }
+    if (action === 'record-fuel') {
+      return 'fuelLitres';
+    }
+    return null;
+  });
 
-  // Title matching Screenshot_20250324-201605.png & Screenshot_20261019-112955.png
+  // Action title
   const actionTitle = useMemo(() => {
     switch (action) {
       case 'check-in':
@@ -114,6 +129,153 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     defLitres,
   ]);
 
+  // In-App Numpad Action Handlers
+  const handleNumpadDigit = useCallback((digit: string) => {
+    if (!activeField) return;
+
+    if (activeField === 'fuelPercentage') {
+      setFuelPercentage((prev) => {
+        const next = prev === '0' ? digit : prev + digit;
+        if (Number(next) > 100) return '100';
+        return next;
+      });
+    } else if (activeField === 'defPercentage') {
+      setDefPercentage((prev) => {
+        const next = prev === '0' ? digit : prev + digit;
+        if (Number(next) > 100) return '100';
+        return next;
+      });
+    } else if (activeField === 'kwh') {
+      setKwh((prev) => {
+        if (prev.length >= 7) return prev;
+        return prev === '0' ? digit : prev + digit;
+      });
+    } else if (activeField === 'fuelLitres') {
+      setFuelLitres((prev) => {
+        if (prev.length >= 6) return prev;
+        return prev === '0' ? digit : prev + digit;
+      });
+    } else if (activeField === 'defLitres') {
+      setDefLitres((prev) => {
+        if (prev.length >= 6) return prev;
+        return prev === '0' ? digit : prev + digit;
+      });
+    }
+  }, [activeField]);
+
+  const handleNumpadBackspace = useCallback(() => {
+    if (!activeField) return;
+
+    if (activeField === 'fuelPercentage') {
+      setFuelPercentage((prev) => prev.slice(0, -1));
+    } else if (activeField === 'defPercentage') {
+      setDefPercentage((prev) => prev.slice(0, -1));
+    } else if (activeField === 'kwh') {
+      setKwh((prev) => prev.slice(0, -1));
+    } else if (activeField === 'fuelLitres') {
+      setFuelLitres((prev) => prev.slice(0, -1));
+    } else if (activeField === 'defLitres') {
+      setDefLitres((prev) => prev.slice(0, -1));
+    }
+  }, [activeField]);
+
+  const handleNumpadClear = useCallback(() => {
+    if (!activeField) return;
+
+    if (activeField === 'fuelPercentage') {
+      setFuelPercentage('');
+    } else if (activeField === 'defPercentage') {
+      setDefPercentage('');
+    } else if (activeField === 'kwh') {
+      setKwh('');
+    } else if (activeField === 'fuelLitres') {
+      setFuelLitres('');
+    } else if (activeField === 'defLitres') {
+      setDefLitres('');
+    }
+  }, [activeField]);
+
+  const handleNumpadNext = useCallback(() => {
+    if (!activeField || formFields.length <= 1) return;
+    const currentIndex = formFields.indexOf(activeField);
+    if (currentIndex >= 0 && currentIndex < formFields.length - 1) {
+      setActiveField(formFields[currentIndex + 1]);
+    } else {
+      setActiveField(formFields[0]);
+    }
+  }, [activeField, formFields]);
+
+  const handleQuickSelect = useCallback(
+    (item: { label: string; value: string | number; isDelta?: boolean }) => {
+      if (!activeField) return;
+
+      if (activeField === 'fuelPercentage') {
+        setFuelPercentage(String(item.value));
+      } else if (activeField === 'defPercentage') {
+        setDefPercentage(String(item.value));
+      } else if (activeField === 'fuelLitres' || activeField === 'defLitres') {
+        const setter = activeField === 'fuelLitres' ? setFuelLitres : setDefLitres;
+        if (item.isDelta) {
+          setter((prev) => {
+            const current = parseInt(prev, 10) || 0;
+            return String(current + Number(item.value));
+          });
+        } else {
+          setter(String(item.value));
+        }
+      }
+    },
+    [activeField]
+  );
+
+  // Quick buttons configured for the active field
+  const quickButtons = useMemo(() => {
+    if (activeField === 'fuelPercentage' || activeField === 'defPercentage') {
+      return [
+        { label: '25%', value: '25' },
+        { label: '50%', value: '50' },
+        { label: '75%', value: '75' },
+        { label: '100%', value: '100' },
+      ];
+    }
+    if (activeField === 'fuelLitres' || activeField === 'defLitres') {
+      return [
+        { label: '+50L', value: 50, isDelta: true },
+        { label: '+100L', value: 100, isDelta: true },
+        { label: '+250L', value: 250, isDelta: true },
+        { label: '+500L', value: 500, isDelta: true },
+      ];
+    }
+    return undefined;
+  }, [activeField]);
+
+  // Support physical keyboard entry on desktop workstations / laptops
+  useEffect(() => {
+    const handlePhysicalKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        handleNumpadDigit(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleNumpadBackspace();
+      } else if (e.key === 'Delete' || e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        handleNumpadClear();
+      } else if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault();
+        handleNumpadNext();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onCancel();
+      }
+    };
+
+    window.addEventListener('keydown', handlePhysicalKeyDown);
+    return () => window.removeEventListener('keydown', handlePhysicalKeyDown);
+  }, [handleNumpadDigit, handleNumpadBackspace, handleNumpadClear, handleNumpadNext, onCancel]);
+
   const getTransactionType = (): TransactionType => {
     if (action === 'check-in') {
       if (isGen) return 'CheckInGenerator';
@@ -169,60 +331,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     onSubmitValues(txData);
   };
 
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      (e.target as HTMLInputElement).blur();
-    }
-  };
-
-  // Track visualViewport resizing to accurately detect when software keyboard is open on mobile
-  useEffect(() => {
-    const checkViewport = () => {
-      if (typeof window !== 'undefined' && window.visualViewport) {
-        const isShrunk = (window.innerHeight - window.visualViewport.height) > 100;
-        setIsKeyboardVisible(isShrunk || isInputFocused);
-      } else {
-        setIsKeyboardVisible(isInputFocused);
-      }
-    };
-
-    checkViewport();
-    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
-    if (vv) {
-      vv.addEventListener('resize', checkViewport);
-    }
-    window.addEventListener('resize', checkViewport);
-
-    return () => {
-      if (vv) {
-        vv.removeEventListener('resize', checkViewport);
-      }
-      window.removeEventListener('resize', checkViewport);
-    };
-  }, [isInputFocused]);
-
-  const dismissKeyboard = (e?: React.SyntheticEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    setIsInputFocused(false);
-    setIsKeyboardVisible(false);
-  };
-
-  const handleContainerClick = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement | null;
-    if (target && !target.closest('input') && !target.closest('button')) {
-      dismissKeyboard();
-    }
-  };
-
   return (
-    <div className="old-screen-container" onClick={handleContainerClick}>
+    <div className="old-screen-container transaction-form-container">
       {/* 1. TOP: Matches placement and styling of scan view text box */}
       <div className="scan-top-area">
         <div className="old-scan-input asset-detail-id-box">
@@ -234,7 +344,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       </div>
 
       {/* 2. FORM BODY */}
-      <div className="old-form-body" onClick={handleContainerClick}>
+      <div className="old-form-body">
         {/* Header bar with Action Title */}
         <div className="old-form-header-bar">
           <h2 className="old-form-title">{actionTitle}</h2>
@@ -242,82 +352,66 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
         <form onSubmit={handleSubmit} noValidate autoComplete="off" className="old-form-content">
           {/* ======================================================= */}
-          {/* Generator Check In / Check Out (Screenshot 20250324-201605) */}
+          {/* Generator Check In / Check Out                          */}
           {/* ======================================================= */}
           {(action === 'check-in' || action === 'check-out') && isGen && (
             <div className="old-form-grid">
-              <div className="old-form-row">
+              <div
+                className={`old-form-row ${activeField === 'fuelPercentage' ? 'row-selected' : ''}`}
+                onClick={() => setActiveField('fuelPercentage')}
+              >
                 <span className="old-form-lbl">Fuel level</span>
                 <input
-                  ref={firstInputRef}
-                  autoFocus
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  max="100"
-                  step="1"
-                  className="old-form-input"
-                  placeholder=""
+                  type="text"
+                  inputMode="none"
+                  readOnly
+                  className={`old-form-input ${activeField === 'fuelPercentage' ? 'is-active' : ''}`}
+                  placeholder="0"
                   value={fuelPercentage}
-                  onChange={(e) => setFuelPercentage(e.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                  onKeyDown={handleInputKeyDown}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  data-lpignore="true"
-                  data-form-type="other"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveField('fuelPercentage');
+                  }}
                 />
                 <span className="old-form-unit">%</span>
               </div>
 
-              <div className="old-form-row">
+              <div
+                className={`old-form-row ${activeField === 'defPercentage' ? 'row-selected' : ''}`}
+                onClick={() => setActiveField('defPercentage')}
+              >
                 <span className="old-form-lbl">DEF level</span>
                 <input
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  max="100"
-                  step="1"
-                  className="old-form-input"
-                  placeholder=""
+                  type="text"
+                  inputMode="none"
+                  readOnly
+                  className={`old-form-input ${activeField === 'defPercentage' ? 'is-active' : ''}`}
+                  placeholder="0"
                   value={defPercentage}
-                  onChange={(e) => setDefPercentage(e.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                  onKeyDown={handleInputKeyDown}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  data-lpignore="true"
-                  data-form-type="other"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveField('defPercentage');
+                  }}
                 />
                 <span className="old-form-unit">%</span>
               </div>
 
-              <div className="old-form-row">
+              <div
+                className={`old-form-row ${activeField === 'kwh' ? 'row-selected' : ''}`}
+                onClick={() => setActiveField('kwh')}
+              >
                 <span className="old-form-lbl">Meter</span>
                 <input
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  step="1"
-                  className="old-form-input"
-                  placeholder=""
+                  type="text"
+                  inputMode="none"
+                  readOnly
+                  className={`old-form-input ${activeField === 'kwh' ? 'is-active' : ''}`}
+                  placeholder="0"
                   value={kwh}
-                  onChange={(e) => setKwh(e.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                  onKeyDown={handleInputKeyDown}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  data-lpignore="true"
-                  data-form-type="other"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveField('kwh');
+                  }}
                 />
                 <span className="old-form-unit">kWh</span>
               </div>
@@ -382,29 +476,22 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           {/* ======================================================= */}
           {(action === 'check-in' || action === 'check-out') && isPlant && (
             <div className="old-form-grid">
-              <div className="old-form-row">
+              <div
+                className={`old-form-row ${activeField === 'fuelPercentage' ? 'row-selected' : ''}`}
+                onClick={() => setActiveField('fuelPercentage')}
+              >
                 <span className="old-form-lbl">Fuel level</span>
                 <input
-                  ref={firstInputRef}
-                  autoFocus
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  max="100"
-                  step="1"
-                  className="old-form-input"
-                  placeholder=""
+                  type="text"
+                  inputMode="none"
+                  readOnly
+                  className={`old-form-input ${activeField === 'fuelPercentage' ? 'is-active' : ''}`}
+                  placeholder="0"
                   value={fuelPercentage}
-                  onChange={(e) => setFuelPercentage(e.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                  onKeyDown={handleInputKeyDown}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  data-lpignore="true"
-                  data-form-type="other"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveField('fuelPercentage');
+                  }}
                 />
                 <span className="old-form-unit">%</span>
               </div>
@@ -416,58 +503,63 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           {/* ======================================================= */}
           {action === 'record-fuel' && (
             <div className="old-form-grid">
-              <div className="old-form-row">
+              <div
+                className={`old-form-row ${activeField === 'fuelLitres' ? 'row-selected' : ''}`}
+                onClick={() => setActiveField('fuelLitres')}
+              >
                 <span className="old-form-lbl">Fuel transferred</span>
                 <input
-                  ref={firstInputRef}
-                  autoFocus
-                  type="number"
-                  inputMode="numeric"
-                  min="1"
-                  step="1"
-                  className="old-form-input"
-                  placeholder=""
+                  type="text"
+                  inputMode="none"
+                  readOnly
+                  className={`old-form-input ${activeField === 'fuelLitres' ? 'is-active' : ''}`}
+                  placeholder="0"
                   value={fuelLitres}
-                  onChange={(e) => setFuelLitres(e.target.value)}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                  onKeyDown={handleInputKeyDown}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  data-lpignore="true"
-                  data-form-type="other"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveField('fuelLitres');
+                  }}
                 />
                 <span className="old-form-unit">litres</span>
               </div>
 
               {isGen && (
-                <div className="old-form-row">
+                <div
+                  className={`old-form-row ${activeField === 'defLitres' ? 'row-selected' : ''}`}
+                  onClick={() => setActiveField('defLitres')}
+                >
                   <span className="old-form-lbl">DEF transferred</span>
                   <input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    step="1"
-                    className="old-form-input"
-                    placeholder=""
+                    type="text"
+                    inputMode="none"
+                    readOnly
+                    className={`old-form-input ${activeField === 'defLitres' ? 'is-active' : ''}`}
+                    placeholder="0"
                     value={defLitres}
-                    onChange={(e) => setDefLitres(e.target.value)}
-                    onFocus={() => setIsInputFocused(true)}
-                    onBlur={() => setIsInputFocused(false)}
-                    onKeyDown={handleInputKeyDown}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    data-lpignore="true"
-                    data-form-type="other"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveField('defLitres');
+                    }}
                   />
                   <span className="old-form-unit">litres</span>
                 </div>
               )}
             </div>
+          )}
+
+          {/* ======================================================= */}
+          {/* Custom In-App Touch Keypad                              */}
+          {/* ======================================================= */}
+          {formFields.length > 0 && (
+            <InAppNumpad
+              onDigit={handleNumpadDigit}
+              onBackspace={handleNumpadBackspace}
+              onClear={handleNumpadClear}
+              onNext={formFields.length > 1 ? handleNumpadNext : undefined}
+              isLastField={activeField === formFields[formFields.length - 1]}
+              quickButtons={quickButtons}
+              onQuickSelect={handleQuickSelect}
+            />
           )}
 
           {/* ======================================================= */}
@@ -494,23 +586,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           </div>
         </form>
       </div>
-
-      {/* Floating Hide Keyboard button (visible whenever keyboard is active) */}
-      {isKeyboardVisible && (
-        <button
-          type="button"
-          className="form-floating-hide-kb-btn"
-          onClick={dismissKeyboard}
-          onMouseDown={(e) => e.preventDefault()}
-          onTouchStart={(e) => e.preventDefault()}
-          title="Hide keyboard"
-          aria-label="Hide keyboard"
-        >
-          <Keyboard size={18} />
-          <span>Hide keyboard</span>
-          <ChevronDown size={14} />
-        </button>
-      )}
     </div>
   );
 };

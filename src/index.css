@@ -1297,7 +1297,7 @@ html.is-desktop-browser .app-root {
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 16px 18px;
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1312,57 +1312,16 @@ html.is-desktop-browser .app-root {
   align-items: center;
   justify-content: center;
   position: relative;
-  margin: 6px 0 20px;
+  margin: 4px 0 10px;
 }
 
 .old-form-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-main);
   text-align: center;
   margin: 0;
   letter-spacing: 0.3px;
-}
-
-
-.form-floating-hide-kb-btn {
-  position: fixed;
-  right: 14px;
-  bottom: 14px;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background-color: #111827;
-  color: #FFFFFF;
-  border: 1px solid #374151;
-  padding: 9px 15px;
-  font-size: 13.5px;
-  font-weight: 700;
-  font-family: var(--font-btn);
-  border-radius: 9999px !important;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-  animation: fadeInKbBtn 0.15s ease-out;
-}
-
-.form-floating-hide-kb-btn:hover {
-  background-color: #1F2937;
-}
-
-.form-floating-hide-kb-btn:active {
-  transform: scale(0.96);
-}
-
-@keyframes fadeInKbBtn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .old-form-content {
@@ -1374,10 +1333,11 @@ html.is-desktop-browser .app-root {
 
 .old-form-grid {
   width: 100%;
+  max-width: 320px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 8px;
+  margin-bottom: 8px;
   align-items: center;
 }
 
@@ -1385,45 +1345,59 @@ html.is-desktop-browser .app-root {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.old-form-row.row-selected {
+  background-color: rgba(37, 99, 235, 0.05);
+  border-color: rgba(37, 99, 235, 0.2);
 }
 
 .old-form-lbl {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-muted);
-  width: 130px;
+  width: 125px;
   text-align: right;
   flex-shrink: 0;
 }
 
 .old-form-input {
-  width: 110px;
-  height: 44px;
+  width: 105px;
+  height: 40px;
   background-color: #FFFFFF !important;
   border: 1px solid var(--border-medium);
   color: var(--text-main);
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   text-align: center;
   font-family: 'JetBrains Mono', monospace;
-  border-radius: 0px !important;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  border-radius: 4px !important;
+  cursor: pointer;
+  caret-color: transparent;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.old-form-input.is-active,
 .old-form-input:focus {
   outline: none;
-  background-color: #FFFFFF !important;
-  border-color: var(--btn-blue-bg);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  background-color: #EFF6FF !important;
+  border-color: var(--btn-blue-bg) !important;
+  color: #1E40AF !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25) !important;
 }
 
 .old-form-unit {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-muted);
-  width: 50px;
+  width: 48px;
   text-align: left;
   flex-shrink: 0;
 }
@@ -1495,13 +1469,146 @@ html.is-desktop-browser .app-root {
   font-weight: 700;
 }
 
+/* ==========================================================================
+   IN-APP NUMPAD (Custom Glove-Friendly Industrial Keypad)
+   - Completely replaces soft keyboard (Gboard) and stops Android autofill
+   - Tactile 3x4 grid + quick buttons
+   ========================================================================== */
+
+.inapp-numpad-container {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 8px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.inapp-numpad-quick-row {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.inapp-quick-btn {
+  height: 34px;
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-medium);
+  color: var(--text-main);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.1s ease, transform 0.05s ease;
+}
+
+.inapp-quick-btn:hover {
+  background-color: #F9FAFB;
+}
+
+.inapp-quick-btn:active {
+  background-color: #E5E7EB;
+  transform: scale(0.97);
+}
+
+.inapp-quick-btn.inapp-quick-next {
+  background-color: var(--btn-blue-bg);
+  border-color: var(--btn-blue-border);
+  color: #FFFFFF;
+  font-family: var(--font-btn);
+  font-size: 12.5px;
+}
+
+.inapp-quick-btn.inapp-quick-next:hover {
+  background-color: var(--btn-blue-hover);
+}
+
+.inapp-quick-btn.inapp-quick-next:active {
+  background-color: var(--btn-blue-active);
+}
+
+.inapp-numpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.inapp-num-key {
+  height: 42px;
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-medium);
+  color: #111827;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 21px;
+  font-weight: 700;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 0.1s ease, transform 0.05s ease, box-shadow 0.05s ease;
+}
+
+.inapp-num-key:hover {
+  background-color: #F9FAFB;
+}
+
+.inapp-num-key:active {
+  background-color: #E5E7EB;
+  transform: scale(0.96);
+  box-shadow: none;
+}
+
+.inapp-num-key.action-clear {
+  color: #DC2626;
+  font-weight: 800;
+  font-size: 18px;
+  background-color: #FEF2F2;
+  border-color: #FECACA;
+}
+
+.inapp-num-key.action-clear:hover {
+  background-color: #FEE2E2;
+}
+
+.inapp-num-key.action-clear:active {
+  background-color: #FECACA;
+}
+
+.inapp-num-key.action-backspace {
+  color: #4B5563;
+  background-color: #F9FAFB;
+  border-color: var(--border-medium);
+}
+
+.inapp-num-key.action-backspace:hover {
+  background-color: #F3F4F6;
+}
+
+.inapp-num-key.action-backspace:active {
+  background-color: #E5E7EB;
+}
+
 /* Form Action Buttons: Submit & Cancel in one row */
 .old-form-btn-row {
   display: flex;
   flex-direction: row;
   gap: 10px;
   width: 100%;
-  margin-top: 14px;
+  max-width: 320px;
+  margin-top: 6px;
 }
 
 .old-form-btn-row .old-btn-submit,

@@ -259,6 +259,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             autoCorrect="off"
             autoCapitalize="characters"
             spellCheck="false"
+            data-lpignore="true"
+            data-form-type="other"
           />
         </div>
 
@@ -345,7 +347,10 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       }}
                       autoComplete="off"
                       autoCorrect="off"
+                      autoCapitalize="off"
                       spellCheck="false"
+                      data-lpignore="true"
+                      data-form-type="other"
                     />
                     <button
                       type="button"
