@@ -7,6 +7,7 @@ interface HeaderProps {
   syncState: SyncState;
   isFullscreen?: boolean;
   hasUpdate?: boolean;
+  settingsRequiresAttention?: boolean;
   onToggleSimulatedOffline: () => void;
   onTriggerSync: () => void;
   onToggleFullscreen?: () => void;
@@ -18,12 +19,14 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   syncState,
   hasUpdate = false,
+  settingsRequiresAttention,
   onToggleSimulatedOffline,
   onTriggerSync,
   onOpenOutbox,
   onOpenSettings,
   onShowSplash,
 }) => {
+  const requiresAttention = settingsRequiresAttention ?? hasUpdate;
   return (
     <header className="app-header">
       {/* Top Left: App Title and Version (Vnn) */}
@@ -83,15 +86,28 @@ export const Header: React.FC<HeaderProps> = ({
           {syncState.isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}
         </button>
 
-        {/* Settings Button: Gear icon (rendered in primary blue if update is available) */}
+        {/* Settings Button: Gear icon (displays orange exclamation mark in front when attention is required) */}
         {onOpenSettings && (
           <button
             type="button"
-            className={`icon-btn ${hasUpdate ? 'has-update' : ''}`}
+            className={`icon-btn settings-btn ${requiresAttention ? 'has-attention' : ''}`}
             onClick={onOpenSettings}
-            title={hasUpdate ? "App update available - Settings" : "Settings"}
-            aria-label="Settings"
+            title={requiresAttention ? "Settings require attention (App update available)" : "Settings"}
+            aria-label={requiresAttention ? "Settings (requires attention)" : "Settings"}
           >
+            {requiresAttention && (
+              <svg
+                width="5"
+                height="15"
+                viewBox="0 0 5 15"
+                fill="none"
+                className="settings-attention-mark"
+                aria-hidden="true"
+              >
+                <line x1="2.5" y1="1.5" x2="2.5" y2="9.5" stroke="#EC721E" strokeWidth="2.5" strokeLinecap="round" />
+                <circle cx="2.5" cy="13.2" r="1.3" fill="#EC721E" />
+              </svg>
+            )}
             <Settings size={15} />
           </button>
         )}

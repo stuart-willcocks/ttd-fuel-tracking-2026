@@ -456,25 +456,29 @@ html.is-desktop-browser .app-root {
   border-color: var(--border-medium);
 }
 
-.icon-btn.has-update {
-  background-color: var(--btn-blue-bg) !important;
-  border-color: var(--btn-blue-bg) !important;
-  color: #FFFFFF !important;
+.icon-btn.settings-btn.has-attention {
+  width: auto !important;
+  min-width: 32px;
+  height: 30px;
+  padding: 0 6px !important;
+  gap: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #FFFFFF !important;
+  border-color: rgba(236, 114, 30, 0.5) !important;
+  color: var(--text-main) !important;
 }
 
-.icon-btn.has-update svg path {
-  fill: #FFFFFF !important;
-  stroke: #FFFFFF !important;
+.icon-btn.settings-btn.has-attention:hover {
+  background-color: #F8FAFC !important;
+  border-color: var(--brand-orange, #EC721E) !important;
+  color: var(--text-main) !important;
 }
 
-.icon-btn.has-update svg circle {
-  fill: var(--btn-blue-bg) !important;
-  stroke: var(--btn-blue-bg) !important;
-}
-
-.icon-btn.has-update:hover {
-  background-color: var(--btn-blue-hover) !important;
-  border-color: var(--btn-blue-hover) !important;
+.settings-attention-mark {
+  flex-shrink: 0;
+  display: block;
 }
 
 .spinning {
