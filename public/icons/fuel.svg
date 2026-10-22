@@ -1,6 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <rect x="3" y="4" width="10" height="16" rx="2" />
-  <rect x="5.5" y="7" width="5" height="4" rx="0.5" />
-  <path d="M13 8h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V8.5a1.5 1.5 0 0 0-2.5-1.1L16 8.5" />
-  <line x1="2" y1="20" x2="14" y2="20" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  <g transform="translate(-68)">
+    <g transform="translate(2)">
+      <circle cx="86.75" cy="12.25" r="1.75" fill="currentColor" stroke="none" />
+      <path d="M 85.5,12 86.715026,9.5 88,12" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    </g>
+    <path d="m 72.5,20.5 c 0,0 -0.437655,-1.493564 -0.5,-2 -0.06234,-0.506436 -0.0811,-0.656438 0,-1 0.0811,-0.343562 0.253228,-0.657622 0.5,-1 0.246772,-0.342378 1,-1 1,-1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <path d="M 72.5,13.5 76,17 77.5,17.5 78.5,17 83,12.5 82.5,9 80,6.5 78.5,7.5 77,7 l -2,2 0.5,1.5 z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <path d="m 81.5,7.5 3.5,-3 h 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <path d="M 75,15 78.5,11.5 82,13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <path d="M 78,12.5 V 15" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  </g>
 </svg>

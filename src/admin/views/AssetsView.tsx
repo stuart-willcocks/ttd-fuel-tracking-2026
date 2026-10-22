@@ -14,6 +14,7 @@ import {
   ReceiptText,
 } from 'lucide-react';
 import type { Equipment, Transaction } from '../../types';
+import { EquipmentTypeIcon } from '../../components/EquipmentTypeIcon';
 
 interface AssetsViewProps {
   assets: Equipment[];
@@ -239,11 +240,11 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
         {[
           { key: 'ALL', label: 'All Equipment', count: counts.all },
-          { key: 'GENERATOR', label: '⚡ Generators', count: counts.generator },
-          { key: 'TANK', label: '🛢️ Fuel Tanks', count: counts.tank },
-          { key: 'PLANT', label: '🚜 Plant', count: counts.plant },
-          { key: 'RUNNING', label: '🟢 Energized (Running)', count: counts.running },
-          { key: 'STANDBY', label: '⚪ Standby Generators', count: counts.standby },
+          { key: 'GENERATOR', label: 'Generators', icon: <EquipmentTypeIcon type="GENERATOR" size={13} />, count: counts.generator },
+          { key: 'TANK', label: 'Fuel Tanks', icon: <EquipmentTypeIcon type="TANK" size={13} />, count: counts.tank },
+          { key: 'PLANT', label: 'Plant', icon: <EquipmentTypeIcon type="PLANT" size={13} />, count: counts.plant },
+          { key: 'RUNNING', label: 'Energized (Running)', icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ADE80', display: 'inline-block' }} />, count: counts.running },
+          { key: 'STANDBY', label: 'Standby Generators', icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94A3B8', display: 'inline-block' }} />, count: counts.standby },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -252,8 +253,12 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             style={{
               borderColor: activeFilter === tab.key ? 'var(--adm-accent-yellow)' : undefined,
               color: activeFilter === tab.key ? '#ffffff' : undefined,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
           >
+            {tab.icon}
             <span>{tab.label}</span>
             <span
               style={{
@@ -344,8 +349,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
                     {/* Classification */}
                     <td>
-                      <span className={`admin-badge admin-badge-${asset.type.toLowerCase()}`}>
-                        {asset.type}
+                      <span className={`admin-badge admin-badge-${asset.type.toLowerCase()}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <EquipmentTypeIcon type={asset.type} size={13} />
+                        <span>{asset.type}</span>
                       </span>
                     </td>
 
@@ -484,8 +490,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
               >
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <span className={`admin-badge admin-badge-${asset.type.toLowerCase()}`}>
-                      {asset.type}
+                    <span className={`admin-badge admin-badge-${asset.type.toLowerCase()}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                      <EquipmentTypeIcon type={asset.type} size={13} />
+                      <span>{asset.type}</span>
                     </span>
                     {asset.type === 'GENERATOR' && (
                       <span className={`admin-badge ${isRunning ? 'admin-badge-running' : 'admin-badge-standby'}`}>

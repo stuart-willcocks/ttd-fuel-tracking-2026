@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5" />
-  <polyline points="14 17 19 12 14 7" />
-  <line x1="19" y1="12" x2="7" y2="12" />
+  <g transform="translate(-34)">
+    <path d="M 46,5 V 3 h 9 v 18 h -9 v -1 -1" />
+    <path d="m 37,12 h 10 1" />
+    <path d="m 41,9 -4,3 4,3" />
+  </g>
 </svg>
