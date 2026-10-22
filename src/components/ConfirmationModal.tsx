@@ -115,7 +115,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             <IconSubmit size={24} />
             <span>Confirm & Save</span>
           </button>
-          <button className="btn-modal-cancel" onClick={onCancel}>
+          <button className="btn-modal-cancel btn-pda-red" onClick={onCancel}>
             <IconCancel size={24} />
             <span>Cancel</span>
           </button>

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Minus, Plus, Keyboard, ChevronDown } from 'lucide-react';
 import { IconSubmit, IconCancel } from './icons/AppIcons';
 import type { Equipment, ActionType, Transaction, TransactionType } from '../types';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
@@ -25,10 +25,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [fuelPercentage, setFuelPercentage] = useState<string>('');
   const [defPercentage, setDefPercentage] = useState<string>('');
   const [kwh, setKwh] = useState<string>('');
-  const [fuelEighths, setFuelEighths] = useState<number>(0);
+  const [fuelEighths, setFuelEighths] = useState<number | null>(null);
   const [tankSpinnerInteracted, setTankSpinnerInteracted] = useState<boolean>(false);
   const [fuelLitres, setFuelLitres] = useState<string>('');
   const [defLitres, setDefLitres] = useState<string>('');
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState<boolean>(false);
+  const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
 
   // Title matching Screenshot_20250324-201605.png & Screenshot_20261019-112955.png
   const actionTitle = useMemo(() => {
@@ -66,7 +68,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         );
       }
       if (isTank) {
-        return tankSpinnerInteracted && fuelEighths >= 0 && fuelEighths <= 8;
+        return tankSpinnerInteracted && fuelEighths !== null && fuelEighths >= 0 && fuelEighths <= 8;
       }
       if (isPlant) {
         return isPercentageValid(fuelPercentage);
@@ -130,7 +132,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         txData.checkInFuelPercentage = parseInt(fuelPercentage, 10);
         txData.checkInDefPercentage = parseInt(defPercentage, 10);
         txData.checkInKWH = parseInt(kwh, 10);
-      } else if (isTank) {
+      } else if (isTank && fuelEighths !== null) {
         txData.checkInFuelEighths = fuelEighths;
       } else if (isPlant) {
         txData.checkInFuelPercentage = parseInt(fuelPercentage, 10);
@@ -140,7 +142,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         txData.checkOutFuelPercentage = parseInt(fuelPercentage, 10);
         txData.checkOutDefPercentage = parseInt(defPercentage, 10);
         txData.checkOutKWH = parseInt(kwh, 10);
-      } else if (isTank) {
+      } else if (isTank && fuelEighths !== null) {
         txData.checkOutFuelEighths = fuelEighths;
       } else if (isPlant) {
         txData.checkOutFuelPercentage = parseInt(fuelPercentage, 10);
@@ -162,10 +164,42 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   };
 
-  const dismissKeyboard = () => {
+  // Track visualViewport resizing to accurately detect when software keyboard is open on mobile
+  useEffect(() => {
+    const checkViewport = () => {
+      if (typeof window !== 'undefined' && window.visualViewport) {
+        const isShrunk = (window.innerHeight - window.visualViewport.height) > 100;
+        setIsKeyboardVisible(isShrunk || isInputFocused);
+      } else {
+        setIsKeyboardVisible(isInputFocused);
+      }
+    };
+
+    checkViewport();
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    if (vv) {
+      vv.addEventListener('resize', checkViewport);
+    }
+    window.addEventListener('resize', checkViewport);
+
+    return () => {
+      if (vv) {
+        vv.removeEventListener('resize', checkViewport);
+      }
+      window.removeEventListener('resize', checkViewport);
+    };
+  }, [isInputFocused]);
+
+  const dismissKeyboard = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
+    setIsInputFocused(false);
+    setIsKeyboardVisible(false);
   };
 
   const handleContainerClick = (e: React.MouseEvent) => {
@@ -189,8 +223,25 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
       {/* 2. FORM BODY */}
       <div className="old-form-body" onClick={handleContainerClick}>
-        {/* Blue Bold Uppercase Title */}
-        <h2 className="old-form-title">{actionTitle}</h2>
+        {/* Header bar with Action Title & inline Hide Keyboard button */}
+        <div className="old-form-header-bar">
+          <h2 className="old-form-title">{actionTitle}</h2>
+          {isKeyboardVisible && (
+            <button
+              type="button"
+              className="form-hide-kb-btn"
+              onClick={dismissKeyboard}
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => e.preventDefault()}
+              title="Hide keyboard"
+              aria-label="Hide keyboard"
+            >
+              <Keyboard size={16} />
+              <span>Hide keyboard</span>
+              <ChevronDown size={12} />
+            </button>
+          )}
+        </div>
 
         <form onSubmit={handleSubmit} noValidate className="old-form-content">
           {/* ======================================================= */}
@@ -206,9 +257,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   max="100"
                   step="1"
                   className="old-form-input"
-                  placeholder="100"
+                  placeholder=""
                   value={fuelPercentage}
                   onChange={(e) => setFuelPercentage(e.target.value)}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
                   onKeyDown={handleInputKeyDown}
                 />
                 <span className="old-form-unit">%</span>
@@ -222,9 +275,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   max="100"
                   step="1"
                   className="old-form-input"
-                  placeholder="100"
+                  placeholder=""
                   value={defPercentage}
                   onChange={(e) => setDefPercentage(e.target.value)}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
                   onKeyDown={handleInputKeyDown}
                 />
                 <span className="old-form-unit">%</span>
@@ -237,9 +292,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   min="0"
                   step="1"
                   className="old-form-input"
-                  placeholder="1752"
+                  placeholder=""
                   value={kwh}
                   onChange={(e) => setKwh(e.target.value)}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
                   onKeyDown={handleInputKeyDown}
                 />
                 <span className="old-form-unit">kWh</span>
@@ -258,21 +315,21 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   <button
                     type="button"
                     className="old-btn-step"
-                    disabled={fuelEighths <= 0}
+                    disabled={fuelEighths !== null && fuelEighths <= 0}
                     onClick={() => {
-                      setFuelEighths((p) => Math.max(0, p - 1));
+                      setFuelEighths((p) => Math.max(0, (p ?? 1) - 1));
                       setTankSpinnerInteracted(true);
                     }}
                   >
                     <Minus size={18} />
                   </button>
-                  <span className="old-tank-val">{fuelEighths} / 8</span>
+                  <span className="old-tank-val">{fuelEighths !== null ? `${fuelEighths} / 8` : '— / 8'}</span>
                   <button
                     type="button"
                     className="old-btn-step"
-                    disabled={fuelEighths >= 8}
+                    disabled={fuelEighths !== null && fuelEighths >= 8}
                     onClick={() => {
-                      setFuelEighths((p) => Math.min(8, p + 1));
+                      setFuelEighths((p) => Math.min(8, (p ?? -1) + 1));
                       setTankSpinnerInteracted(true);
                     }}
                   >
@@ -313,9 +370,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   max="100"
                   step="1"
                   className="old-form-input"
-                  placeholder="100"
+                  placeholder=""
                   value={fuelPercentage}
                   onChange={(e) => setFuelPercentage(e.target.value)}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
                   onKeyDown={handleInputKeyDown}
                 />
                 <span className="old-form-unit">%</span>
@@ -335,9 +394,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   min="1"
                   step="1"
                   className="old-form-input"
-                  placeholder="500"
+                  placeholder=""
                   value={fuelLitres}
                   onChange={(e) => setFuelLitres(e.target.value)}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
                   onKeyDown={handleInputKeyDown}
                 />
                 <span className="old-form-unit">litres</span>
@@ -351,9 +412,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                     min="0"
                     step="1"
                     className="old-form-input"
-                    placeholder="100"
+                    placeholder=""
                     value={defLitres}
                     onChange={(e) => setDefLitres(e.target.value)}
+                    onFocus={() => setIsInputFocused(true)}
+                    onBlur={() => setIsInputFocused(false)}
                     onKeyDown={handleInputKeyDown}
                   />
                   <span className="old-form-unit">litres</span>
@@ -377,7 +440,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
             <button
               type="button"
-              className="old-btn-cancel"
+              className="old-btn-cancel btn-pda-red"
               onClick={onCancel}
             >
               <IconCancel size={24} />
@@ -386,6 +449,23 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Floating Hide Keyboard button (visible whenever keyboard is active) */}
+      {isKeyboardVisible && (
+        <button
+          type="button"
+          className="form-floating-hide-kb-btn"
+          onClick={dismissKeyboard}
+          onMouseDown={(e) => e.preventDefault()}
+          onTouchStart={(e) => e.preventDefault()}
+          title="Hide keyboard"
+          aria-label="Hide keyboard"
+        >
+          <Keyboard size={18} />
+          <span>Hide keyboard</span>
+          <ChevronDown size={14} />
+        </button>
+      )}
     </div>
   );
 };

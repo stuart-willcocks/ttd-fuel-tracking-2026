@@ -833,7 +833,7 @@ html.is-desktop-browser .app-root {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--btn-blue-bg);
+  color: #EC721E !important;
 }
 
 .asset-detail-id-text {
@@ -856,6 +856,7 @@ html.is-desktop-browser .app-root {
   align-items: center;
   justify-content: center;
   line-height: 1;
+  color: #EC721E !important;
 }
 
 /* 2. METADATA SECTION: Rectangular Card Container (no radiused corners) */
@@ -1249,13 +1250,89 @@ html.is-desktop-browser .app-root {
   border-top: 1px solid var(--border-subtle);
 }
 
+.old-form-header-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: 6px 0 20px;
+}
+
 .old-form-title {
   font-size: 16px;
   font-weight: 700;
   color: var(--text-main);
   text-align: center;
-  margin: 6px 0 20px;
+  margin: 0;
   letter-spacing: 0.3px;
+}
+
+.form-hide-kb-btn {
+  position: absolute;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: var(--btn-green-bg);
+  border: 1px solid var(--btn-green-border);
+  color: #FFFFFF;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-btn);
+  border-radius: 4px !important;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.15s ease, transform 0.08s ease;
+}
+
+.form-hide-kb-btn:hover {
+  background-color: var(--btn-green-hover);
+}
+
+.form-hide-kb-btn:active {
+  transform: scale(0.96);
+}
+
+.form-floating-hide-kb-btn {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #111827;
+  color: #FFFFFF;
+  border: 1px solid #374151;
+  padding: 9px 15px;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-family: var(--font-btn);
+  border-radius: 9999px !important;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  animation: fadeInKbBtn 0.15s ease-out;
+}
+
+.form-floating-hide-kb-btn:hover {
+  background-color: #1F2937;
+}
+
+.form-floating-hide-kb-btn:active {
+  transform: scale(0.96);
+}
+
+@keyframes fadeInKbBtn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .old-form-content {

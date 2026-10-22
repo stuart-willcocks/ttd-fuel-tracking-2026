@@ -20,16 +20,16 @@ export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({
 
   if (t.includes('CheckIn') || t === 'check-in') {
     return (
-      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Check In'}>
-        <IconCheckIn size={size} className="tx-type-icon" />
+      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Check In'} style={{ color: '#16A34A' }}>
+        <IconCheckIn size={size} color="#16A34A" className="tx-type-icon" />
       </span>
     );
   }
 
   if (t.includes('CheckOut') || t === 'check-out') {
     return (
-      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Check Out'}>
-        <IconCheckOut size={size} className="tx-type-icon" />
+      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Check Out'} style={{ color: '#16A34A' }}>
+        <IconCheckOut size={size} color="#16A34A" className="tx-type-icon" />
       </span>
     );
   }
@@ -52,8 +52,8 @@ export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({
 
   if (t.includes('FuelTransfer') || t.includes('Fuel') || t === 'record-fuel') {
     return (
-      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Fuel Transfer'}>
-        <IconFuel size={size} className="tx-type-icon" />
+      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Fuel Transfer'} style={{ color: '#2563EB' }}>
+        <IconFuel size={size} color="#2563EB" className="tx-type-icon" />
       </span>
     );
   }

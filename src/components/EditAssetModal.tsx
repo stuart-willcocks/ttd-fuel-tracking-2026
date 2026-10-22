@@ -95,7 +95,7 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
               <Check size={18} />
               <span>Save Changes</span>
             </button>
-            <button type="button" className="btn-modal-cancel" onClick={onClose}>
+            <button type="button" className="btn-modal-cancel btn-pda-red" onClick={onClose}>
               <X size={18} />
               <span>Cancel</span>
             </button>

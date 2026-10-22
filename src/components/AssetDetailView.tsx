@@ -36,7 +36,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       return (
         <div className="tx-data-row">
           <span className="tx-data-item">
-            <IconFuel size={24} className="data-icon icon-fuel" />
+            <IconFuel size={24} color="#2563EB" className="data-icon icon-fuel" />
             <span>
               Fuel{' '}
               {tx.fuelTransferLitres !== undefined
@@ -86,7 +86,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       <div className="tx-data-row">
         {(fuelPct !== undefined || fuelEighths !== undefined) && (
           <span className="tx-data-item">
-            <IconFuel size={24} className="data-icon icon-fuel" />
+            <IconFuel size={24} color="#2563EB" className="data-icon icon-fuel" />
             <span>
               Fuel {fuelPct !== undefined ? `${fuelPct}%` : `${fuelEighths}/8`}
             </span>
@@ -187,7 +187,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
         <button
           type="button"
-          className="btn-pda-rect btn-pda-green"
+          className="btn-pda-rect btn-pda-blue"
           onClick={() => onSelectAction('record-fuel')}
         >
           <IconFuel size={24} />
@@ -205,7 +205,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
         <button
           type="button"
-          className="btn-pda-rect btn-pda-blue"
+          className="btn-pda-rect btn-pda-red"
           onClick={onBack}
         >
           <IconBack size={24} />
