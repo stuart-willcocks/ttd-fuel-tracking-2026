@@ -1,16 +1,18 @@
-import React from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Check, Power, PowerOff } from 'lucide-react';
 import { IconCheckIn, IconCheckOut, IconFuel, IconBack } from './icons/AppIcons';
 import type { Equipment, Transaction, ActionType } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
+import { DeleteTransactionModal } from './DeleteTransactionModal';
 
 export interface AssetDetailViewProps {
   asset: Equipment;
   transactions: Transaction[];
   onSelectAction: (action: ActionType) => void;
   onBack: () => void;
+  onDeleteTransaction?: (transactionId: string) => void | Promise<void>;
 }
 
 export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
@@ -18,8 +20,65 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
   transactions,
   onSelectAction,
   onBack,
+  onDeleteTransaction,
 }) => {
   const isGenerator = asset.type === 'GENERATOR';
+
+  // Delete transaction modal state & long-press detection
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pointerStartPosRef.current = null;
+  }, []);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent, tx: Transaction) => {
+    // Only primary touch/click button
+    if (e.button !== 0) return;
+
+    clearLongPress();
+    pointerStartPosRef.current = { x: e.clientX, y: e.clientY };
+
+    longPressTimerRef.current = setTimeout(() => {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate?.(50);
+      }
+      setTransactionToDelete(tx);
+    }, 550);
+  }, [clearLongPress]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!pointerStartPosRef.current || !longPressTimerRef.current) return;
+    const dx = e.clientX - pointerStartPosRef.current.x;
+    const dy = e.clientY - pointerStartPosRef.current.y;
+    // If movement exceeds 10px, the user is scrolling the list: cancel long press
+    if (Math.hypot(dx, dy) > 10) {
+      clearLongPress();
+    }
+  }, [clearLongPress]);
+
+  const handlePointerUpOrLeave = useCallback(() => {
+    clearLongPress();
+  }, [clearLongPress]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    // Suppress system context menu on mobile / desktop long-press
+    e.preventDefault();
+  }, []);
+
+  const handleConfirmDelete = async () => {
+    if (!transactionToDelete) return;
+    const id = transactionToDelete.id;
+    setTransactionToDelete(null);
+    if (onDeleteTransaction) {
+      await onDeleteTransaction(id);
+    }
+  };
 
   // Sort transactions in reverse timestamp order (newest first)
   const sortedTransactions = [...transactions].sort((a, b) => {
@@ -145,7 +204,15 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
         ) : (
           <div className="tx-list-stack">
             {sortedTransactions.map((tx) => (
-              <div key={tx.id} className="tx-row-card">
+              <div
+                key={tx.id}
+                className="tx-row-card"
+                onPointerDown={(e) => handlePointerDown(e, tx)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUpOrLeave}
+                onPointerCancel={handlePointerUpOrLeave}
+                onContextMenu={handleContextMenu}
+              >
                 {/* Transaction Type Icon */}
                 <div className="tx-type-icon-col">
                   <TransactionTypeIcon type={tx.transactionType} size={24} />
@@ -227,6 +294,17 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           <span>Back</span>
         </button>
       </div>
+
+      {/* Delete Transaction Confirmation Modal */}
+      {transactionToDelete && (
+        <DeleteTransactionModal
+          asset={asset}
+          transaction={transactionToDelete}
+          isOpen={Boolean(transactionToDelete)}
+          onCancel={() => setTransactionToDelete(null)}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
     </div>
   );
 };

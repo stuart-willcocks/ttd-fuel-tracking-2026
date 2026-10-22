@@ -947,6 +947,16 @@ html.is-desktop-browser .app-root {
   box-shadow: none !important;
   width: 100%;
   box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: pan-y;
+  transition: background-color 0.15s ease;
+}
+
+.tx-row-card:active {
+  background-color: var(--bg-surface-hover) !important;
 }
 
 .tx-row-card:nth-child(even) {
@@ -1641,6 +1651,55 @@ html.is-desktop-browser .app-root {
   font-size: 15px;
   font-weight: 700;
   color: var(--text-main);
+}
+
+/* Delete Transaction Confirmation Modal */
+.delete-tx-backdrop {
+  z-index: 1000;
+}
+
+.delete-tx-modal {
+  max-width: 380px !important;
+  border-radius: 4px !important;
+}
+
+.delete-tx-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 12px;
+}
+
+.delete-tx-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: rgba(220, 38, 38, 0.12);
+  flex-shrink: 0;
+}
+
+.delete-tx-details {
+  margin-bottom: 12px;
+}
+
+.delete-tx-warning-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  border-radius: 4px;
+  color: #DC2626;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 14px;
 }
 
 /* Modal backdrop specifically for asset picker to pin to the top of screen */

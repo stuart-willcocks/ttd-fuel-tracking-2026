@@ -285,6 +285,54 @@ export function apiMiddleware(): Connect.NextHandleFunction {
         return;
       }
 
+      // DELETE /api/transactions
+      if (pathname === '/api/transactions' && req.method === 'DELETE') {
+        const query = new URL(rawUrl, 'http://localhost').searchParams;
+        let targetId = query.get('id') || query.get('transactionId');
+        if (!targetId) {
+          const body = await parseJsonBody(req).catch(() => ({}));
+          targetId = body.transactionId || body.id;
+        }
+        if (!targetId) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'Missing transaction id parameter' }));
+          return;
+        }
+        const data = readData();
+        const deletedTx = data.transactions.find((t) => t.id === targetId);
+        const beforeCount = data.transactions.length;
+        data.transactions = data.transactions.filter((t) => t.id !== targetId);
+
+        // If the deleted transaction was a power event, re-evaluate equipment power state
+        if (deletedTx && (deletedTx.transactionType === 'PoweredUp' || deletedTx.transactionType === 'PoweredDown')) {
+          const eq: any = data.equipments.find((e: any) => e.equipmentId === deletedTx.equipmentId);
+          if (eq) {
+            const powerTxs = data.transactions
+              .filter((t) => t.equipmentId === deletedTx.equipmentId && (t.transactionType === 'PoweredUp' || t.transactionType === 'PoweredDown'))
+              .sort((a, b) => new Date(b.transactionTimestamp).getTime() - new Date(a.transactionTimestamp).getTime());
+
+            if (powerTxs.length > 0) {
+              const latest = powerTxs[0];
+              if (latest.transactionType === 'PoweredUp') {
+                eq.poweredUpTimestamp = latest.transactionTimestamp;
+                delete eq.poweredDownTimestamp;
+              } else {
+                eq.poweredDownTimestamp = latest.transactionTimestamp;
+              }
+            } else {
+              delete eq.poweredUpTimestamp;
+              delete eq.poweredDownTimestamp;
+            }
+          }
+        }
+
+        writeData(data);
+        console.log(`[API] Transaction ${targetId} deleted`);
+        res.statusCode = 200;
+        res.end(JSON.stringify({ success: true, deletedId: targetId, removed: beforeCount !== data.transactions.length }));
+        return;
+      }
+
       // POST /api/reset
       if (pathname === '/api/reset' && req.method === 'POST') {
         writeData(INITIAL_DATA);

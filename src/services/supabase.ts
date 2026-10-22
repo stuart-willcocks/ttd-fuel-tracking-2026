@@ -109,6 +109,20 @@ export async function deleteEquipmentFromSupabase(equipmentId: string): Promise<
 }
 
 /**
+ * Delete a single transaction from Supabase
+ */
+export async function deleteTransactionFromSupabase(transactionId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  const { error } = await client.from('transactions').delete().eq('id', transactionId);
+  if (error) {
+    console.error('Error deleting transaction from Supabase:', error);
+    throw error;
+  }
+}
+
+/**
  * Wipe all transactions and equipment from Supabase
  */
 export async function clearAllCloudData(): Promise<void> {

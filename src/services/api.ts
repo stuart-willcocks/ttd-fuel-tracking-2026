@@ -4,6 +4,7 @@ import {
   fetchEquipmentFromSupabase,
   saveEquipmentToSupabase,
   deleteEquipmentFromSupabase,
+  deleteTransactionFromSupabase,
   fetchTransactionsFromSupabase,
   clearAllCloudData,
   bulkImportEquipmentToSupabase,
@@ -82,6 +83,22 @@ export async function postRemoteTransaction(
   });
   if (!res.ok) throw new Error(`Failed to post transaction: ${res.statusText}`);
   return await res.json();
+}
+
+export async function deleteRemoteTransaction(transactionId: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    try {
+      await deleteTransactionFromSupabase(transactionId);
+      return;
+    } catch (err) {
+      console.warn('Supabase delete transaction failed, falling back to local API:', err);
+    }
+  }
+
+  const res = await fetch(`/api/transactions?id=${encodeURIComponent(transactionId)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(`Failed to delete transaction: ${res.statusText}`);
 }
 
 export async function resetRemoteData(): Promise<void> {

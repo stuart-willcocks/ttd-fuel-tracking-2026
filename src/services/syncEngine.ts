@@ -1,6 +1,6 @@
 import { db } from '../db/indexedDB';
 import { uploadTransactionToCloud } from './supabase';
-import { fetchRemoteEquipment, fetchRemoteTransactions } from './api';
+import { fetchRemoteEquipment, fetchRemoteTransactions, deleteRemoteTransaction } from './api';
 import type { Transaction } from '../types';
 
 export interface SyncState {
@@ -18,6 +18,7 @@ type RemoteDataListener = () => void;
 class SyncEngine {
   private listeners: Set<SyncListener> = new Set();
   private dataListeners: Set<RemoteDataListener> = new Set();
+  private deletedTxIds: Set<string> = new Set();
   private isSimulatedOffline: boolean = false;
   private isSyncing: boolean = false;
   private isFlushing: boolean = false;
@@ -27,6 +28,15 @@ class SyncEngine {
 
   constructor() {
     if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('ttd_deleted_tx_ids');
+        if (stored) {
+          this.deletedTxIds = new Set(JSON.parse(stored));
+        }
+      } catch {
+        // Ignore localStorage errors
+      }
+
       window.addEventListener('online', () => this.handleNetworkChange());
       window.addEventListener('offline', () => this.handleNetworkChange());
       window.addEventListener('visibilitychange', () => {
@@ -115,6 +125,75 @@ class SyncEngine {
     this.dataListeners.forEach((listener) => listener());
   }
 
+  private saveDeletedTxIds() {
+    try {
+      localStorage.setItem('ttd_deleted_tx_ids', JSON.stringify(Array.from(this.deletedTxIds)));
+    } catch {
+      // Ignore localStorage errors
+    }
+  }
+
+  /**
+   * Deletes a transaction from local IndexedDB, outbox queue, and remote database.
+   * If the transaction affected equipment power status, recomputes the equipment's power state.
+   */
+  public async deleteTransaction(transactionId: string): Promise<void> {
+    const tx = await db.transactions.get(transactionId);
+
+    // 1. Delete from local database and outbox
+    await db.transactions.delete(transactionId);
+    await db.outbox.delete(transactionId);
+
+    // 2. Track in tombstones so background sync doesn't resurrect it
+    this.deletedTxIds.add(transactionId);
+    this.saveDeletedTxIds();
+
+    // 3. Recalculate equipment power state if this was a power event
+    if (tx && (tx.transactionType === 'PoweredUp' || tx.transactionType === 'PoweredDown')) {
+      const remainingTxs = await db.transactions
+        .where('equipmentId')
+        .equals(tx.equipmentId)
+        .toArray();
+
+      const remainingPowerTxs = remainingTxs
+        .filter((t) => t.id !== transactionId && (t.transactionType === 'PoweredUp' || t.transactionType === 'PoweredDown'))
+        .sort((a, b) => new Date(b.transactionTimestamp).getTime() - new Date(a.transactionTimestamp).getTime());
+
+      const eq = await db.equipments.get(tx.equipmentId);
+      if (eq) {
+        if (remainingPowerTxs.length > 0) {
+          const latest = remainingPowerTxs[0];
+          if (latest.transactionType === 'PoweredUp') {
+            eq.poweredUpTimestamp = latest.transactionTimestamp;
+            delete eq.poweredDownTimestamp;
+          } else {
+            eq.poweredDownTimestamp = latest.transactionTimestamp;
+          }
+        } else {
+          delete eq.poweredUpTimestamp;
+          delete eq.poweredDownTimestamp;
+        }
+        eq.updatedAt = new Date().toISOString();
+        await db.equipments.put(eq);
+      }
+    }
+
+    // 4. Notify UI of local update immediately
+    await this.notify();
+    this.notifyDataChange();
+
+    // 5. Delete from remote server / Supabase
+    if (this.isEffectivelyOnline()) {
+      try {
+        await deleteRemoteTransaction(transactionId);
+        this.deletedTxIds.delete(transactionId);
+        this.saveDeletedTxIds();
+      } catch (err) {
+        console.warn('Could not delete transaction remotely immediately, queued for next sync:', err);
+      }
+    }
+  }
+
   /**
    * Enqueues a newly created transaction into local IndexedDB and the outbox queue.
    * Immediately attempts upload to the shared server.
@@ -171,6 +250,19 @@ class SyncEngine {
       const flushRes = await this.flushOutboxInternal();
       let hadUpdates = flushRes.processed > 0;
 
+      // Purge any pending tombstoned transactions remotely
+      if (this.deletedTxIds.size > 0) {
+        for (const delId of Array.from(this.deletedTxIds)) {
+          try {
+            await deleteRemoteTransaction(delId);
+            this.deletedTxIds.delete(delId);
+          } catch {
+            // Keep in set for next sync attempt
+          }
+        }
+        this.saveDeletedTxIds();
+      }
+
       // Step 2: Download latest transactions and equipment from central server
       const [remoteEquipment, remoteTransactions] = await Promise.all([
         fetchRemoteEquipment().catch((err) => {
@@ -185,15 +277,15 @@ class SyncEngine {
 
       // Step 3: Mirror server state & delete any records that were removed from the server
       if (remoteTransactions && Array.isArray(remoteTransactions)) {
-        const remoteIdSet = new Set(remoteTransactions.map((t) => t.id));
+        const filteredRemote = remoteTransactions.filter((t) => !this.deletedTxIds.has(t.id));
+        const remoteIdSet = new Set(filteredRemote.map((t) => t.id));
         const outboxItems = await db.outbox.toArray();
         const pendingOutboxIdSet = new Set(outboxItems.map((o) => o.id));
 
-        // Delete local transactions that were removed from Supabase/server
-        // (unless they are new items currently waiting in the offline outbox)
+        // Delete local transactions that were removed from Supabase/server or marked deleted
         const allLocal = await db.transactions.toArray();
         const idsToDelete = allLocal
-          .filter((tx) => !remoteIdSet.has(tx.id) && !pendingOutboxIdSet.has(tx.id))
+          .filter((tx) => (!remoteIdSet.has(tx.id) && !pendingOutboxIdSet.has(tx.id)) || this.deletedTxIds.has(tx.id))
           .map((tx) => tx.id);
 
         if (idsToDelete.length > 0) {
@@ -201,8 +293,8 @@ class SyncEngine {
           hadUpdates = true;
         }
 
-        if (remoteTransactions.length > 0) {
-          await db.transactions.bulkPut(remoteTransactions);
+        if (filteredRemote.length > 0) {
+          await db.transactions.bulkPut(filteredRemote);
           hadUpdates = true;
         } else if (allLocal.length > 0 && idsToDelete.length === allLocal.length) {
           await db.transactions.clear();

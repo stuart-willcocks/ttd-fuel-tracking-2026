@@ -485,6 +485,17 @@ export const App: React.FC = () => {
     await syncEngine.syncWithRemote();
   };
 
+  const handleDeleteTransaction = async (transactionId: string) => {
+    try {
+      await syncEngine.deleteTransaction(transactionId);
+      if (currentAsset) {
+        await loadAssetDetails(currentAsset.equipmentId);
+      }
+    } catch (err) {
+      console.error('Error deleting transaction:', err);
+    }
+  };
+
   const renderDesktopToolbar = () => {
     if (!isDesktop) return null;
     return (
@@ -590,6 +601,7 @@ export const App: React.FC = () => {
                 transactions={currentAssetTransactions}
                 onSelectAction={handleSelectAction}
                 onBack={handleBackToScanner}
+                onDeleteTransaction={handleDeleteTransaction}
               />
             ) : (
               <TransactionForm
