@@ -485,6 +485,17 @@ export const App: React.FC = () => {
     await syncEngine.syncWithRemote();
   };
 
+  const handleUpdateTransaction = async (updatedTx: Transaction) => {
+    try {
+      await syncEngine.updateTransaction(updatedTx);
+      if (currentAsset) {
+        await loadAssetDetails(currentAsset.equipmentId);
+      }
+    } catch (err) {
+      console.error('Error updating transaction:', err);
+    }
+  };
+
   const handleDeleteTransaction = async (transactionId: string) => {
     try {
       await syncEngine.deleteTransaction(transactionId);
@@ -601,6 +612,7 @@ export const App: React.FC = () => {
                 transactions={currentAssetTransactions}
                 onSelectAction={handleSelectAction}
                 onBack={handleBackToScanner}
+                onUpdateTransaction={handleUpdateTransaction}
                 onDeleteTransaction={handleDeleteTransaction}
               />
             ) : (

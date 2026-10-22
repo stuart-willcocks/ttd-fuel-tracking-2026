@@ -5,13 +5,14 @@ import type { Equipment, Transaction, ActionType } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
-import { DeleteTransactionModal } from './DeleteTransactionModal';
+import { EditTransactionModal } from './EditTransactionModal';
 
 export interface AssetDetailViewProps {
   asset: Equipment;
   transactions: Transaction[];
   onSelectAction: (action: ActionType) => void;
   onBack: () => void;
+  onUpdateTransaction?: (updatedTx: Transaction) => void | Promise<void>;
   onDeleteTransaction?: (transactionId: string) => void | Promise<void>;
 }
 
@@ -20,12 +21,13 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
   transactions,
   onSelectAction,
   onBack,
+  onUpdateTransaction,
   onDeleteTransaction,
 }) => {
   const isGenerator = asset.type === 'GENERATOR';
 
-  // Delete transaction modal state & long-press detection
-  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  // Edit / Delete transaction modal state & long-press detection
+  const [selectedTransactionForEdit, setSelectedTransactionForEdit] = useState<Transaction | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -48,7 +50,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
         navigator.vibrate?.(50);
       }
-      setTransactionToDelete(tx);
+      setSelectedTransactionForEdit(tx);
     }, 550);
   }, [clearLongPress]);
 
@@ -71,12 +73,17 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
     e.preventDefault();
   }, []);
 
-  const handleConfirmDelete = async () => {
-    if (!transactionToDelete) return;
-    const id = transactionToDelete.id;
-    setTransactionToDelete(null);
+  const handleSaveTransaction = async (updatedTx: Transaction) => {
+    setSelectedTransactionForEdit(null);
+    if (onUpdateTransaction) {
+      await onUpdateTransaction(updatedTx);
+    }
+  };
+
+  const handleDeleteTransaction = async (transactionId: string) => {
+    setSelectedTransactionForEdit(null);
     if (onDeleteTransaction) {
-      await onDeleteTransaction(id);
+      await onDeleteTransaction(transactionId);
     }
   };
 
@@ -295,14 +302,15 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
         </button>
       </div>
 
-      {/* Delete Transaction Confirmation Modal */}
-      {transactionToDelete && (
-        <DeleteTransactionModal
+      {/* Edit / Delete Transaction Modal */}
+      {selectedTransactionForEdit && (
+        <EditTransactionModal
           asset={asset}
-          transaction={transactionToDelete}
-          isOpen={Boolean(transactionToDelete)}
-          onCancel={() => setTransactionToDelete(null)}
-          onConfirm={handleConfirmDelete}
+          transaction={selectedTransactionForEdit}
+          isOpen={Boolean(selectedTransactionForEdit)}
+          onCancel={() => setSelectedTransactionForEdit(null)}
+          onSave={handleSaveTransaction}
+          onDelete={handleDeleteTransaction}
         />
       )}
     </div>

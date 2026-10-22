@@ -233,6 +233,57 @@ class SyncEngine {
   }
 
   /**
+   * Updates an existing transaction in local IndexedDB and adds it to the outbox queue.
+   * If online, immediately triggers an outbox flush to update the record in Supabase.
+   */
+  public async updateTransaction(tx: Transaction): Promise<void> {
+    const updatedTx: Transaction = {
+      ...tx,
+      syncStatus: 'pending',
+    };
+
+    // If it was previously in tombstones, remove it
+    if (this.deletedTxIds.has(tx.id)) {
+      this.deletedTxIds.delete(tx.id);
+      this.saveDeletedTxIds();
+    }
+
+    // 1. Write to local IndexedDB
+    await db.transactions.put(updatedTx);
+
+    // 2. Put in outbox
+    await db.outbox.put({
+      id: updatedTx.id,
+      equipmentId: updatedTx.equipmentId,
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    });
+
+    // 3. Update local equipment power state cleanly if this was a power event
+    const currentEq = await db.equipments.get(updatedTx.equipmentId);
+    if (currentEq) {
+      if (updatedTx.transactionType === 'PoweredUp') {
+        currentEq.poweredUpTimestamp = updatedTx.transactionTimestamp;
+        delete currentEq.poweredDownTimestamp;
+      } else if (updatedTx.transactionType === 'PoweredDown') {
+        currentEq.poweredDownTimestamp = updatedTx.transactionTimestamp;
+      }
+      currentEq.updatedAt = new Date().toISOString();
+      await db.equipments.put(currentEq);
+    }
+
+    await this.notify();
+    this.notifyDataChange();
+
+    // 4. Immediately trigger flush in background if online
+    if (this.isEffectivelyOnline()) {
+      this.flushOutbox().catch((err) => {
+        console.error('Immediate flush error after updating transaction:', err);
+      });
+    }
+  }
+
+  /**
    * Full two-way sync:
    * 1. Flush any pending outbox items from this device to the central server.
    * 2. Pull remote transactions & equipment from the central server and update local IndexedDB.

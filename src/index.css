@@ -2556,3 +2556,163 @@ html.is-desktop-browser .app-root {
 .desktop-launchpad-link-btn:hover {
   color: var(--text-main);
 }
+
+/* ==========================================================================
+   EDIT / DELETE TRANSACTION MODAL
+   ========================================================================== */
+
+.edit-tx-modal {
+  max-width: 360px;
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--bg-page);
+  border-radius: 0px !important;
+  box-sizing: border-box;
+}
+
+.edit-tx-header,
+.delete-tx-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.edit-tx-icon-wrap,
+.delete-tx-icon-wrap {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.edit-tx-icon-wrap {
+  background-color: #EFF6FF;
+  border: 1px solid #BFDBFE;
+}
+
+.delete-tx-icon-wrap {
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+}
+
+.edit-tx-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.edit-tx-asset {
+  color: #111827;
+  font-weight: 800;
+}
+
+.edit-tx-dot {
+  color: #9CA3AF;
+}
+
+.edit-tx-fields-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin: 4px 0;
+}
+
+.edit-tx-power-toggle-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 300px;
+  margin: 10px 0;
+}
+
+.edit-tx-power-btn {
+  flex: 1;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border-medium);
+  background-color: #FFFFFF;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 4px !important;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-tx-power-btn.selected-power-up {
+  background-color: var(--btn-green-bg);
+  color: var(--btn-green-text);
+  border-color: var(--btn-green-border);
+}
+
+.edit-tx-power-btn.selected-power-down {
+  background-color: var(--btn-red-bg);
+  color: var(--btn-red-text);
+  border-color: var(--btn-red-border);
+}
+
+.edit-tx-btn-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 8px;
+}
+
+.btn-modal-action {
+  flex: 1;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-btn);
+  font-size: 13.5px;
+  font-weight: var(--btn-font-weight);
+  letter-spacing: var(--btn-letter-spacing);
+  border-radius: 4px !important;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.15s ease, transform 0.08s ease;
+}
+
+.btn-modal-action:active {
+  transform: scale(0.97);
+}
+
+.btn-modal-action.disabled {
+  background-color: #E5E7EB !important;
+  border: 1px solid var(--border-medium) !important;
+  color: var(--text-dim) !important;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.delete-tx-warning-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #DC2626;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 10px;
+  margin: 10px 0 14px;
+  text-align: left;
+}
+
