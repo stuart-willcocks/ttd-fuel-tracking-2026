@@ -341,8 +341,11 @@ class SyncEngine {
           hadUpdates = true;
         }
 
-        if (filteredRemote.length > 0) {
-          await db.transactions.bulkPut(filteredRemote);
+        // Protect locally pending outbox transactions from being overwritten by stale remote copies
+        const transactionsToApply = filteredRemote.filter((t) => !pendingOutboxIdSet.has(t.id));
+
+        if (transactionsToApply.length > 0) {
+          await db.transactions.bulkPut(transactionsToApply);
           hadUpdates = true;
         } else if (allLocal.length > 0 && idsToDelete.length === allLocal.length) {
           await db.transactions.clear();

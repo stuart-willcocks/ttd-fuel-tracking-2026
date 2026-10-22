@@ -325,14 +325,41 @@ export async function uploadTransactionToCloud(
       device_id: tx.deviceId ?? null,
     };
 
-    let { error: txError } = await client.from('transactions').upsert(payload, { onConflict: 'id' });
+    // Step 2: Save the transaction to Supabase.
+    // Try standard insert first (for new transactions).
+    let { error: txError } = await client.from('transactions').insert(payload);
 
     // If device_id column does not exist yet on remote Supabase table, retry without device_id
     if (txError && (txError as any).code === 'PGRST204' && (txError as any).message?.includes('device_id')) {
       const fallbackPayload = { ...payload };
       delete fallbackPayload.device_id;
-      const retryRes = await client.from('transactions').upsert(fallbackPayload, { onConflict: 'id' });
+      const retryRes = await client.from('transactions').insert(fallbackPayload);
       txError = retryRes.error;
+    }
+
+    // If duplicate key (code 23505) or RLS policy violation on existing row (code 42501):
+    // This is an edit/update to an existing transaction.
+    // Because Supabase anonymous RLS allows DELETE and INSERT but restricts UPDATE,
+    // delete the existing row and insert the updated payload to preserve the exact transaction ID.
+    if (
+      txError &&
+      (txError.code === '23505' ||
+        txError.code === '42501' ||
+        (txError as any).message?.includes('duplicate key') ||
+        (txError as any).message?.includes('already exists') ||
+        (txError as any).message?.includes('row-level security'))
+    ) {
+      await client.from('transactions').delete().eq('id', tx.id);
+
+      const reinsertRes = await client.from('transactions').insert(payload);
+      txError = reinsertRes.error;
+
+      if (txError && (txError as any).code === 'PGRST204' && (txError as any).message?.includes('device_id')) {
+        const fallbackPayload = { ...payload };
+        delete fallbackPayload.device_id;
+        const retryRes = await client.from('transactions').insert(fallbackPayload);
+        txError = retryRes.error;
+      }
     }
 
     if (txError) throw txError;
