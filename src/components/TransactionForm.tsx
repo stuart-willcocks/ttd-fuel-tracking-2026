@@ -243,7 +243,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           )}
         </div>
 
-        <form onSubmit={handleSubmit} noValidate className="old-form-content">
+        <form onSubmit={handleSubmit} noValidate autoComplete="off" className="old-form-content">
           {/* ======================================================= */}
           {/* Generator Check In / Check Out (Screenshot 20250324-201605) */}
           {/* ======================================================= */}
@@ -253,6 +253,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="old-form-lbl">Fuel level</span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   max="100"
                   step="1"
@@ -263,6 +264,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   onFocus={() => setIsInputFocused(true)}
                   onBlur={() => setIsInputFocused(false)}
                   onKeyDown={handleInputKeyDown}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  data-form-type="other"
                 />
                 <span className="old-form-unit">%</span>
               </div>
@@ -271,6 +278,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="old-form-lbl">DEF level</span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   max="100"
                   step="1"
@@ -281,6 +289,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   onFocus={() => setIsInputFocused(true)}
                   onBlur={() => setIsInputFocused(false)}
                   onKeyDown={handleInputKeyDown}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  data-form-type="other"
                 />
                 <span className="old-form-unit">%</span>
               </div>
@@ -289,6 +303,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="old-form-lbl">Meter</span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   step="1"
                   className="old-form-input"
@@ -298,6 +313,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   onFocus={() => setIsInputFocused(true)}
                   onBlur={() => setIsInputFocused(false)}
                   onKeyDown={handleInputKeyDown}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  data-form-type="other"
                 />
                 <span className="old-form-unit">kWh</span>
               </div>
@@ -366,6 +387,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="old-form-lbl">Fuel level</span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   max="100"
                   step="1"
@@ -376,6 +398,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   onFocus={() => setIsInputFocused(true)}
                   onBlur={() => setIsInputFocused(false)}
                   onKeyDown={handleInputKeyDown}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  data-form-type="other"
                 />
                 <span className="old-form-unit">%</span>
               </div>
@@ -391,6 +419,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 <span className="old-form-lbl">Fuel transferred</span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="1"
                   step="1"
                   className="old-form-input"
@@ -400,6 +429,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   onFocus={() => setIsInputFocused(true)}
                   onBlur={() => setIsInputFocused(false)}
                   onKeyDown={handleInputKeyDown}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  data-form-type="other"
                 />
                 <span className="old-form-unit">litres</span>
               </div>
@@ -409,6 +444,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                   <span className="old-form-lbl">DEF transferred</span>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min="0"
                     step="1"
                     className="old-form-input"
@@ -418,6 +454,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                     onFocus={() => setIsInputFocused(true)}
                     onBlur={() => setIsInputFocused(false)}
                     onKeyDown={handleInputKeyDown}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    data-lpignore="true"
+                    data-form-type="other"
                   />
                   <span className="old-form-unit">litres</span>
                 </div>
