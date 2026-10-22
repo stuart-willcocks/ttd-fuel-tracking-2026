@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, Power, PowerOff } from 'lucide-react';
 import { IconCheckIn, IconCheckOut, IconFuel, IconBack } from './icons/AppIcons';
 import type { Equipment, Transaction, ActionType } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
@@ -66,10 +66,18 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
     if (!hasAnyData) {
       if (tx.transactionType === 'PoweredUp') {
-        return <div className="tx-data-row"><span>Status: Powered Up</span></div>;
+        return (
+          <div className="tx-data-row">
+            <span style={{ color: '#16A34A', fontWeight: 700 }}>Status: Powered Up</span>
+          </div>
+        );
       }
       if (tx.transactionType === 'PoweredDown') {
-        return <div className="tx-data-row"><span>Status: Powered Down</span></div>;
+        return (
+          <div className="tx-data-row">
+            <span style={{ color: '#DC2626', fontWeight: 700 }}>Status: Powered Down</span>
+          </div>
+        );
       }
       return null;
     }
@@ -151,10 +159,10 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
                   {renderTransactionData(tx)}
                 </div>
 
-                {/* Uploaded Status: White tick inside filled green circle */}
+                {/* Uploaded Status: White tick inside filled green circle (20% smaller) */}
                 <div className="tx-sync-col" title="Uploaded">
                   <span className="tx-uploaded-circle" aria-label="Uploaded">
-                    <Check size={12} strokeWidth={3.5} className="tx-uploaded-check" />
+                    <Check size={10} strokeWidth={3.5} className="tx-uploaded-check" />
                   </span>
                 </div>
               </div>
@@ -163,24 +171,15 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
         )}
       </div>
 
-      {/* 4. TRANSACTION BUTTONS: Consistent height, width 100%, center justified, modern 8px rounded corners with icons */}
+      {/* 4. TRANSACTION BUTTONS: 2-column grid, full width */}
       <div className="asset-detail-btn-stack">
         <button
           type="button"
           className="btn-pda-rect btn-pda-green"
           onClick={() => onSelectAction('check-in')}
         >
-          <IconCheckIn size={24} />
+          <IconCheckIn size={20} />
           <span>Check In</span>
-        </button>
-
-        <button
-          type="button"
-          className="btn-pda-rect btn-pda-blue"
-          onClick={() => onSelectAction('record-fuel')}
-        >
-          <IconFuel size={24} />
-          <span>Record Fuel Transfer</span>
         </button>
 
         <button
@@ -188,8 +187,35 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           className="btn-pda-rect btn-pda-green"
           onClick={() => onSelectAction('check-out')}
         >
-          <IconCheckOut size={24} />
+          <IconCheckOut size={20} />
           <span>Check Out</span>
+        </button>
+
+        <button
+          type="button"
+          className="btn-pda-rect btn-pda-green"
+          onClick={() => onSelectAction('power-up')}
+        >
+          <Power size={20} />
+          <span>Mark powered up</span>
+        </button>
+
+        <button
+          type="button"
+          className="btn-pda-rect btn-pda-slate"
+          onClick={() => onSelectAction('power-down')}
+        >
+          <PowerOff size={20} />
+          <span>Mark powered down</span>
+        </button>
+
+        <button
+          type="button"
+          className="btn-pda-rect btn-pda-blue"
+          onClick={() => onSelectAction('record-fuel')}
+        >
+          <IconFuel size={20} />
+          <span>Record Fuel Transfer</span>
         </button>
 
         <button
@@ -197,7 +223,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           className="btn-pda-rect btn-pda-red"
           onClick={onBack}
         >
-          <IconBack size={24} />
+          <IconBack size={20} />
           <span>Back</span>
         </button>
       </div>

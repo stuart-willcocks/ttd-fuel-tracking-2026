@@ -12,6 +12,7 @@ import { ConfirmationModal } from './components/ConfirmationModal';
 import { EditAssetModal } from './components/EditAssetModal';
 import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
+import { PowerEventModal } from './components/PowerEventModal';
 import { getDeviceName } from './services/device';
 import { Smartphone, ExternalLink } from 'lucide-react';
 import { DesktopLaunchpad } from './components/DesktopLaunchpad';
@@ -247,6 +248,7 @@ export const App: React.FC = () => {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isOutboxModalOpen, setIsOutboxModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [powerModalType, setPowerModalType] = useState<'PoweredUp' | 'PoweredDown' | null>(null);
 
   const [availableAssets, setAvailableAssets] = useState<Equipment[]>([]);
   const [currentAsset, setCurrentAsset] = useState<Equipment | null>(null);
@@ -441,6 +443,40 @@ export const App: React.FC = () => {
     await loadAssetDetails(currentAsset.equipmentId);
   };
 
+  const handleSelectAction = (action: ActionType) => {
+    if (action === 'power-up') {
+      setPowerModalType('PoweredUp');
+    } else if (action === 'power-down') {
+      setPowerModalType('PoweredDown');
+    } else {
+      setActiveAction(action);
+    }
+  };
+
+  const handleConfirmPowerEvent = async (timestamp: string) => {
+    if (!currentAsset || !powerModalType) return;
+
+    const nowIso = new Date().toISOString();
+    const newTx: Transaction = {
+      id: generateUUID(),
+      equipmentId: currentAsset.equipmentId,
+      transactionTimestamp: timestamp,
+      transactionType: powerModalType,
+      syncStatus: 'pending',
+      deviceId: getDeviceName(),
+      createdAt: nowIso,
+    };
+
+    // Store in IndexedDB and upload to shared central server
+    await syncEngine.queueTransaction(newTx);
+    if (syncEngine.isEffectivelyOnline()) {
+      await syncEngine.flushOutbox();
+    }
+
+    setPowerModalType(null);
+    await loadAssetDetails(currentAsset.equipmentId);
+  };
+
   const handleSaveEditedAsset = async (updated: Equipment) => {
     await db.equipments.put(updated);
     setCurrentAsset(updated);
@@ -541,7 +577,8 @@ export const App: React.FC = () => {
               isSettingsModalOpen ||
               isOutboxModalOpen ||
               isConfirmModalOpen ||
-              isEditingAsset
+              isEditingAsset ||
+              Boolean(powerModalType)
             }
           />
         ) : (
@@ -551,7 +588,7 @@ export const App: React.FC = () => {
               <AssetDetailView
                 asset={currentAsset}
                 transactions={currentAssetTransactions}
-                onSelectAction={(action) => setActiveAction(action)}
+                onSelectAction={handleSelectAction}
                 onBack={handleBackToScanner}
               />
             ) : (
@@ -565,6 +602,17 @@ export const App: React.FC = () => {
           )
         )}
       </main>
+
+      {/* Power Event Modal (Calendar and Time Picker) */}
+      {currentAsset && powerModalType && (
+        <PowerEventModal
+          asset={currentAsset}
+          type={powerModalType}
+          isOpen={Boolean(powerModalType)}
+          onCancel={() => setPowerModalType(null)}
+          onConfirm={handleConfirmPowerEvent}
+        />
+      )}
 
       {/* Confirmation Modal */}
       {currentAsset && pendingTxData && (

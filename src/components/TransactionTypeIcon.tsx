@@ -34,18 +34,18 @@ export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({
     );
   }
 
-  if (t === 'PoweredUp') {
+  if (t === 'PoweredUp' || t === 'power-up') {
     return (
-      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Power Up'}>
-        <Power size={size} className="tx-type-icon icon-powerup" />
+      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Powered Up'} style={{ color: '#16A34A' }}>
+        <Power size={size} color="#16A34A" className="tx-type-icon icon-powerup" />
       </span>
     );
   }
 
-  if (t === 'PoweredDown') {
+  if (t === 'PoweredDown' || t === 'power-down') {
     return (
-      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Power Down'}>
-        <PowerOff size={size} className="tx-type-icon icon-powerdown" />
+      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Powered Down'} style={{ color: '#DC2626' }}>
+        <PowerOff size={size} color="#DC2626" className="tx-type-icon icon-powerdown" />
       </span>
     );
   }
