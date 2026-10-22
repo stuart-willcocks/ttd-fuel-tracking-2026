@@ -123,6 +123,12 @@ export const App: React.FC = () => {
       return;
     }
 
+    // On mobile/PDA, ensure we exit any HTML5 fullscreen mode to prevent Android's
+    // intrusive "To exit full screen, swipe down..." system prompt from covering "Choose from list".
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
+
     const handleFsChange = () => {
       const doc = document as unknown as {
         fullscreenElement?: Element;
@@ -134,33 +140,9 @@ export const App: React.FC = () => {
     document.addEventListener('fullscreenchange', handleFsChange);
     document.addEventListener('webkitfullscreenchange', handleFsChange);
 
-    const handleFirstGesture = () => {
-      if (!isMobileDevice()) return;
-      const doc = document as unknown as {
-        fullscreenElement?: Element;
-        webkitFullscreenElement?: Element;
-      };
-      if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
-        const docEl = document.documentElement as unknown as {
-          requestFullscreen?: () => Promise<void>;
-          webkitRequestFullscreen?: () => Promise<void>;
-        };
-        if (docEl.requestFullscreen) {
-          docEl.requestFullscreen().catch(() => {});
-        } else if (docEl.webkitRequestFullscreen) {
-          docEl.webkitRequestFullscreen().catch(() => {});
-        }
-      }
-    };
-
-    window.addEventListener('click', handleFirstGesture, { once: true });
-    window.addEventListener('touchend', handleFirstGesture, { once: true });
-
     return () => {
       document.removeEventListener('fullscreenchange', handleFsChange);
       document.removeEventListener('webkitfullscreenchange', handleFsChange);
-      window.removeEventListener('click', handleFirstGesture);
-      window.removeEventListener('touchend', handleFirstGesture);
     };
   }, [isMobileDevice]);
 
