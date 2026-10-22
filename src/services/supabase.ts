@@ -115,10 +115,21 @@ export async function deleteTransactionFromSupabase(transactionId: string): Prom
   const client = getSupabaseClient();
   if (!client) return;
 
-  const { error } = await client.from('transactions').delete().eq('id', transactionId);
+  const { error, count } = await client
+    .from('transactions')
+    .delete({ count: 'exact' })
+    .eq('id', transactionId);
+
   if (error) {
     console.error('Error deleting transaction from Supabase:', error);
     throw error;
+  }
+
+  if (count === 0) {
+    console.warn(
+      `[Supabase Warning] Transaction ${transactionId} delete returned count: 0. ` +
+      `Ensure the "Allow delete transactions for anon" policy exists on public.transactions in Supabase.`
+    );
   }
 }
 
@@ -376,9 +387,16 @@ export async function uploadTransactionToCloud(
   }
 }
 
-export const SUPABASE_SQL_MIGRATION = `-- TTD Fuel Tracking: Add device_id tracking to existing tables
+export const SUPABASE_SQL_MIGRATION = `-- TTD Fuel Tracking: Migration to enable transaction deletion and device tracking
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS device_id text;
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS device_id text;
+
+-- Enable delete and update policies so transactions deleted on PDAs are deleted from Supabase
+DROP POLICY IF EXISTS "Allow delete transactions for anon" ON public.transactions;
+CREATE POLICY "Allow delete transactions for anon" ON public.transactions FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Allow update transactions for anon" ON public.transactions;
+CREATE POLICY "Allow update transactions for anon" ON public.transactions FOR UPDATE USING (true) WITH CHECK (true);
 `;
 
 export const SUPABASE_SQL_SCHEMA = `-- TTD Fuel Tracking 2026 - Supabase PostgreSQL Schema
@@ -419,10 +437,6 @@ create table if not exists public.transactions (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- Migration for existing databases:
--- ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS device_id text;
--- ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS device_id text;
-
 -- 3. Indexes for fast query performance across multiple PDAs
 create index if not exists idx_tx_equipment_id on public.transactions(equipment_id);
 create index if not exists idx_tx_timestamp on public.transactions(transaction_timestamp desc);
@@ -431,12 +445,14 @@ create index if not exists idx_tx_timestamp on public.transactions(transaction_t
 alter table public.equipment_list enable row level security;
 alter table public.transactions enable row level security;
 
--- 5. Policies: Devices can read and write records
+-- 5. Policies: Devices can read, write, and delete records
 create policy "Allow read equipment for anon" on public.equipment_list for select using (true);
 create policy "Allow upsert equipment for anon" on public.equipment_list for all using (true);
 
 create policy "Allow read transactions for anon" on public.transactions for select using (true);
 create policy "Allow insert/upsert transactions for anon" on public.transactions for all using (true);
+create policy "Allow update transactions for anon" on public.transactions for update using (true) with check (true);
+create policy "Allow delete transactions for anon" on public.transactions for delete using (true);
 
 -- 6. Insert initial fleet equipment
 insert into public.equipment_list (equipment_id, area, location, what3words, type, capacity, rental_serial_number, powered_up_timestamp)

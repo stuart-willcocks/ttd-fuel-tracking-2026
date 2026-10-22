@@ -182,12 +182,10 @@ class SyncEngine {
     await this.notify();
     this.notifyDataChange();
 
-    // 5. Delete from remote server / Supabase
+    // 5. Delete from remote server / Supabase in background if online
     if (this.isEffectivelyOnline()) {
       try {
         await deleteRemoteTransaction(transactionId);
-        this.deletedTxIds.delete(transactionId);
-        this.saveDeletedTxIds();
       } catch (err) {
         console.warn('Could not delete transaction remotely immediately, queued for next sync:', err);
       }
@@ -250,17 +248,15 @@ class SyncEngine {
       const flushRes = await this.flushOutboxInternal();
       let hadUpdates = flushRes.processed > 0;
 
-      // Purge any pending tombstoned transactions remotely
-      if (this.deletedTxIds.size > 0) {
+      // Attempt remote deletion for all active tombstones
+      if (this.deletedTxIds.size > 0 && this.isEffectivelyOnline()) {
         for (const delId of Array.from(this.deletedTxIds)) {
           try {
             await deleteRemoteTransaction(delId);
-            this.deletedTxIds.delete(delId);
           } catch {
-            // Keep in set for next sync attempt
+            // Keep in tombstone set and retry on next sync
           }
         }
-        this.saveDeletedTxIds();
       }
 
       // Step 2: Download latest transactions and equipment from central server
@@ -275,14 +271,15 @@ class SyncEngine {
         }),
       ]);
 
-      // Step 3: Mirror server state & delete any records that were removed from the server
+      // Step 3: Mirror server state & ensure deleted transactions are never re-inserted
       if (remoteTransactions && Array.isArray(remoteTransactions)) {
+        // Exclude all tombstoned transactions so they CANNOT be re-inserted into IndexedDB
         const filteredRemote = remoteTransactions.filter((t) => !this.deletedTxIds.has(t.id));
         const remoteIdSet = new Set(filteredRemote.map((t) => t.id));
         const outboxItems = await db.outbox.toArray();
         const pendingOutboxIdSet = new Set(outboxItems.map((o) => o.id));
 
-        // Delete local transactions that were removed from Supabase/server or marked deleted
+        // Delete local transactions that were removed from Supabase/server or marked deleted locally
         const allLocal = await db.transactions.toArray();
         const idsToDelete = allLocal
           .filter((tx) => (!remoteIdSet.has(tx.id) && !pendingOutboxIdSet.has(tx.id)) || this.deletedTxIds.has(tx.id))
@@ -299,6 +296,19 @@ class SyncEngine {
         } else if (allLocal.length > 0 && idsToDelete.length === allLocal.length) {
           await db.transactions.clear();
           hadUpdates = true;
+        }
+
+        // Retire tombstones ONLY when the remote server confirms it no longer returns the record
+        const actualRemoteIds = new Set(remoteTransactions.map((t) => t.id));
+        let tombstonesChanged = false;
+        for (const delId of Array.from(this.deletedTxIds)) {
+          if (!actualRemoteIds.has(delId)) {
+            this.deletedTxIds.delete(delId);
+            tombstonesChanged = true;
+          }
+        }
+        if (tombstonesChanged) {
+          this.saveDeletedTxIds();
         }
       }
 
