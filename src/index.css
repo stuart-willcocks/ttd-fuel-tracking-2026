@@ -1486,55 +1486,6 @@ html.is-desktop-browser .app-root {
   -webkit-user-select: none;
 }
 
-.inapp-numpad-quick-row {
-  display: grid;
-  gap: 6px;
-  width: 100%;
-}
-
-.inapp-quick-btn {
-  height: 34px;
-  background-color: #FFFFFF;
-  border: 1px solid var(--border-medium);
-  color: var(--text-main);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  font-weight: 700;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  cursor: pointer;
-  touch-action: manipulation;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  transition: background-color 0.1s ease, transform 0.05s ease;
-}
-
-.inapp-quick-btn:hover {
-  background-color: #F9FAFB;
-}
-
-.inapp-quick-btn:active {
-  background-color: #E5E7EB;
-  transform: scale(0.97);
-}
-
-.inapp-quick-btn.inapp-quick-next {
-  background-color: var(--btn-blue-bg);
-  border-color: var(--btn-blue-border);
-  color: #FFFFFF;
-  font-family: var(--font-btn);
-  font-size: 12.5px;
-}
-
-.inapp-quick-btn.inapp-quick-next:hover {
-  background-color: var(--btn-blue-hover);
-}
-
-.inapp-quick-btn.inapp-quick-next:active {
-  background-color: var(--btn-blue-active);
-}
 
 .inapp-numpad-grid {
   display: grid;

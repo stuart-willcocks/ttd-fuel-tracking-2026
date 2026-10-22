@@ -205,49 +205,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     }
   }, [activeField, formFields]);
 
-  const handleQuickSelect = useCallback(
-    (item: { label: string; value: string | number; isDelta?: boolean }) => {
-      if (!activeField) return;
-
-      if (activeField === 'fuelPercentage') {
-        setFuelPercentage(String(item.value));
-      } else if (activeField === 'defPercentage') {
-        setDefPercentage(String(item.value));
-      } else if (activeField === 'fuelLitres' || activeField === 'defLitres') {
-        const setter = activeField === 'fuelLitres' ? setFuelLitres : setDefLitres;
-        if (item.isDelta) {
-          setter((prev) => {
-            const current = parseInt(prev, 10) || 0;
-            return String(current + Number(item.value));
-          });
-        } else {
-          setter(String(item.value));
-        }
-      }
-    },
-    [activeField]
-  );
-
-  // Quick buttons configured for the active field
-  const quickButtons = useMemo(() => {
-    if (activeField === 'fuelPercentage' || activeField === 'defPercentage') {
-      return [
-        { label: '25%', value: '25' },
-        { label: '50%', value: '50' },
-        { label: '75%', value: '75' },
-        { label: '100%', value: '100' },
-      ];
-    }
-    if (activeField === 'fuelLitres' || activeField === 'defLitres') {
-      return [
-        { label: '+50L', value: 50, isDelta: true },
-        { label: '+100L', value: 100, isDelta: true },
-        { label: '+250L', value: 250, isDelta: true },
-        { label: '+500L', value: 500, isDelta: true },
-      ];
-    }
-    return undefined;
-  }, [activeField]);
 
   // Support physical keyboard entry on desktop workstations / laptops
   useEffect(() => {
@@ -555,10 +512,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               onDigit={handleNumpadDigit}
               onBackspace={handleNumpadBackspace}
               onClear={handleNumpadClear}
-              onNext={formFields.length > 1 ? handleNumpadNext : undefined}
-              isLastField={activeField === formFields[formFields.length - 1]}
-              quickButtons={quickButtons}
-              onQuickSelect={handleQuickSelect}
             />
           )}
 
