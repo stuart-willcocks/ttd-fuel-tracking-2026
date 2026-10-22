@@ -9,11 +9,11 @@
    ========================================================================== */
 
 :root {
-  /* Clean White Surfaces */
-  --adm-bg: #FFFFFF;
+  /* Clean Light Grey Surfaces */
+  --adm-bg: #F3F4F6;
   --adm-surface-1: #F8FAFC;
-  --adm-surface-2: #FFFFFF;
-  --adm-surface-3: #F1F5F9;
+  --adm-surface-2: #F3F4F6;
+  --adm-surface-3: #E5E7EB;
   --adm-card-bg: #FFFFFF;
   --adm-card-hover: #F8FAFC;
 
@@ -684,7 +684,7 @@ body.admin-body {
 }
 
 .admin-modal-panel {
-  background: #FFFFFF;
+  background: var(--adm-bg);
   border: 1px solid var(--adm-border-subtle);
   border-radius: 0px !important;
   width: 100%;

@@ -71,14 +71,14 @@
   --btn-light-text: #FFFFFF;
   --btn-light-border: #2563EB;
 
-  /* Clean Simple White Background Surfaces */
-  --bg-page: #FFFFFF;
+  /* Clean Light Grey Background Surfaces (#F3F4F6) */
+  --bg-page: #F3F4F6;
   --bg-scan-page: #F3F4F6;
-  --bg-header: #FFFFFF;
-  --bg-banner: #FFFFFF;
-  --bg-surface: #FFFFFF;
-  --bg-surface-hover: #F8FAFC;
-  --bg-surface-alt: #F9FAFB;
+  --bg-header: #F3F4F6;
+  --bg-banner: #F3F4F6;
+  --bg-surface: #F3F4F6;
+  --bg-surface-hover: #E5E7EB;
+  --bg-surface-alt: rgba(0, 0, 0, 0.035);
   --border-subtle: #E5E7EB;
   --border-medium: #D1D5DB;
   --border-strong: #9CA3AF;
@@ -217,7 +217,7 @@ html.is-desktop-browser .app-root {
   border-radius: 0px !important;
   box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
   flex-shrink: 0;
-  background-color: #FFFFFF;
+  background-color: var(--bg-page);
 }
 
 /* Desktop PDA Toolbar */
@@ -321,7 +321,7 @@ html.is-desktop-browser .app-root {
     border-radius: 0px !important;
     box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
     flex-shrink: 0;
-    background-color: #FFFFFF;
+    background-color: var(--bg-page);
   }
 }
 
@@ -336,7 +336,7 @@ html.is-desktop-browser .app-root {
   align-items: center;
   justify-content: space-between;
   padding: 8px 14px;
-  background-color: #FFFFFF;
+  background-color: var(--bg-header);
   color: var(--text-main);
   min-height: 48px;
   border-bottom: 1px solid var(--border-subtle);
@@ -521,7 +521,7 @@ html.is-desktop-browser .app-root {
    ========================================================================== */
 
 .app-root.splash-screen-root {
-  background-color: #EC721E;
+  background-color: #EC721E !important;
   border-left: none;
   border-right: none;
 }
@@ -530,7 +530,7 @@ html.is-desktop-browser .app-root {
   --splash-grey: #F8F9FA;
   width: 100%;
   height: 100%;
-  background-color: #EC721E;
+  background-color: #EC721E !important;
   color: var(--splash-grey);
   display: flex;
   flex-direction: column;
@@ -767,7 +767,7 @@ html.is-desktop-browser .app-root {
   flex-shrink: 0;
   width: 100%;
   padding: 10px 12px;
-  background-color: #FFFFFF;
+  background-color: var(--bg-page);
   border-top: 1px solid var(--border-subtle);
   box-sizing: border-box;
   border-radius: 0px !important;
@@ -867,7 +867,7 @@ html.is-desktop-browser .app-root {
 /* 2. METADATA SECTION: Rectangular Card Container (no radiused corners) */
 .asset-detail-meta-box {
   flex-shrink: 0;
-  background-color: #FFFFFF;
+  background-color: var(--bg-page);
   padding: 10px 14px;
   text-align: center;
   display: flex;
@@ -941,7 +941,7 @@ html.is-desktop-browser .app-root {
   align-items: center;
   gap: 10px;
   padding: 6px 12px;
-  background-color: #FFFFFF;
+  background-color: var(--bg-page);
   border: none !important;
   border-radius: 0px !important;
   box-shadow: none !important;
@@ -1035,7 +1035,7 @@ html.is-desktop-browser .app-root {
   grid-template-columns: repeat(2, 1fr);
   gap: 6px;
   padding: 8px 10px;
-  background-color: #FFFFFF;
+  background-color: var(--bg-page);
   border-top: 1px solid var(--border-subtle);
   box-sizing: border-box;
   border-radius: 0px !important;
@@ -1391,7 +1391,7 @@ html.is-desktop-browser .app-root {
 .old-form-input {
   width: 110px;
   height: 44px;
-  background-color: #FFFFFF;
+  background-color: #FFFFFF !important;
   border: 1px solid var(--border-medium);
   color: var(--text-main);
   font-size: 17px;
@@ -1404,7 +1404,7 @@ html.is-desktop-browser .app-root {
 
 .old-form-input:focus {
   outline: none;
-  background-color: #FFFFFF;
+  background-color: #FFFFFF !important;
   border-color: var(--btn-blue-bg);
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
@@ -1567,7 +1567,7 @@ html.is-desktop-browser .app-root {
 .modal-box {
   width: 100%;
   max-width: 440px;
-  background: #FFFFFF;
+  background: var(--bg-page);
   color: var(--text-main);
   border: 1px solid var(--border-subtle);
   border-radius: 0px !important;
@@ -1639,7 +1639,7 @@ html.is-desktop-browser .app-root {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-main);
-  background-color: #FFFFFF;
+  background-color: #FFFFFF !important;
   border: 1px solid var(--border-medium);
   border-radius: 4px;
   box-sizing: border-box;
@@ -1648,6 +1648,7 @@ html.is-desktop-browser .app-root {
 .power-datetime-input:focus {
   outline: none;
   border-color: #2563EB;
+  background-color: #FFFFFF !important;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
@@ -1711,7 +1712,7 @@ html.is-desktop-browser .app-root {
   display: flex;
   flex-direction: column;
   padding: 10px 10px 8px;
-  background-color: #FFFFFF;
+  background-color: var(--bg-page);
   border: none;
   border-radius: 0px !important;
   overflow: hidden;
@@ -1721,7 +1722,7 @@ html.is-desktop-browser .app-root {
 .picker-pinned-top {
   flex-shrink: 0;
   width: 100%;
-  background-color: #FFFFFF;
+  background-color: var(--bg-page);
   z-index: 10;
 }
 
@@ -1869,7 +1870,7 @@ html.is-desktop-browser .app-root {
 .picker-search-input {
   width: 100%;
   height: 42px;
-  background-color: #FFFFFF;
+  background-color: #FFFFFF !important;
   border: 1px solid var(--border-medium);
   color: var(--text-main);
   padding: 0 40px 0 34px;
@@ -1882,7 +1883,7 @@ html.is-desktop-browser .app-root {
 .picker-search-input:focus {
   outline: none;
   border-color: var(--btn-blue-bg);
-  background-color: #FFFFFF;
+  background-color: #FFFFFF !important;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
@@ -1935,7 +1936,7 @@ html.is-desktop-browser .app-root {
   min-height: 0;
   overflow-y: auto;
   border: 1px solid var(--border-subtle);
-  background: #FFFFFF;
+  background: var(--bg-page);
   margin-bottom: 8px;
   width: 100%;
   border-radius: 0px !important;
@@ -1948,7 +1949,7 @@ html.is-desktop-browser .app-root {
   padding: 10px 10px;
   border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
-  background: #FFFFFF;
+  background: var(--bg-page);
   transition: background-color 0.1s ease;
   white-space: nowrap;
   gap: 10px;
@@ -2034,7 +2035,7 @@ html.is-desktop-browser .app-root {
 
 .values-table-wrap {
   margin-bottom: 16px;
-  background: #FFFFFF;
+  background: var(--bg-page);
   border: 1px solid var(--border-subtle);
   border-radius: 0px !important;
   padding: 8px 12px;
@@ -2100,7 +2101,7 @@ html.is-desktop-browser .app-root {
 }
 
 .settings-device-card {
-  background-color: #FFFFFF;
+  background-color: var(--bg-page);
   border: 1px solid var(--border-subtle);
   border-radius: 0px !important;
   padding: 14px 16px;
@@ -2153,7 +2154,7 @@ html.is-desktop-browser .app-root {
   flex: 1;
   min-width: 0;
   height: 42px;
-  background-color: #FFFFFF;
+  background-color: #FFFFFF !important;
   border: 1.5px solid var(--border-medium);
   border-radius: 0px !important;
   padding: 0 12px;
@@ -2196,7 +2197,7 @@ html.is-desktop-browser .app-root {
 }
 
 .settings-version-card {
-  background-color: #FFFFFF;
+  background-color: var(--bg-page);
   border: 1px solid var(--border-subtle);
   border-radius: 0px !important;
   padding: 20px 16px;
@@ -2249,7 +2250,7 @@ html.is-desktop-browser .app-root {
 
 .queue-row {
   padding: 10px 12px;
-  background: #FFFFFF;
+  background: var(--bg-page);
   border: 1px solid var(--border-subtle);
   border-radius: 0px !important;
   display: flex;
@@ -2289,7 +2290,7 @@ html.is-desktop-browser .app-root {
 
 .edit-form .text-input {
   height: 42px;
-  background-color: #FFFFFF;
+  background-color: #FFFFFF !important;
   border: 1px solid var(--border-medium);
   color: var(--text-main);
   padding: 0 12px;
