@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Power, PowerOff, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Power, PowerOff } from 'lucide-react';
 import { IconCancel } from './icons/AppIcons';
 import type { Equipment } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
@@ -12,11 +12,6 @@ interface PowerEventModalProps {
   onConfirm: (timestamp: string) => void;
 }
 
-function getLocalDateTimeString(date: Date = new Date()): string {
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
-
 export const PowerEventModal: React.FC<PowerEventModalProps> = ({
   asset,
   type,
@@ -24,35 +19,24 @@ export const PowerEventModal: React.FC<PowerEventModalProps> = ({
   onCancel,
   onConfirm,
 }) => {
-  const [selectedDateTime, setSelectedDateTime] = useState<string>(getLocalDateTimeString);
+  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setCurrentTime(new Date());
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const isPowerUp = type === 'PoweredUp';
 
-  const handleResetToNow = () => {
-    setSelectedDateTime(getLocalDateTimeString(new Date()));
-  };
-
   const handleConfirm = () => {
-    if (!selectedDateTime) {
-      onConfirm(new Date().toISOString());
-      return;
-    }
-    const d = new Date(selectedDateTime);
-    const isoString = isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-    onConfirm(isoString);
+    onConfirm(new Date().toISOString());
   };
-
-  const displayFormatted = (() => {
-    try {
-      if (!selectedDateTime) return '—';
-      const d = new Date(selectedDateTime);
-      return isNaN(d.getTime()) ? '—' : formatPdaTimestamp(d);
-    } catch {
-      return '—';
-    }
-  })();
 
   return (
     <div className="modal-backdrop">
@@ -78,34 +62,11 @@ export const PowerEventModal: React.FC<PowerEventModalProps> = ({
           </div>
         </div>
 
-        {/* Picker section */}
+        {/* Current UK Time Display */}
         <div className="power-modal-content">
-          <label className="power-modal-label" htmlFor="power-datetime-input">
-            <Calendar size={16} />
-            <span>Select Date and Time</span>
-          </label>
-
-          <div className="power-input-row">
-            <input
-              id="power-datetime-input"
-              type="datetime-local"
-              className="power-datetime-input"
-              value={selectedDateTime}
-              onChange={(e) => setSelectedDateTime(e.target.value)}
-            />
-            <button
-              type="button"
-              className="btn-power-now"
-              onClick={handleResetToNow}
-              title="Reset to current date and time"
-            >
-              Current Time
-            </button>
-          </div>
-
           <div className="power-preview-card">
-            <span className="power-preview-label">Recorded Time:</span>
-            <span className="power-preview-value">{displayFormatted}</span>
+            <span className="power-preview-label">Current UK Time</span>
+            <span className="power-preview-value">{formatPdaTimestamp(currentTime)}</span>
           </div>
         </div>
 
