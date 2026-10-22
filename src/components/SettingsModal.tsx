@@ -1,6 +1,7 @@
-import React from 'react';
-import { X, Sparkles, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Sparkles, CheckCircle2, Smartphone, Check } from 'lucide-react';
 import { APP_VERSION } from '../version';
+import { getDeviceId, setDeviceId } from '../services/device';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -17,7 +18,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   availableVersion,
   onUpdate,
 }) => {
+  const [deviceIdInput, setDeviceIdInput] = useState<string>('');
+  const [isSaved, setIsSaved] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setDeviceIdInput(getDeviceId());
+      setIsSaved(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const handleSaveDeviceId = (valToSave?: string) => {
+    const val = (valToSave !== undefined ? valToSave : deviceIdInput).trim();
+    if (val) {
+      setDeviceId(val);
+      setDeviceIdInput(val);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 2000);
+    }
+  };
+
+  const handleDeviceIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setDeviceIdInput(val);
+    if (val.trim()) {
+      setDeviceId(val.trim());
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 1500);
+    }
+  };
 
   const formatVersionTag = (v: string | number) => {
     const s = String(v).trim();
@@ -49,6 +80,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
+        {/* Device ID Display & Edit */}
+        <div className="settings-device-card">
+          <div className="settings-card-label-row">
+            <Smartphone size={16} className="settings-card-icon" />
+            <span className="settings-card-label">Device ID</span>
+            {isSaved && (
+              <span className="settings-saved-pill">
+                <Check size={12} />
+                <span>Saved</span>
+              </span>
+            )}
+          </div>
+          <div className="settings-input-row">
+            <input
+              type="text"
+              className="settings-device-input"
+              value={deviceIdInput}
+              onChange={handleDeviceIdChange}
+              onBlur={() => handleSaveDeviceId()}
+              placeholder="e.g. TC26-01"
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              className="btn-pda-rect btn-pda-blue settings-device-save-btn"
+              onClick={() => handleSaveDeviceId()}
+            >
+              Save
+            </button>
+          </div>
+          <div className="settings-card-helper">
+            Identifies all transactions uploaded from this handheld unit.
+          </div>
+        </div>
+
+        {/* App Version & Update Card */}
         <div className="settings-version-card">
           <div className="settings-version-status-row">
             {hasUpdate ? (
@@ -70,12 +138,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           )}
         </div>
 
-        {/* Retain only the Close button at the bottom */}
+        {/* Close Button */}
         <div className="modal-buttons-row">
           <button
             type="button"
             className="btn-pda-rect btn-pda-blue"
-            onClick={onClose}
+            onClick={() => {
+              handleSaveDeviceId();
+              onClose();
+            }}
           >
             Close
           </button>

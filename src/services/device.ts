@@ -27,6 +27,19 @@ export function getDeviceId(): string {
   }
   return id;
 }
+/**
+ * Sets a custom permanent device identifier for this PDA installation.
+ * Also synchronizes the display device name.
+ */
+export function setDeviceId(id: string): void {
+  if (typeof window === 'undefined') return;
+
+  const trimmed = id.trim();
+  if (trimmed) {
+    localStorage.setItem(STORAGE_KEY_DEVICE_ID, trimmed);
+    localStorage.setItem(STORAGE_KEY_DEVICE_NAME, trimmed);
+  }
+}
 
 /**
  * Returns the configurable display name for this PDA (e.g. "PDA 1", "PDA 2", or auto-generated ID).
