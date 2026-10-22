@@ -1,5 +1,5 @@
 import React from 'react';
-import { Droplet, Zap, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { IconCheckIn, IconCheckOut, IconFuel, IconBack } from './icons/AppIcons';
 import type { Equipment, Transaction, ActionType } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
@@ -36,19 +36,11 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       return (
         <div className="tx-data-row">
           <span className="tx-data-item">
-            <IconFuel size={24} color="#2563EB" className="data-icon icon-fuel" />
-            <span>
-              Fuel{' '}
-              {tx.fuelTransferLitres !== undefined
-                ? `${tx.fuelTransferLitres}.0`
-                : '0.0'}{' '}
-              litres
-            </span>
+            Fuel: {tx.fuelTransferLitres !== undefined ? `${tx.fuelTransferLitres}L` : '0L'}
           </span>
           {tx.defTransferLitres !== undefined && (
             <span className="tx-data-item">
-              <Droplet size={13} className="data-icon icon-def" />
-              <span>DEF {tx.defTransferLitres}.0 litres</span>
+              DEF: {tx.defTransferLitres}L
             </span>
           )}
         </div>
@@ -86,22 +78,17 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       <div className="tx-data-row">
         {(fuelPct !== undefined || fuelEighths !== undefined) && (
           <span className="tx-data-item">
-            <IconFuel size={24} color="#2563EB" className="data-icon icon-fuel" />
-            <span>
-              Fuel {fuelPct !== undefined ? `${fuelPct}%` : `${fuelEighths}/8`}
-            </span>
+            Fuel: {fuelPct !== undefined ? `${fuelPct}%` : `${fuelEighths}/8`}
           </span>
         )}
         {defPct !== undefined && (
           <span className="tx-data-item">
-            <Droplet size={13} className="data-icon icon-def" />
-            <span>DEF {defPct}%</span>
+            DEF: {defPct}%
           </span>
         )}
         {kwh !== undefined && (
           <span className="tx-data-item">
-            <Zap size={13} className="data-icon icon-kwh" />
-            <span>{kwh} kWh</span>
+            kWh: {kwh}
           </span>
         )}
       </div>
@@ -164,9 +151,11 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
                   {renderTransactionData(tx)}
                 </div>
 
-                {/* Sync Status: Green Tick */}
-                <div className="tx-sync-col" title="Sync Status: Green Tick">
-                  <Check size={18} strokeWidth={3} className="sync-green-tick" />
+                {/* Uploaded Status: White tick inside filled green circle */}
+                <div className="tx-sync-col" title="Uploaded">
+                  <span className="tx-uploaded-circle" aria-label="Uploaded">
+                    <Check size={12} strokeWidth={3.5} className="tx-uploaded-check" />
+                  </span>
                 </div>
               </div>
             ))}

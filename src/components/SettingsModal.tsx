@@ -18,22 +18,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   availableVersion,
   onUpdate,
 }) => {
+  const [savedDeviceId, setSavedDeviceId] = useState<string>('');
   const [deviceIdInput, setDeviceIdInput] = useState<string>('');
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen) {
-      setDeviceIdInput(getDeviceId());
+      const current = getDeviceId();
+      setDeviceIdInput(current);
+      setSavedDeviceId(current);
       setIsSaved(false);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSaveDeviceId = (valToSave?: string) => {
-    const val = (valToSave !== undefined ? valToSave : deviceIdInput).trim();
-    if (val) {
+  const isDirty = deviceIdInput.trim() !== savedDeviceId && deviceIdInput.trim().length > 0;
+
+  const handleSaveDeviceId = () => {
+    const val = deviceIdInput.trim();
+    if (val && isDirty) {
       setDeviceId(val);
+      setSavedDeviceId(val);
       setDeviceIdInput(val);
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 2000);
@@ -41,13 +47,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleDeviceIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setDeviceIdInput(val);
-    if (val.trim()) {
-      setDeviceId(val.trim());
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 1500);
-    }
+    setDeviceIdInput(e.target.value);
   };
 
   const formatVersionTag = (v: string | number) => {
@@ -98,15 +98,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               className="settings-device-input"
               value={deviceIdInput}
               onChange={handleDeviceIdChange}
-              onBlur={() => handleSaveDeviceId()}
               placeholder="e.g. TC26-01"
               spellCheck={false}
               autoComplete="off"
             />
             <button
               type="button"
+              disabled={!isDirty}
               className="btn-pda-rect btn-pda-blue settings-device-save-btn"
-              onClick={() => handleSaveDeviceId()}
+              onClick={handleSaveDeviceId}
             >
               Save
             </button>
@@ -143,10 +143,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             type="button"
             className="btn-pda-rect btn-pda-blue"
-            onClick={() => {
-              handleSaveDeviceId();
-              onClose();
-            }}
+            onClick={onClose}
           >
             Close
           </button>

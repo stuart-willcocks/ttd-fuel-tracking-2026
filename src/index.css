@@ -711,7 +711,7 @@ html.is-desktop-browser .app-root {
   width: 100%;
   height: 52px;
   background-color: #FFFFFF;
-  border: 2px solid var(--btn-blue-bg) !important;
+  border: 1px solid var(--border-medium) !important;
   color: #111827;
   font-family: var(--font-equipment-id);
   font-size: 24px;
@@ -724,15 +724,15 @@ html.is-desktop-browser .app-root {
   align-items: center;
   justify-content: center;
   border-radius: 0px !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: none !important;
 }
 
 .old-scan-input:focus {
   outline: none;
-  border: 2px solid var(--btn-blue-bg) !important;
+  border: 1px solid var(--border-medium) !important;
   background-color: #FFFFFF;
   color: #111827;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18) !important;
+  box-shadow: none !important;
 }
 
 .old-scan-input::placeholder {
@@ -826,9 +826,9 @@ html.is-desktop-browser .app-root {
 .asset-detail-id-box {
   position: relative;
   background-color: #FFFFFF !important;
-  border: 2px solid var(--btn-blue-bg) !important;
+  border: 1px solid var(--border-medium) !important;
   border-radius: 0px !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: none !important;
 }
 
 .asset-detail-id-icon {
@@ -975,34 +975,21 @@ html.is-desktop-browser .app-root {
 .tx-data-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   font-size: 12.5px;
   color: var(--text-muted);
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tx-data-item {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-}
-
-.data-icon {
-  display: inline-block;
-  vertical-align: middle;
-}
-
-.icon-fuel {
-  color: var(--btn-blue-bg);
-}
-
-.icon-def {
-  color: #0284C7;
-}
-
-.icon-kwh {
-  color: var(--btn-blue-bg);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tx-sync-col {
@@ -1010,11 +997,23 @@ html.is-desktop-browser .app-root {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-left: 4px;
+  padding-left: 6px;
 }
 
-.sync-green-tick {
-  color: var(--btn-green-bg) !important;
+.tx-uploaded-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50% !important;
+  background-color: var(--btn-green-bg, #16A34A);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tx-uploaded-check {
+  color: #FFFFFF !important;
+  stroke: #FFFFFF !important;
 }
 
 .tx-empty-state {
@@ -2023,6 +2022,16 @@ html.is-desktop-browser .app-root {
   width: auto !important;
   flex-shrink: 0;
   font-weight: 700 !important;
+}
+
+.settings-device-save-btn:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  background-color: #E5E7EB !important;
+  border-color: #D1D5DB !important;
+  color: #9CA3AF !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 .settings-card-helper {
