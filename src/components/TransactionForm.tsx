@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Minus, Plus, Keyboard, ChevronDown } from 'lucide-react';
 import { IconSubmit, IconCancel } from './icons/AppIcons';
 import type { Equipment, ActionType, Transaction, TransactionType } from '../types';
@@ -31,6 +31,18 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [defLitres, setDefLitres] = useState<string>('');
   const [isKeyboardVisible, setIsKeyboardVisible] = useState<boolean>(false);
   const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
+
+  const firstInputRef = useRef<HTMLInputElement>(null);
+
+  // Ensure the uppermost text box receives focus when any transaction view is opened
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (firstInputRef.current) {
+        firstInputRef.current.focus();
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Title matching Screenshot_20250324-201605.png & Screenshot_20261019-112955.png
   const actionTitle = useMemo(() => {
@@ -223,24 +235,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
       {/* 2. FORM BODY */}
       <div className="old-form-body" onClick={handleContainerClick}>
-        {/* Header bar with Action Title & inline Hide Keyboard button */}
+        {/* Header bar with Action Title */}
         <div className="old-form-header-bar">
           <h2 className="old-form-title">{actionTitle}</h2>
-          {isKeyboardVisible && (
-            <button
-              type="button"
-              className="form-hide-kb-btn"
-              onClick={dismissKeyboard}
-              onMouseDown={(e) => e.preventDefault()}
-              onTouchStart={(e) => e.preventDefault()}
-              title="Hide keyboard"
-              aria-label="Hide keyboard"
-            >
-              <Keyboard size={16} />
-              <span>Hide keyboard</span>
-              <ChevronDown size={12} />
-            </button>
-          )}
         </div>
 
         <form onSubmit={handleSubmit} noValidate autoComplete="off" className="old-form-content">
@@ -252,6 +249,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               <div className="old-form-row">
                 <span className="old-form-lbl">Fuel level</span>
                 <input
+                  ref={firstInputRef}
+                  autoFocus
                   type="number"
                   inputMode="numeric"
                   min="0"
@@ -386,6 +385,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               <div className="old-form-row">
                 <span className="old-form-lbl">Fuel level</span>
                 <input
+                  ref={firstInputRef}
+                  autoFocus
                   type="number"
                   inputMode="numeric"
                   min="0"
@@ -418,6 +419,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               <div className="old-form-row">
                 <span className="old-form-lbl">Fuel transferred</span>
                 <input
+                  ref={firstInputRef}
+                  autoFocus
                   type="number"
                   inputMode="numeric"
                   min="1"
