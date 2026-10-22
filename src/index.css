@@ -73,6 +73,7 @@
 
   /* Clean Simple White Background Surfaces */
   --bg-page: #FFFFFF;
+  --bg-scan-page: #F3F4F6;
   --bg-header: #FFFFFF;
   --bg-banner: #FFFFFF;
   --bg-surface: #FFFFFF;
@@ -688,7 +689,7 @@ html.is-desktop-browser .app-root {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background-color: var(--bg-page);
+  background-color: var(--bg-scan-page);
   justify-content: space-between;
 }
 
@@ -710,7 +711,7 @@ html.is-desktop-browser .app-root {
 .old-scan-input {
   width: 100%;
   height: 52px;
-  background-color: #FFFFFF;
+  background-color: #FFFFFF !important;
   border: 1px solid var(--border-medium) !important;
   color: #111827;
   font-family: var(--font-equipment-id);
@@ -730,7 +731,7 @@ html.is-desktop-browser .app-root {
 .old-scan-input:focus {
   outline: none;
   border: 1px solid var(--border-medium) !important;
-  background-color: #FFFFFF;
+  background-color: #FFFFFF !important;
   color: #111827;
   box-shadow: none !important;
 }
