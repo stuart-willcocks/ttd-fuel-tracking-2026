@@ -288,6 +288,49 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     onSubmitValues(txData);
   };
 
+  const renderInputField = (
+    label: string,
+    field: FormField,
+    value: string,
+    unit: string
+  ) => {
+    const isActive = activeField === field;
+
+    return (
+      <div
+        key={field}
+        className="old-form-row"
+        onClick={() => setActiveField(field)}
+      >
+        <span className="old-form-lbl">{label}</span>
+        <div
+          className={`old-form-input-box ${isActive ? 'is-active' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveField(field);
+          }}
+          role="textbox"
+          aria-label={label}
+          tabIndex={0}
+        >
+          <span className="old-form-display-val">{value}</span>
+          {isActive && <span className="old-form-caret" aria-hidden="true" />}
+          <input
+            type="text"
+            inputMode="none"
+            readOnly
+            tabIndex={-1}
+            aria-hidden="true"
+            className="old-form-hidden-input"
+            value={value}
+            onChange={() => {}}
+          />
+        </div>
+        <span className="old-form-unit">{unit}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="old-screen-container transaction-form-container">
       {/* 1. TOP: Matches placement and styling of scan view text box */}
@@ -313,65 +356,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           {/* ======================================================= */}
           {(action === 'check-in' || action === 'check-out') && isGen && (
             <div className="old-form-grid">
-              <div
-                className={`old-form-row ${activeField === 'fuelPercentage' ? 'row-selected' : ''}`}
-                onClick={() => setActiveField('fuelPercentage')}
-              >
-                <span className="old-form-lbl">Fuel level</span>
-                <input
-                  type="text"
-                  inputMode="none"
-                  readOnly
-                  className={`old-form-input ${activeField === 'fuelPercentage' ? 'is-active' : ''}`}
-                  placeholder="0"
-                  value={fuelPercentage}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveField('fuelPercentage');
-                  }}
-                />
-                <span className="old-form-unit">%</span>
-              </div>
-
-              <div
-                className={`old-form-row ${activeField === 'defPercentage' ? 'row-selected' : ''}`}
-                onClick={() => setActiveField('defPercentage')}
-              >
-                <span className="old-form-lbl">DEF level</span>
-                <input
-                  type="text"
-                  inputMode="none"
-                  readOnly
-                  className={`old-form-input ${activeField === 'defPercentage' ? 'is-active' : ''}`}
-                  placeholder="0"
-                  value={defPercentage}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveField('defPercentage');
-                  }}
-                />
-                <span className="old-form-unit">%</span>
-              </div>
-
-              <div
-                className={`old-form-row ${activeField === 'kwh' ? 'row-selected' : ''}`}
-                onClick={() => setActiveField('kwh')}
-              >
-                <span className="old-form-lbl">Meter</span>
-                <input
-                  type="text"
-                  inputMode="none"
-                  readOnly
-                  className={`old-form-input ${activeField === 'kwh' ? 'is-active' : ''}`}
-                  placeholder="0"
-                  value={kwh}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveField('kwh');
-                  }}
-                />
-                <span className="old-form-unit">kWh</span>
-              </div>
+              {renderInputField('Fuel level', 'fuelPercentage', fuelPercentage, '%')}
+              {renderInputField('DEF level', 'defPercentage', defPercentage, '%')}
+              {renderInputField('Meter', 'kwh', kwh, 'kWh')}
             </div>
           )}
 
@@ -433,25 +420,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           {/* ======================================================= */}
           {(action === 'check-in' || action === 'check-out') && isPlant && (
             <div className="old-form-grid">
-              <div
-                className={`old-form-row ${activeField === 'fuelPercentage' ? 'row-selected' : ''}`}
-                onClick={() => setActiveField('fuelPercentage')}
-              >
-                <span className="old-form-lbl">Fuel level</span>
-                <input
-                  type="text"
-                  inputMode="none"
-                  readOnly
-                  className={`old-form-input ${activeField === 'fuelPercentage' ? 'is-active' : ''}`}
-                  placeholder="0"
-                  value={fuelPercentage}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveField('fuelPercentage');
-                  }}
-                />
-                <span className="old-form-unit">%</span>
-              </div>
+              {renderInputField('Fuel level', 'fuelPercentage', fuelPercentage, '%')}
             </div>
           )}
 
@@ -460,47 +429,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           {/* ======================================================= */}
           {action === 'record-fuel' && (
             <div className="old-form-grid">
-              <div
-                className={`old-form-row ${activeField === 'fuelLitres' ? 'row-selected' : ''}`}
-                onClick={() => setActiveField('fuelLitres')}
-              >
-                <span className="old-form-lbl">Fuel transferred</span>
-                <input
-                  type="text"
-                  inputMode="none"
-                  readOnly
-                  className={`old-form-input ${activeField === 'fuelLitres' ? 'is-active' : ''}`}
-                  placeholder="0"
-                  value={fuelLitres}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveField('fuelLitres');
-                  }}
-                />
-                <span className="old-form-unit">litres</span>
-              </div>
-
-              {isGen && (
-                <div
-                  className={`old-form-row ${activeField === 'defLitres' ? 'row-selected' : ''}`}
-                  onClick={() => setActiveField('defLitres')}
-                >
-                  <span className="old-form-lbl">DEF transferred</span>
-                  <input
-                    type="text"
-                    inputMode="none"
-                    readOnly
-                    className={`old-form-input ${activeField === 'defLitres' ? 'is-active' : ''}`}
-                    placeholder="0"
-                    value={defLitres}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveField('defLitres');
-                    }}
-                  />
-                  <span className="old-form-unit">litres</span>
-                </div>
-              )}
+              {renderInputField('Fuel transferred', 'fuelLitres', fuelLitres, 'litres')}
+              {isGen && renderInputField('DEF transferred', 'defLitres', defLitres, 'litres')}
             </div>
           )}
 
