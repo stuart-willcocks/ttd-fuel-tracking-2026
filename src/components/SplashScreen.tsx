@@ -173,7 +173,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
 
           <div className="splash-title-block">
             <h1 className="splash-main-title">The Technical Department Ltd</h1>
-            <h2 className="splash-sub-title">Fuel Tracking App</h2>
+            <h2 className="splash-sub-title">Fuel Tracking App (STAGING)</h2>
           </div>
         </div>
 
