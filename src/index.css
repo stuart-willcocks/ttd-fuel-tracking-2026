@@ -2722,7 +2722,8 @@ html.is-desktop-browser .app-root {
   background-color: #F3F4F6 !important;
   border: 1px solid #D1D5DB !important;
   color: #9CA3AF !important;
-  cursor: pointer;
+  cursor: default !important;
+  pointer-events: none;
 }
 
 .edit-tx-input-wrap.is-unlocked {
@@ -2730,7 +2731,8 @@ html.is-desktop-browser .app-root {
   border: 2px solid var(--btn-blue-bg) !important;
   color: #111827 !important;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25) !important;
-  cursor: text;
+  cursor: default !important;
+  pointer-events: none;
 }
 
 .edit-tx-display-val {
@@ -2845,26 +2847,46 @@ html.is-desktop-browser .app-root {
   border-color: var(--btn-red-border);
 }
 
-.edit-tx-btn-row {
+.edit-tx-actions-stack {
   display: flex;
-  flex-direction: row;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
   width: 100%;
   max-width: 310px;
-  margin: 8px auto 0;
+  margin: 10px auto 0;
   box-sizing: border-box;
 }
 
+.edit-tx-btn-save {
+  width: 100% !important;
+  height: 46px !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+
+.edit-tx-secondary-btn-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  width: 100%;
+}
+
+.edit-tx-btn-large {
+  flex: 1 !important;
+  height: 46px !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  padding: 0 12px !important;
+}
+
 .btn-modal-action {
-  flex: 1;
-  min-width: 0;
-  height: 42px;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   font-family: var(--font-btn);
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: var(--btn-font-weight);
   letter-spacing: var(--btn-letter-spacing);
   border-radius: 4px !important;

@@ -477,8 +477,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
         <span className="edit-tx-lbl">{label}</span>
         <div
           className={`edit-tx-input-wrap ${isUnlocked ? 'is-unlocked' : 'is-locked'}`}
-          onClick={() => handleToggleEdit(field)}
-          title={isUnlocked ? 'Unlocked for editing' : 'Locked - click to unlock'}
+          title={isUnlocked ? 'Editing field' : 'Field locked - press Edit to unlock'}
         >
           <span className="edit-tx-display-val">
             {value !== '' ? value : (isUnlocked ? '' : '0')}
@@ -514,7 +513,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
 
   return (
     <>
-      <div className="modal-backdrop edit-tx-backdrop" onClick={onCancel}>
+      <div className="modal-backdrop edit-tx-backdrop">
         <div
           className="modal-box edit-tx-modal"
           onClick={(e) => e.stopPropagation()}
@@ -640,38 +639,40 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             />
           )}
 
-          {/* Buttons Row: Save, Delete, Cancel */}
-          <div className="edit-tx-btn-row">
+          {/* Action Buttons: Save (Full Width) + Delete & Cancel (Large Buttons Row) */}
+          <div className="edit-tx-actions-stack">
             <button
               type="button"
               disabled={!canSave}
-              className={`btn-modal-action btn-pda-green ${canSave ? '' : 'disabled'}`}
+              className={`btn-modal-action btn-pda-green edit-tx-btn-save ${canSave ? '' : 'disabled'}`}
               onClick={() => setShowConfirmSave(true)}
               title={canSave ? 'Save changes' : 'No changes to save'}
             >
-              <Check size={18} />
+              <Check size={20} />
               <span>Save</span>
             </button>
 
-            <button
-              type="button"
-              className="btn-modal-action btn-pda-red"
-              onClick={() => setShowConfirmDelete(true)}
-              title="Delete transaction"
-            >
-              <Trash2 size={18} />
-              <span>Delete</span>
-            </button>
+            <div className="edit-tx-secondary-btn-row">
+              <button
+                type="button"
+                className="btn-modal-action btn-pda-red edit-tx-btn-large"
+                onClick={() => setShowConfirmDelete(true)}
+                title="Delete transaction"
+              >
+                <Trash2 size={20} />
+                <span>Delete</span>
+              </button>
 
-            <button
-              type="button"
-              className="btn-modal-action btn-pda-slate"
-              onClick={onCancel}
-              title="Cancel"
-            >
-              <IconCancel size={18} />
-              <span>Cancel</span>
-            </button>
+              <button
+                type="button"
+                className="btn-modal-action btn-pda-slate edit-tx-btn-large"
+                onClick={onCancel}
+                title="Cancel"
+              >
+                <IconCancel size={20} />
+                <span>Cancel</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

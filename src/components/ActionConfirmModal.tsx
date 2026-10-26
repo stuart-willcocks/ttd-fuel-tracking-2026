@@ -53,7 +53,7 @@ export const ActionConfirmModal: React.FC<ActionConfirmModalProps> = ({
   };
 
   return (
-    <div className="modal-backdrop action-confirm-backdrop" onClick={onCancel}>
+    <div className="modal-backdrop action-confirm-backdrop">
       <div
         className="modal-box action-confirm-box"
         onClick={(e) => e.stopPropagation()}
