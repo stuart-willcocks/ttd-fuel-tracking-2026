@@ -2561,13 +2561,20 @@ html.is-desktop-browser .app-root {
    EDIT / DELETE TRANSACTION MODAL
    ========================================================================== */
 
+.edit-tx-backdrop {
+  padding: 8px !important;
+  overflow-x: hidden !important;
+}
+
 .edit-tx-modal {
-  max-width: 360px;
-  width: 100%;
-  padding: 12px 14px;
+  max-width: 344px !important;
+  width: 100% !important;
+  padding: 12px 10px !important;
   background: var(--bg-page);
   border-radius: 0px !important;
-  box-sizing: border-box;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+  max-height: calc(100% - 16px);
 }
 
 .edit-tx-header,
@@ -2577,12 +2584,14 @@ html.is-desktop-browser .app-root {
   gap: 10px;
   margin-bottom: 8px;
   text-align: left;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .edit-tx-icon-wrap,
 .delete-tx-icon-wrap {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2603,11 +2612,12 @@ html.is-desktop-browser .app-root {
 .edit-tx-meta-line {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   font-size: 11.5px;
   color: var(--text-muted);
   font-weight: 600;
   margin-top: 2px;
+  flex-wrap: wrap;
 }
 
 .edit-tx-asset {
@@ -2624,7 +2634,110 @@ html.is-desktop-browser .app-root {
   flex-direction: column;
   align-items: center;
   width: 100%;
+  box-sizing: border-box;
   margin: 4px 0;
+}
+
+.edit-tx-grid {
+  width: 100%;
+  max-width: 310px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.edit-tx-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 0;
+  border-radius: 4px;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  box-sizing: border-box;
+}
+
+.edit-tx-lbl {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  width: 76px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.edit-tx-input {
+  width: 72px;
+  height: 38px;
+  background-color: #FFFFFF !important;
+  border: 1px solid var(--border-medium);
+  color: var(--text-main);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  border-radius: 4px !important;
+  cursor: pointer;
+  caret-color: transparent;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.edit-tx-input.is-active,
+.edit-tx-input:focus {
+  outline: none;
+  background-color: #EFF6FF !important;
+  border-color: var(--btn-blue-bg) !important;
+  color: #1E40AF !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25) !important;
+}
+
+.edit-tx-unit {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  width: 38px;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.btn-field-edit {
+  height: 34px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border-radius: 4px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 1px solid var(--border-medium);
+  background-color: #F3F4F6;
+  color: #374151;
+  transition: all 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.btn-field-edit:hover {
+  background-color: #E5E7EB;
+  border-color: #9CA3AF;
+  color: #111827;
+}
+
+.btn-field-edit.is-editing {
+  background-color: var(--btn-blue-bg);
+  border-color: var(--btn-blue-border, #1D4ED8);
+  color: #FFFFFF;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
 .edit-tx-power-toggle-row {
@@ -2632,7 +2745,8 @@ html.is-desktop-browser .app-root {
   gap: 8px;
   width: 100%;
   max-width: 300px;
-  margin: 10px 0;
+  margin: 10px auto;
+  box-sizing: border-box;
 }
 
 .edit-tx-power-btn {
@@ -2667,19 +2781,21 @@ html.is-desktop-browser .app-root {
 .edit-tx-btn-row {
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  max-width: 320px;
-  margin-top: 8px;
+  max-width: 310px;
+  margin: 8px auto 0;
+  box-sizing: border-box;
 }
 
 .btn-modal-action {
   flex: 1;
+  min-width: 0;
   height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   font-family: var(--font-btn);
   font-size: 13.5px;
   font-weight: var(--btn-font-weight);
@@ -2715,4 +2831,77 @@ html.is-desktop-browser .app-root {
   margin: 10px 0 14px;
   text-align: left;
 }
+
+/* ==========================================================================
+   ACTION CONFIRMATION MODAL (Yes / No Dialog)
+   ========================================================================== */
+
+.action-confirm-backdrop {
+  z-index: 1200 !important;
+  background: rgba(15, 23, 42, 0.6) !important;
+  padding: 12px !important;
+}
+
+.action-confirm-box {
+  max-width: 310px !important;
+  width: 100% !important;
+  padding: 18px 16px !important;
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-medium) !important;
+  border-radius: 4px !important;
+  text-align: center;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15) !important;
+  box-sizing: border-box !important;
+}
+
+.action-confirm-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0 0 8px 0;
+}
+
+.action-confirm-message {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1F2937;
+  margin: 0 0 4px 0;
+  line-height: 1.4;
+}
+
+.action-confirm-submessage {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #6B7280;
+  margin: 4px 0 0 0;
+}
+
+.action-confirm-btn-row {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.btn-confirm-action {
+  flex: 1;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-btn);
+  font-size: 14.5px;
+  font-weight: 700;
+  border-radius: 4px !important;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: transform 0.08s ease, background-color 0.15s ease;
+}
+
+.btn-confirm-action:active {
+  transform: scale(0.97);
+}
+
 

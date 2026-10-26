@@ -6,6 +6,7 @@ import { formatPdaTimestamp } from '../utils/dateFormat';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 import { EditTransactionModal } from './EditTransactionModal';
+import { ActionConfirmModal } from './ActionConfirmModal';
 
 export interface AssetDetailViewProps {
   asset: Equipment;
@@ -27,6 +28,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
   const isGenerator = asset.type === 'GENERATOR';
 
   // Edit / Delete transaction modal state & long-press detection
+  const [pendingTxToModify, setPendingTxToModify] = useState<Transaction | null>(null);
   const [selectedTransactionForEdit, setSelectedTransactionForEdit] = useState<Transaction | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerStartPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -50,7 +52,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
         navigator.vibrate?.(50);
       }
-      setSelectedTransactionForEdit(tx);
+      setPendingTxToModify(tx);
     }, 550);
   }, [clearLongPress]);
 
@@ -301,6 +303,21 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           <span>Back</span>
         </button>
       </div>
+
+      {/* Modify Confirmation Dialog */}
+      <ActionConfirmModal
+        isOpen={Boolean(pendingTxToModify)}
+        title="Modify Transaction?"
+        message="Modify this transaction?"
+        confirmLabel="Yes"
+        cancelLabel="No"
+        confirmVariant="green"
+        onConfirm={() => {
+          setSelectedTransactionForEdit(pendingTxToModify);
+          setPendingTxToModify(null);
+        }}
+        onCancel={() => setPendingTxToModify(null)}
+      />
 
       {/* Edit / Delete Transaction Modal */}
       {selectedTransactionForEdit && (
