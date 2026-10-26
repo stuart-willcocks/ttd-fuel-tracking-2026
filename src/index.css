@@ -1552,6 +1552,35 @@ html.is-desktop-browser .app-root {
   background-color: #E5E7EB;
 }
 
+.inapp-numpad-container.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.inapp-num-key:disabled,
+.inapp-num-key.is-disabled {
+  background-color: #F3F4F6 !important;
+  color: #9CA3AF !important;
+  border-color: #E5E7EB !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+.inapp-num-key.action-clear:disabled,
+.inapp-num-key.action-clear.is-disabled {
+  background-color: #F9FAFB !important;
+  color: #D1D5DB !important;
+  border-color: #E5E7EB !important;
+}
+
+.inapp-num-key.action-backspace:disabled,
+.inapp-num-key.action-backspace.is-disabled {
+  background-color: #F9FAFB !important;
+  color: #D1D5DB !important;
+  border-color: #E5E7EB !important;
+}
+
 /* Form Action Buttons: Submit & Cancel in one row */
 .old-form-btn-row {
   display: flex;
@@ -2671,31 +2700,65 @@ html.is-desktop-browser .app-root {
   flex-shrink: 0;
 }
 
-.edit-tx-input {
+.edit-tx-input-wrap {
   width: 72px;
   height: 38px;
-  background-color: #FFFFFF !important;
-  border: 1px solid var(--border-medium);
-  color: var(--text-main);
+  border-radius: 4px !important;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 17px;
   font-weight: 700;
-  text-align: center;
-  font-family: 'JetBrains Mono', monospace;
-  border-radius: 4px !important;
-  cursor: pointer;
-  caret-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  position: relative;
   flex-shrink: 0;
-  box-sizing: border-box;
   transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.edit-tx-input.is-active,
-.edit-tx-input:focus {
-  outline: none;
-  background-color: #EFF6FF !important;
-  border-color: var(--btn-blue-bg) !important;
-  color: #1E40AF !important;
+.edit-tx-input-wrap.is-locked {
+  background-color: #F3F4F6 !important;
+  border: 1px solid #D1D5DB !important;
+  color: #9CA3AF !important;
+  cursor: pointer;
+}
+
+.edit-tx-input-wrap.is-unlocked {
+  background-color: #FFFFFF !important;
+  border: 2px solid var(--btn-blue-bg) !important;
+  color: #111827 !important;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25) !important;
+  cursor: text;
+}
+
+.edit-tx-display-val {
+  display: inline-block;
+  line-height: 1;
+}
+
+@keyframes caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.edit-tx-caret {
+  display: inline-block;
+  width: 2px;
+  height: 20px;
+  background-color: var(--btn-blue-bg);
+  margin-left: 2px;
+  animation: caret-blink 0.9s infinite;
+  flex-shrink: 0;
+}
+
+.edit-tx-hidden-input {
+  opacity: 0;
+  position: absolute;
+  pointer-events: none;
+  width: 0;
+  height: 0;
 }
 
 .edit-tx-unit {
@@ -2709,8 +2772,8 @@ html.is-desktop-browser .app-root {
 
 .btn-field-edit {
   height: 34px;
-  padding: 0 10px;
-  font-size: 12.5px;
+  padding: 0 8px;
+  font-size: 12px;
   font-weight: 700;
   border-radius: 4px !important;
   display: inline-flex;
@@ -2720,20 +2783,24 @@ html.is-desktop-browser .app-root {
   flex-shrink: 0;
   cursor: pointer;
   border: 1px solid var(--border-medium);
-  background-color: #F3F4F6;
-  color: #374151;
   transition: all 0.15s ease;
   user-select: none;
   -webkit-user-select: none;
 }
 
-.btn-field-edit:hover {
+.btn-field-edit.is-locked {
+  background-color: #F3F4F6;
+  border-color: #D1D5DB;
+  color: #4B5563;
+}
+
+.btn-field-edit.is-locked:hover {
   background-color: #E5E7EB;
   border-color: #9CA3AF;
   color: #111827;
 }
 
-.btn-field-edit.is-editing {
+.btn-field-edit.is-unlocked {
   background-color: var(--btn-blue-bg);
   border-color: var(--btn-blue-border, #1D4ED8);
   color: #FFFFFF;

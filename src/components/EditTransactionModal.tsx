@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Trash2, Check, Minus, Plus, Power, PowerOff, Pencil } from 'lucide-react';
+import { Trash2, Check, Minus, Plus, Power, PowerOff, Lock, Unlock, Pencil } from 'lucide-react';
 import { IconCancel } from './icons/AppIcons';
 import type { Equipment, Transaction } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
@@ -167,9 +167,8 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     initialPowerType,
   ]);
 
-  // Active form field and keyboard visibility (hidden by default)
+  // Active form field - exactly one text field can be unlocked at any time, null if all locked
   const [activeField, setActiveField] = useState<EditField | null>(null);
-  const [showKeyboard, setShowKeyboard] = useState<boolean>(false);
 
   // Field input refs for focus handling
   const fuelInputRef = useRef<HTMLInputElement>(null);
@@ -178,14 +177,29 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const fuelLitresInputRef = useRef<HTMLInputElement>(null);
   const defLitresInputRef = useRef<HTMLInputElement>(null);
 
+  // Active fields applicable to this transaction type
+  const activeFieldsList = useMemo<EditField[]>(() => {
+    if (isCheckIn || isCheckOut) {
+      if (isGen) return ['fuelPercentage', 'defPercentage', 'kwh'];
+      if (isPlant) return ['fuelPercentage'];
+      return [];
+    }
+    if (isFuelTransfer) {
+      if (isGen) return ['fuelLitres', 'defLitres'];
+      return ['fuelLitres'];
+    }
+    return [];
+  }, [isCheckIn, isCheckOut, isFuelTransfer, isGen, isPlant]);
+
+  // Toggling lock on a field: only one field can be unlocked at a time
   const handleToggleEdit = (field: EditField) => {
-    if (activeField === field && showKeyboard) {
+    if (activeField === field) {
+      // Locking currently unlocked field
       setActiveField(null);
-      setShowKeyboard(false);
       return;
     }
+    // Unlocking this field (and automatically locking any other)
     setActiveField(field);
-    setShowKeyboard(true);
     setTimeout(() => {
       switch (field) {
         case 'fuelPercentage':
@@ -360,8 +374,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        if (showKeyboard) {
-          setShowKeyboard(false);
+        if (activeField) {
           setActiveField(null);
         } else {
           onCancel();
@@ -371,7 +384,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showConfirmSave, showConfirmDelete, activeField, showKeyboard, handleNumpadDigit, handleNumpadBackspace, handleNumpadClear, onCancel]);
+  }, [showConfirmSave, showConfirmDelete, activeField, handleNumpadDigit, handleNumpadBackspace, handleNumpadClear, onCancel]);
 
   const handleCommitSave = () => {
     setShowConfirmSave(false);
@@ -449,6 +462,54 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     }
   };
 
+  // Reusable helper to render each editable field row
+  const renderFieldRow = (
+    label: string,
+    field: EditField,
+    value: string,
+    unit: string,
+    inputRef: React.RefObject<HTMLInputElement | null>
+  ) => {
+    const isUnlocked = activeField === field;
+
+    return (
+      <div className="edit-tx-row" key={field}>
+        <span className="edit-tx-lbl">{label}</span>
+        <div
+          className={`edit-tx-input-wrap ${isUnlocked ? 'is-unlocked' : 'is-locked'}`}
+          onClick={() => handleToggleEdit(field)}
+          title={isUnlocked ? 'Unlocked for editing' : 'Locked - click to unlock'}
+        >
+          <span className="edit-tx-display-val">
+            {value !== '' ? value : (isUnlocked ? '' : '0')}
+          </span>
+          {isUnlocked && <span className="edit-tx-caret" aria-hidden="true" />}
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="none"
+            readOnly={!isUnlocked}
+            tabIndex={-1}
+            aria-label={label}
+            className="edit-tx-hidden-input"
+            value={value}
+            onChange={() => {}}
+          />
+        </div>
+        <span className="edit-tx-unit">{unit}</span>
+        <button
+          type="button"
+          className={`btn-field-edit ${isUnlocked ? 'is-unlocked' : 'is-locked'}`}
+          onClick={() => handleToggleEdit(field)}
+          title={isUnlocked ? 'Field unlocked - click to lock' : 'Field locked - click to unlock'}
+        >
+          {isUnlocked ? <Unlock size={14} /> : <Lock size={14} />}
+          <span>Edit</span>
+        </button>
+      </div>
+    );
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -482,77 +543,9 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             {/* Generator Check In / Check Out */}
             {(isCheckIn || isCheckOut) && isGen && (
               <div className="edit-tx-grid">
-                <div className="edit-tx-row">
-                  <span className="edit-tx-lbl">Fuel level</span>
-                  <input
-                    ref={fuelInputRef}
-                    type="text"
-                    inputMode="none"
-                    readOnly={activeField !== 'fuelPercentage'}
-                    className={`edit-tx-input ${activeField === 'fuelPercentage' ? 'is-active' : ''}`}
-                    value={fuelPercentage}
-                    placeholder="0"
-                    onClick={() => handleToggleEdit('fuelPercentage')}
-                  />
-                  <span className="edit-tx-unit">%</span>
-                  <button
-                    type="button"
-                    className={`btn-field-edit ${activeField === 'fuelPercentage' && showKeyboard ? 'is-editing' : ''}`}
-                    onClick={() => handleToggleEdit('fuelPercentage')}
-                    title="Edit fuel level"
-                  >
-                    <Pencil size={12} />
-                    <span>Edit</span>
-                  </button>
-                </div>
-
-                <div className="edit-tx-row">
-                  <span className="edit-tx-lbl">DEF level</span>
-                  <input
-                    ref={defInputRef}
-                    type="text"
-                    inputMode="none"
-                    readOnly={activeField !== 'defPercentage'}
-                    className={`edit-tx-input ${activeField === 'defPercentage' ? 'is-active' : ''}`}
-                    value={defPercentage}
-                    placeholder="0"
-                    onClick={() => handleToggleEdit('defPercentage')}
-                  />
-                  <span className="edit-tx-unit">%</span>
-                  <button
-                    type="button"
-                    className={`btn-field-edit ${activeField === 'defPercentage' && showKeyboard ? 'is-editing' : ''}`}
-                    onClick={() => handleToggleEdit('defPercentage')}
-                    title="Edit DEF level"
-                  >
-                    <Pencil size={12} />
-                    <span>Edit</span>
-                  </button>
-                </div>
-
-                <div className="edit-tx-row">
-                  <span className="edit-tx-lbl">Meter</span>
-                  <input
-                    ref={kwhInputRef}
-                    type="text"
-                    inputMode="none"
-                    readOnly={activeField !== 'kwh'}
-                    className={`edit-tx-input ${activeField === 'kwh' ? 'is-active' : ''}`}
-                    value={kwh}
-                    placeholder="0"
-                    onClick={() => handleToggleEdit('kwh')}
-                  />
-                  <span className="edit-tx-unit">kWh</span>
-                  <button
-                    type="button"
-                    className={`btn-field-edit ${activeField === 'kwh' && showKeyboard ? 'is-editing' : ''}`}
-                    onClick={() => handleToggleEdit('kwh')}
-                    title="Edit kWh meter"
-                  >
-                    <Pencil size={12} />
-                    <span>Edit</span>
-                  </button>
-                </div>
+                {renderFieldRow('Fuel level', 'fuelPercentage', fuelPercentage, '%', fuelInputRef)}
+                {renderFieldRow('DEF level', 'defPercentage', defPercentage, '%', defInputRef)}
+                {renderFieldRow('Meter', 'kwh', kwh, 'kWh', kwhInputRef)}
               </div>
             )}
 
@@ -601,84 +594,15 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             {/* Plant Check In / Check Out */}
             {(isCheckIn || isCheckOut) && isPlant && (
               <div className="edit-tx-grid">
-                <div className="edit-tx-row">
-                  <span className="edit-tx-lbl">Fuel level</span>
-                  <input
-                    ref={fuelInputRef}
-                    type="text"
-                    inputMode="none"
-                    readOnly={activeField !== 'fuelPercentage'}
-                    className={`edit-tx-input ${activeField === 'fuelPercentage' ? 'is-active' : ''}`}
-                    value={fuelPercentage}
-                    placeholder="0"
-                    onClick={() => handleToggleEdit('fuelPercentage')}
-                  />
-                  <span className="edit-tx-unit">%</span>
-                  <button
-                    type="button"
-                    className={`btn-field-edit ${activeField === 'fuelPercentage' && showKeyboard ? 'is-editing' : ''}`}
-                    onClick={() => handleToggleEdit('fuelPercentage')}
-                    title="Edit fuel level"
-                  >
-                    <Pencil size={12} />
-                    <span>Edit</span>
-                  </button>
-                </div>
+                {renderFieldRow('Fuel level', 'fuelPercentage', fuelPercentage, '%', fuelInputRef)}
               </div>
             )}
 
             {/* Fuel Transfer */}
             {isFuelTransfer && (
               <div className="edit-tx-grid">
-                <div className="edit-tx-row">
-                  <span className="edit-tx-lbl">Fuel</span>
-                  <input
-                    ref={fuelLitresInputRef}
-                    type="text"
-                    inputMode="none"
-                    readOnly={activeField !== 'fuelLitres'}
-                    className={`edit-tx-input ${activeField === 'fuelLitres' ? 'is-active' : ''}`}
-                    value={fuelLitres}
-                    placeholder="0"
-                    onClick={() => handleToggleEdit('fuelLitres')}
-                  />
-                  <span className="edit-tx-unit">litres</span>
-                  <button
-                    type="button"
-                    className={`btn-field-edit ${activeField === 'fuelLitres' && showKeyboard ? 'is-editing' : ''}`}
-                    onClick={() => handleToggleEdit('fuelLitres')}
-                    title="Edit fuel litres"
-                  >
-                    <Pencil size={12} />
-                    <span>Edit</span>
-                  </button>
-                </div>
-
-                {isGen && (
-                  <div className="edit-tx-row">
-                    <span className="edit-tx-lbl">DEF</span>
-                    <input
-                      ref={defLitresInputRef}
-                      type="text"
-                      inputMode="none"
-                      readOnly={activeField !== 'defLitres'}
-                      className={`edit-tx-input ${activeField === 'defLitres' ? 'is-active' : ''}`}
-                      value={defLitres}
-                      placeholder="0"
-                      onClick={() => handleToggleEdit('defLitres')}
-                    />
-                    <span className="edit-tx-unit">litres</span>
-                    <button
-                      type="button"
-                      className={`btn-field-edit ${activeField === 'defLitres' && showKeyboard ? 'is-editing' : ''}`}
-                      onClick={() => handleToggleEdit('defLitres')}
-                      title="Edit DEF litres"
-                    >
-                      <Pencil size={12} />
-                      <span>Edit</span>
-                    </button>
-                  </div>
-                )}
+                {renderFieldRow('Fuel', 'fuelLitres', fuelLitres, 'litres', fuelLitresInputRef)}
+                {isGen && renderFieldRow('DEF', 'defLitres', defLitres, 'litres', defLitresInputRef)}
               </div>
             )}
 
@@ -706,9 +630,10 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             )}
           </div>
 
-          {/* In-App Touch Numpad for numeric fields - Hidden by default */}
-          {showKeyboard && activeField && (
+          {/* In-App Touch Numpad for numeric fields - Always visible, disabled unless a field is unlocked */}
+          {activeFieldsList.length > 0 && (
             <InAppNumpad
+              disabled={activeField === null}
               onDigit={handleNumpadDigit}
               onBackspace={handleNumpadBackspace}
               onClear={handleNumpadClear}
