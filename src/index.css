@@ -1031,6 +1031,40 @@ html.is-desktop-browser .app-root {
   stroke: #FFFFFF !important;
 }
 
+.tx-pending-circle {
+  width: 16px;
+  height: 16px;
+  border-radius: 50% !important;
+  background-color: #FEF3C7;
+  border: 1px solid #F59E0B;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tx-pending-clock {
+  color: #B45309 !important;
+  stroke: #B45309 !important;
+}
+
+.tx-failed-circle {
+  width: 16px;
+  height: 16px;
+  border-radius: 50% !important;
+  background-color: #FEF2F2;
+  border: 1px solid #EF4444;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tx-failed-icon {
+  color: #DC2626 !important;
+  stroke: #DC2626 !important;
+}
+
 .tx-empty-state {
   padding: 36px 16px;
   text-align: center;

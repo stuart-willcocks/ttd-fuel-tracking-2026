@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Check, Power, PowerOff } from 'lucide-react';
+import { Check, Power, PowerOff, Clock, AlertCircle } from 'lucide-react';
 import { IconCheckIn, IconCheckOut, IconFuel, IconBack } from './icons/AppIcons';
 import type { Equipment, Transaction, ActionType } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
@@ -212,37 +212,53 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           <div className="tx-empty-state">No transactions recorded yet for this asset.</div>
         ) : (
           <div className="tx-list-stack">
-            {sortedTransactions.map((tx) => (
-              <div
-                key={tx.id}
-                className="tx-row-card"
-                onPointerDown={(e) => handlePointerDown(e, tx)}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUpOrLeave}
-                onPointerCancel={handlePointerUpOrLeave}
-                onContextMenu={handleContextMenu}
-              >
-                {/* Transaction Type Icon */}
-                <div className="tx-type-icon-col">
-                  <TransactionTypeIcon type={tx.transactionType} size={24} />
-                </div>
+            {sortedTransactions.map((tx) => {
+              const isUploaded =
+                tx.syncStatus === 'synced' ||
+                (Boolean(tx.uploadTimestamp) && tx.syncStatus !== 'pending' && tx.syncStatus !== 'failed');
 
-                {/* Details: Timestamp & Data Values with Type Icons */}
-                <div className="tx-info-col">
-                  <div className="tx-timestamp-line">
-                    {formatPdaTimestamp(tx.transactionTimestamp)}
+              return (
+                <div
+                  key={tx.id}
+                  className="tx-row-card"
+                  onPointerDown={(e) => handlePointerDown(e, tx)}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUpOrLeave}
+                  onPointerCancel={handlePointerUpOrLeave}
+                  onContextMenu={handleContextMenu}
+                >
+                  {/* Transaction Type Icon */}
+                  <div className="tx-type-icon-col">
+                    <TransactionTypeIcon type={tx.transactionType} size={24} />
                   </div>
-                  {renderTransactionData(tx)}
-                </div>
 
-                {/* Uploaded Status: White tick inside filled green circle (20% smaller) */}
-                <div className="tx-sync-col" title="Uploaded">
-                  <span className="tx-uploaded-circle" aria-label="Uploaded">
-                    <Check size={10} strokeWidth={3.5} className="tx-uploaded-check" />
-                  </span>
+                  {/* Details: Timestamp & Data Values with Type Icons */}
+                  <div className="tx-info-col">
+                    <div className="tx-timestamp-line">
+                      {formatPdaTimestamp(tx.transactionTimestamp)}
+                    </div>
+                    {renderTransactionData(tx)}
+                  </div>
+
+                  {/* Uploaded / Sync Status Indicator */}
+                  <div className="tx-sync-col">
+                    {isUploaded ? (
+                      <span className="tx-uploaded-circle" title="Uploaded" aria-label="Uploaded">
+                        <Check size={10} strokeWidth={3.5} className="tx-uploaded-check" />
+                      </span>
+                    ) : tx.syncStatus === 'failed' ? (
+                      <span className="tx-failed-circle" title="Upload failed - stored locally" aria-label="Upload failed">
+                        <AlertCircle size={10} strokeWidth={2.5} className="tx-failed-icon" />
+                      </span>
+                    ) : (
+                      <span className="tx-pending-circle" title="Pending upload (waiting for server connection)" aria-label="Pending upload">
+                        <Clock size={10} strokeWidth={2.5} className="tx-pending-clock" />
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

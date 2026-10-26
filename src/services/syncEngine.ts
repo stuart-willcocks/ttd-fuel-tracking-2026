@@ -240,6 +240,7 @@ class SyncEngine {
     const updatedTx: Transaction = {
       ...tx,
       syncStatus: 'pending',
+      uploadTimestamp: undefined,
     };
 
     // If it was previously in tombstones, remove it
@@ -441,9 +442,7 @@ class SyncEngine {
       const res = await this.flushOutboxInternal();
       if (res.processed > 0 || res.errors > 0) {
         await this.notify();
-        if (res.processed > 0) {
-          this.notifyDataChange();
-        }
+        this.notifyDataChange();
       }
       return res;
     } finally {
