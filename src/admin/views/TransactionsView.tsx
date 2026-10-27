@@ -33,6 +33,121 @@ interface TransactionsViewProps {
   onDeleteTransaction?: (transactionId: string) => Promise<void>;
 }
 
+const isSet = (v: unknown): v is number =>
+  v !== undefined && v !== null && v !== '' && !isNaN(Number(v));
+
+const renderTransactionValues = (tx: Transaction, eq?: Equipment) => {
+  const isCheckOut = tx.transactionType.includes('CheckOut');
+  const fuelPct = isCheckOut
+    ? (tx.checkOutFuelPercentage ?? tx.checkInFuelPercentage)
+    : (tx.checkInFuelPercentage ?? tx.checkOutFuelPercentage);
+  const defPct = isCheckOut
+    ? (tx.checkOutDefPercentage ?? tx.checkInDefPercentage)
+    : (tx.checkInDefPercentage ?? tx.checkOutDefPercentage);
+  const kwhVal = isCheckOut
+    ? (tx.checkOutKWH ?? tx.checkInKWH)
+    : (tx.checkInKWH ?? tx.checkOutKWH);
+  const fuelEighths = isCheckOut
+    ? (tx.checkOutFuelEighths ?? tx.checkInFuelEighths)
+    : (tx.checkInFuelEighths ?? tx.checkOutFuelEighths);
+
+  const hasTransfer = isSet(tx.fuelTransferLitres) || isSet(tx.defTransferLitres);
+  const hasTelemetry =
+    hasTransfer ||
+    isSet(fuelPct) ||
+    isSet(defPct) ||
+    isSet(kwhVal) ||
+    isSet(fuelEighths);
+
+  if (!hasTelemetry) {
+    return <span style={{ color: 'var(--adm-text-muted)' }}>Status Recorded</span>;
+  }
+
+  // 1. Fuel Transfer
+  if (hasTransfer) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        {isSet(tx.fuelTransferLitres) && (
+          <span>
+            <span style={{ color: '#000000', fontWeight: 600 }}>Fuel: </span>
+            <span style={{ color: '#2563EB', fontWeight: 600 }}>+{tx.fuelTransferLitres} L</span>
+          </span>
+        )}
+        {isSet(tx.defTransferLitres) && (
+          <span>
+            <span style={{ color: '#000000', fontWeight: 600 }}>DEF: </span>
+            <span style={{ color: '#2563EB', fontWeight: 600 }}>+{tx.defTransferLitres} L</span>
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  // Determine equipment type: GENERATOR, TANK, PLANT
+  const rawType = eq?.type || (
+    tx.transactionType.includes('Tank') ? 'TANK' :
+    tx.transactionType.includes('Plant') ? 'PLANT' :
+    'GENERATOR'
+  );
+
+  // 2. TANK Check-In / Check-Out
+  if (rawType === 'TANK') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        {isSet(fuelEighths) ? (
+          <span>
+            <span style={{ color: '#000000', fontWeight: 600 }}>Fuel: </span>
+            <span style={{ color: '#2563EB', fontWeight: 600 }}>{fuelEighths}/8</span>
+          </span>
+        ) : isSet(fuelPct) ? (
+          <span>
+            <span style={{ color: '#000000', fontWeight: 600 }}>Fuel: </span>
+            <span style={{ color: '#2563EB', fontWeight: 600 }}>{fuelPct}%</span>
+          </span>
+        ) : null}
+      </span>
+    );
+  }
+
+  // 3. PLANT Check-In / Check-Out
+  if (rawType === 'PLANT') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        {isSet(fuelPct) && (
+          <span>
+            <span style={{ color: '#000000', fontWeight: 600 }}>Fuel: </span>
+            <span style={{ color: '#2563EB', fontWeight: 600 }}>{fuelPct}%</span>
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  // 4. GENERATOR Check-In / Check-Out: Fuel: {fuel_percentage}% DEF: {def_percentage}% kWh: {kWh_value}
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+      {isSet(fuelPct) && (
+        <span>
+          <span style={{ color: '#000000', fontWeight: 600 }}>Fuel: </span>
+          <span style={{ color: '#2563EB', fontWeight: 600 }}>{fuelPct}%</span>
+        </span>
+      )}
+      {isSet(defPct) && (
+        <span>
+          <span style={{ color: '#000000', fontWeight: 600 }}>DEF: </span>
+          <span style={{ color: '#2563EB', fontWeight: 600 }}>{defPct}%</span>
+        </span>
+      )}
+      {isSet(kwhVal) && (
+        <span>
+          <span style={{ color: '#000000', fontWeight: 600 }}>kWh: </span>
+          <span style={{ color: '#2563EB', fontWeight: 600 }}>{typeof kwhVal === 'number' ? kwhVal.toLocaleString() : kwhVal}</span>
+        </span>
+      )}
+    </span>
+  );
+};
+
 export const TransactionsView: React.FC<TransactionsViewProps> = ({
   transactions,
   assets,
@@ -579,17 +694,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             <tbody>
               {filteredTransactions.map((tx) => {
                 const eq = assetMap.get(tx.equipmentId);
-                const hasTelemetry =
-                  (tx.fuelTransferLitres !== undefined && tx.fuelTransferLitres !== null) ||
-                  (tx.defTransferLitres !== undefined && tx.defTransferLitres !== null) ||
-                  (tx.checkInFuelPercentage !== undefined && tx.checkInFuelPercentage !== null) ||
-                  (tx.checkOutFuelPercentage !== undefined && tx.checkOutFuelPercentage !== null) ||
-                  (tx.checkInDefPercentage !== undefined && tx.checkInDefPercentage !== null) ||
-                  (tx.checkOutDefPercentage !== undefined && tx.checkOutDefPercentage !== null) ||
-                  (tx.checkInFuelEighths !== undefined && tx.checkInFuelEighths !== null) ||
-                  (tx.checkOutFuelEighths !== undefined && tx.checkOutFuelEighths !== null) ||
-                  (tx.checkInKWH !== undefined && tx.checkInKWH !== null) ||
-                  (tx.checkOutKWH !== undefined && tx.checkOutKWH !== null);
 
                 return (
                   <tr key={tx.id}>
@@ -647,48 +751,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     </td>
 
                     {/* Telemetry Readout */}
-                    <td style={{ fontSize: '0.82rem' }}>
-                      {tx.fuelTransferLitres !== undefined && tx.fuelTransferLitres !== null && (
-                        <span style={{ color: 'var(--adm-accent-yellow)', fontWeight: 600 }}>
-                          +{tx.fuelTransferLitres} L Fuel{' '}
-                        </span>
-                      )}
-                      {tx.defTransferLitres !== undefined && tx.defTransferLitres !== null && (
-                        <span style={{ color: 'var(--adm-text-secondary)', fontWeight: 500 }}>
-                          +{tx.defTransferLitres} L DEF{' '}
-                        </span>
-                      )}
-                      {tx.checkInFuelPercentage !== undefined && tx.checkInFuelPercentage !== null && (
-                        <span>{tx.checkInFuelPercentage}% in </span>
-                      )}
-                      {tx.checkOutFuelPercentage !== undefined && tx.checkOutFuelPercentage !== null && (
-                        <span>{tx.checkOutFuelPercentage}% out </span>
-                      )}
-                      {tx.checkInDefPercentage !== undefined && tx.checkInDefPercentage !== null && (
-                        <span style={{ color: 'var(--adm-text-secondary)', fontWeight: 500 }}>
-                          {tx.checkInDefPercentage}% DEF{' '}
-                        </span>
-                      )}
-                      {tx.checkOutDefPercentage !== undefined && tx.checkOutDefPercentage !== null && (
-                        <span style={{ color: 'var(--adm-text-secondary)', fontWeight: 500 }}>
-                          {tx.checkOutDefPercentage}% DEF{' '}
-                        </span>
-                      )}
-                      {tx.checkInFuelEighths !== undefined && tx.checkInFuelEighths !== null && (
-                        <span>{tx.checkInFuelEighths}/8 in </span>
-                      )}
-                      {tx.checkOutFuelEighths !== undefined && tx.checkOutFuelEighths !== null && (
-                        <span>{tx.checkOutFuelEighths}/8 out </span>
-                      )}
-                      {tx.checkInKWH !== undefined && tx.checkInKWH !== null && (
-                        <span style={{ color: '#4ADE80' }}>{tx.checkInKWH.toLocaleString()} kWh </span>
-                      )}
-                      {tx.checkOutKWH !== undefined && tx.checkOutKWH !== null && (
-                        <span style={{ color: '#4ADE80' }}>{tx.checkOutKWH.toLocaleString()} kWh </span>
-                      )}
-                      {!hasTelemetry && (
-                        <span style={{ color: 'var(--adm-text-muted)' }}>Status Recorded</span>
-                      )}
+                    <td style={{ fontSize: '0.84rem' }}>
+                      {renderTransactionValues(tx, eq)}
                     </td>
 
                     {/* Device ID */}
