@@ -296,7 +296,7 @@ export const AdminApp: React.FC = () => {
 
         {/* Main Content Viewport spanning full width */}
         <div className="admin-main-wrap">
-          <main style={{ flex: 1 }}>
+          <main style={{ flex: 1, minWidth: 0, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
             {currentView === 'ASSETS' && (
               <AssetsView
                 assets={assets}

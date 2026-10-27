@@ -767,7 +767,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     {renderSortIndicator('deviceId')}
                   </div>
                 </th>
-                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('syncStatus')}>
+                <th style={{ cursor: 'pointer', userSelect: 'none', paddingRight: '20px' }} onClick={() => handleSort('syncStatus')}>
                   <div style={{ display: 'inline-flex', alignItems: 'center' }}>
                     <span>Sync to database</span>
                     {renderSortIndicator('syncStatus')}
@@ -845,7 +845,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     </td>
 
                     {/* Sync Status */}
-                    <td>
+                    <td style={{ paddingRight: '20px' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', color: '#10b981' }}>
                         <CheckCircle2 size={12} />
                         <span>Synced</span>

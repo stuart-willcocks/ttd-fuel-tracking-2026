@@ -401,7 +401,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     {renderSortIndicator('powerState')}
                   </div>
                 </th>
-                <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
+                <th style={{ textAlign: 'right', whiteSpace: 'nowrap', paddingRight: '20px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -446,9 +446,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     </td>
 
                     {/* Location */}
-                    <td>
-                      <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{asset.area}</div>
-                      <div style={{ fontSize: '0.76rem', color: 'var(--adm-text-muted)' }}>{asset.location}</div>
+                    <td style={{ maxWidth: '220px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.86rem', overflowWrap: 'break-word', wordBreak: 'break-word' }}>{asset.area}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--adm-text-muted)', overflowWrap: 'break-word', wordBreak: 'break-word' }}>{asset.location}</div>
                     </td>
 
                     {/* What3Words */}
@@ -490,14 +490,14 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     </td>
 
                     {/* Action buttons */}
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end' }}>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', paddingRight: '20px' }}>
+                      <div style={{ display: 'inline-flex', gap: '5px', justifyContent: 'flex-end', alignItems: 'center' }}>
                         {/* View Transactions for this asset */}
                         <button
                           onClick={() => onSelectAsset(asset.equipmentId)}
                           className="admin-btn admin-btn-secondary admin-btn-sm"
                           title={`View transactions for ${asset.equipmentId}`}
-                          style={{ padding: '5px 10px', gap: '5px' }}
+                          style={{ padding: '4px 8px', fontSize: '0.78rem', gap: '4px' }}
                         >
                           <ReceiptText size={13} color="var(--adm-accent-yellow)" />
                           <span>Transactions ({txCounts[asset.equipmentId] || 0})</span>
@@ -508,7 +508,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                           onClick={() => onOpenQRModal(asset)}
                           className="admin-btn admin-btn-outline admin-btn-sm"
                           title="Generate & Print Physical QR Tag"
-                          style={{ padding: '5px 8px' }}
+                          style={{ padding: '4px 7px' }}
                         >
                           <QrCode size={14} />
                         </button>
@@ -518,7 +518,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                           onClick={() => onOpenEditModal(asset)}
                           className="admin-btn admin-btn-outline admin-btn-sm"
                           title="Edit Equipment Details"
-                          style={{ padding: '5px 8px' }}
+                          style={{ padding: '4px 7px' }}
                         >
                           <Edit size={14} />
                         </button>
