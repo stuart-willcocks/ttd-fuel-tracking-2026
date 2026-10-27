@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ReceiptText, Code } from 'lucide-react';
+import { X, ReceiptText, Code, Trash2 } from 'lucide-react';
 import type { Transaction, Equipment } from '../../types';
 import { formatAdminTimestamp } from '../../utils/dateFormat';
 
@@ -9,6 +9,7 @@ interface TransactionDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectAsset?: (equipmentId: string) => void;
+  onDeleteTransaction?: (transactionId: string) => Promise<void>;
 }
 
 export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
@@ -17,6 +18,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   isOpen,
   onClose,
   onSelectAsset,
+  onDeleteTransaction,
 }) => {
   const [showJson, setShowJson] = useState(false);
 
@@ -247,7 +249,23 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           )}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid var(--adm-border-subtle)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid var(--adm-border-subtle)' }}>
+          {onDeleteTransaction ? (
+            <button
+              onClick={async () => {
+                if (window.confirm(`Delete transaction ${transaction.id}? If this was a power event, generator state will recalculate from the remaining history.`)) {
+                  await onDeleteTransaction(transaction.id);
+                }
+              }}
+              className="admin-btn admin-btn-outline admin-btn-sm"
+              style={{ color: '#F87171', gap: '6px' }}
+              title="Delete transaction and recalculate equipment state"
+            >
+              <Trash2 size={14} />
+              <span>Delete Transaction</span>
+            </button>
+          ) : <div />}
+
           <button onClick={onClose} className="admin-btn admin-btn-secondary">
             Close Inspector
           </button>

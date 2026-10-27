@@ -123,14 +123,12 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       what3words: w3w || '///field.power.setup',
       rentalSerialNumber: rentalSerialNumber.trim() || 'RSN-UNKNOWN',
       poweredUpTimestamp:
-        type === 'GENERATOR'
-          ? isPoweredUp
-            ? initialAsset?.poweredUpTimestamp || nowIso
-            : undefined
+        type === 'GENERATOR' && isPoweredUp
+          ? initialAsset?.poweredUpTimestamp || nowIso
           : undefined,
       poweredDownTimestamp:
-        type === 'GENERATOR' && !isPoweredUp && initialAsset?.poweredUpTimestamp
-          ? nowIso
+        type === 'GENERATOR' && !isPoweredUp
+          ? initialAsset?.poweredDownTimestamp || nowIso
           : undefined,
       updatedAt: new Date().toISOString(),
     };

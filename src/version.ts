@@ -1,4 +1,4 @@
 // Auto-generated build version - DO NOT EDIT MANUALLY
-export const APP_VERSION = '98';
-export const BUILD_NUMBER = 98;
-export const BUILD_TIME = '2026-10-27 10:43';
+export const APP_VERSION = '99';
+export const BUILD_NUMBER = 99;
+export const BUILD_TIME = '2026-10-27 11:07';

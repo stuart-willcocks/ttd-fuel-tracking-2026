@@ -88,7 +88,7 @@ export function getDeviceClassification(): DeviceClassification {
   }
 
   // 3. Apple macOS / Desktop Linux / ChromeOS Check
-  const isMac = /Macintosh|Mac OS X/i.test(ua) && !('ontouchend' in document && /iPad/i.test(ua));
+  const isMac = /Macintosh|Mac OS X/i.test(ua) && !(typeof document !== 'undefined' && 'ontouchend' in document && /iPad/i.test(ua));
   const isLinuxDesktop = /X11|Linux x86_64/i.test(ua) && !/Android/i.test(ua);
   const isChromeOS = /CrOS/i.test(ua);
 

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { Transaction, Equipment } from '../../types';
 import { formatAdminTimestamp } from '../../utils/dateFormat';
+import { getGeneratorPowerState } from '../../utils/powerState';
 
 interface TransactionsViewProps {
   transactions: Transaction[];
@@ -30,6 +31,7 @@ interface TransactionsViewProps {
   onOpenDeleteModal?: (asset: Equipment) => void;
   onOpenQRModal?: (asset: Equipment) => void;
   onTogglePower?: (asset: Equipment) => void;
+  onDeleteTransaction?: (transactionId: string) => Promise<void>;
 }
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({
@@ -43,6 +45,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   onOpenDeleteModal,
   onOpenQRModal,
   onTogglePower,
+  onDeleteTransaction,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('ALL');
@@ -196,7 +199,9 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   };
 
   const isCurrentAssetRunning = Boolean(
-    currentAsset && currentAsset.poweredUpTimestamp && !currentAsset.poweredDownTimestamp
+    currentAsset &&
+      currentAsset.type === 'GENERATOR' &&
+      getGeneratorPowerState(currentAsset.equipmentId, transactions).isOn
   );
 
   return (
@@ -688,16 +693,33 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     </td>
 
                     {/* Actions */}
-                    <td style={{ textAlign: 'right' }}>
-                      <button
-                        onClick={() => onInspectTransaction(tx)}
-                        className="admin-btn admin-btn-outline admin-btn-sm"
-                        style={{ padding: '4px 8px' }}
-                        title="View raw transaction telemetry & payload"
-                      >
-                        <Eye size={13} />
-                        <span>Inspect</span>
-                      </button>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', gap: '6px' }}>
+                        <button
+                          onClick={() => onInspectTransaction(tx)}
+                          className="admin-btn admin-btn-outline admin-btn-sm"
+                          style={{ padding: '4px 8px' }}
+                          title="View raw transaction telemetry & payload"
+                        >
+                          <Eye size={13} />
+                          <span>Inspect</span>
+                        </button>
+
+                        {onDeleteTransaction && (
+                          <button
+                            onClick={async () => {
+                              if (window.confirm(`Delete transaction ${tx.id}? If this was a power event, generator state will recalculate from the remaining history.`)) {
+                                await onDeleteTransaction(tx.id);
+                              }
+                            }}
+                            className="admin-btn admin-btn-outline admin-btn-sm"
+                            style={{ padding: '4px 8px', color: '#F87171' }}
+                            title="Delete transaction and recalculate equipment state"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

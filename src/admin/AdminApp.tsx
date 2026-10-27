@@ -18,9 +18,11 @@ import {
   deleteRemoteEquipment,
   fetchRemoteTransactions,
   postRemoteTransaction,
+  deleteRemoteTransaction,
   resetRemoteData,
 } from '../services/api';
 import { isSupabaseConfigured, subscribeToCloudChanges } from '../services/supabase';
+import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
 
 export const AdminApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<AdminViewType>('ASSETS');
@@ -61,7 +63,9 @@ export const AdminApp: React.FC = () => {
         fetchRemoteTransactions(),
       ]);
 
-      setAssets(fetchedAssets);
+      // Power state of any generator is determined by its most recent power transaction (OFF by default)
+      const reconciledAssets = reconcileEquipmentPowerStates(fetchedAssets, fetchedTxs);
+      setAssets(reconciledAssets);
       setTransactions(fetchedTxs);
       setIsSupabaseOnline(isSupabaseConfigured());
     } catch (err: unknown) {
@@ -143,17 +147,32 @@ export const AdminApp: React.FC = () => {
     }
   };
 
+  // Delete Transaction Handler (reconciles generator power state automatically)
+  const handleDeleteTransaction = async (transactionId: string) => {
+    try {
+      await deleteRemoteTransaction(transactionId);
+      await loadFleetData(true);
+      showToast('Transaction deleted. Generator power states recalculated.', 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Failed to delete transaction: ${msg}`, 'error');
+      throw err;
+    }
+  };
+
   // Power Toggle for Generator
   const handleTogglePower = async (asset: Equipment) => {
     if (asset.type !== 'GENERATOR') return;
 
-    const isRunning = Boolean(asset.poweredUpTimestamp && !asset.poweredDownTimestamp);
+    // Power state is determined strictly by the most recent power transaction for this equipment ID
+    const powerState = getGeneratorPowerState(asset.equipmentId, transactions);
+    const isRunning = powerState.isOn;
     const newAction = isRunning ? 'PoweredDown' : 'PoweredUp';
     const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
     const updated: Equipment = {
       ...asset,
-      poweredUpTimestamp: isRunning ? asset.poweredUpTimestamp : nowIso,
+      poweredUpTimestamp: isRunning ? undefined : nowIso,
       poweredDownTimestamp: isRunning ? nowIso : undefined,
       updatedAt: new Date().toISOString(),
     };
@@ -254,6 +273,7 @@ export const AdminApp: React.FC = () => {
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 onInspectTransaction={(tx) => setInspectingTransaction(tx)}
+                onDeleteTransaction={handleDeleteTransaction}
                 onOpenEditModal={(asset) => setEditingAsset(asset)}
                 onOpenDeleteModal={(asset) => setAssetPendingDelete(asset)}
                 onOpenQRModal={(asset) => setQrAsset(asset)}
@@ -314,6 +334,10 @@ export const AdminApp: React.FC = () => {
             asset={assets.find((a) => a.equipmentId === inspectingTransaction.equipmentId)}
             isOpen={Boolean(inspectingTransaction)}
             onClose={() => setInspectingTransaction(null)}
+            onDeleteTransaction={async (id) => {
+              await handleDeleteTransaction(id);
+              setInspectingTransaction(null);
+            }}
             onSelectAsset={(id) => {
               setSelectedAssetId(id);
               setCurrentView('TRANSACTIONS');

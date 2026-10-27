@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { Equipment, Transaction } from '../../types';
 import { EquipmentTypeIcon } from '../../components/EquipmentTypeIcon';
+import { getGeneratorPowerState } from '../../utils/powerState';
 
 interface AssetsViewProps {
   assets: Equipment[];
@@ -79,7 +80,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       }
 
       // Classification / Power filter
-      const isRunning = Boolean(asset.poweredUpTimestamp && !asset.poweredDownTimestamp);
+      const isRunning = asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
       if (activeFilter === 'GENERATOR' && asset.type !== 'GENERATOR') return false;
       if (activeFilter === 'TANK' && asset.type !== 'TANK') return false;
       if (activeFilter === 'PLANT' && asset.type !== 'PLANT') return false;
@@ -88,7 +89,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
       return true;
     });
-  }, [assets, searchQuery, activeFilter, selectedArea]);
+  }, [assets, transactions, searchQuery, activeFilter, selectedArea]);
 
   // Counts for pills
   const counts = useMemo(() => {
@@ -97,10 +98,10 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       generator: assets.filter((a) => a.type === 'GENERATOR').length,
       tank: assets.filter((a) => a.type === 'TANK').length,
       plant: assets.filter((a) => a.type === 'PLANT').length,
-      running: assets.filter((a) => a.type === 'GENERATOR' && a.poweredUpTimestamp && !a.poweredDownTimestamp).length,
-      standby: assets.filter((a) => a.type === 'GENERATOR' && (!a.poweredUpTimestamp || a.poweredDownTimestamp)).length,
+      running: assets.filter((a) => a.type === 'GENERATOR' && getGeneratorPowerState(a.equipmentId, transactions).isOn).length,
+      standby: assets.filter((a) => a.type === 'GENERATOR' && !getGeneratorPowerState(a.equipmentId, transactions).isOn).length,
     };
-  }, [assets]);
+  }, [assets, transactions]);
 
   // Export to CSV
   const handleExportCsv = () => {
@@ -320,7 +321,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             </thead>
             <tbody>
               {filteredAssets.map((asset) => {
-                const isRunning = Boolean(asset.poweredUpTimestamp && !asset.poweredDownTimestamp);
+                const isRunning = asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
                 return (
                   <tr key={asset.equipmentId}>
                     {/* Equipment ID */}
@@ -470,7 +471,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         /* Card Grid View */
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
           {filteredAssets.map((asset) => {
-            const isRunning = Boolean(asset.poweredUpTimestamp && !asset.poweredDownTimestamp);
+            const isRunning = asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
             return (
               <div
                 key={asset.equipmentId}

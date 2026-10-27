@@ -115,6 +115,14 @@ export async function deleteTransactionFromSupabase(transactionId: string): Prom
   const client = getSupabaseClient();
   if (!client) return;
 
+  // 1. Fetch transaction record prior to deletion to check if it impacts generator power state
+  const { data: targetTx } = await client
+    .from('transactions')
+    .select('equipment_id, transaction_type')
+    .eq('id', transactionId)
+    .maybeSingle();
+
+  // 2. Delete the transaction record
   const { error, count } = await client
     .from('transactions')
     .delete({ count: 'exact' })
@@ -130,6 +138,40 @@ export async function deleteTransactionFromSupabase(transactionId: string): Prom
       `[Supabase Warning] Transaction ${transactionId} delete returned count: 0. ` +
       `Ensure the "Allow delete transactions for anon" policy exists on public.transactions in Supabase.`
     );
+  }
+
+  // 3. If this was a power event, reconcile the equipment's power state from remaining transactions
+  if (targetTx && (targetTx.transaction_type === 'PoweredUp' || targetTx.transaction_type === 'PoweredDown')) {
+    const { data: remainingPowerTxs } = await client
+      .from('transactions')
+      .select('transaction_type, transaction_timestamp')
+      .eq('equipment_id', targetTx.equipment_id)
+      .in('transaction_type', ['PoweredUp', 'PoweredDown'])
+      .order('transaction_timestamp', { ascending: false })
+      .limit(1);
+
+    if (remainingPowerTxs && remainingPowerTxs.length > 0) {
+      const latest = remainingPowerTxs[0];
+      const isPoweredUp = latest.transaction_type === 'PoweredUp';
+      await client
+        .from('equipment_list')
+        .update({
+          powered_up_timestamp: isPoweredUp ? latest.transaction_timestamp : null,
+          powered_down_timestamp: !isPoweredUp ? latest.transaction_timestamp : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('equipment_id', targetTx.equipment_id);
+    } else {
+      // By default, explicitly OFF when no power transactions exist
+      await client
+        .from('equipment_list')
+        .update({
+          powered_up_timestamp: null,
+          powered_down_timestamp: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('equipment_id', targetTx.equipment_id);
+    }
   }
 }
 

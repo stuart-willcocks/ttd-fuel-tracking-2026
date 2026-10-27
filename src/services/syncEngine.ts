@@ -2,6 +2,7 @@ import { db } from '../db/indexedDB';
 import { uploadTransactionToCloud } from './supabase';
 import { fetchRemoteEquipment, fetchRemoteTransactions, deleteRemoteTransaction } from './api';
 import type { Transaction } from '../types';
+import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
 
 export interface SyncState {
   isOnline: boolean;
@@ -148,30 +149,22 @@ class SyncEngine {
     this.deletedTxIds.add(transactionId);
     this.saveDeletedTxIds();
 
-    // 3. Recalculate equipment power state if this was a power event
+    // 3. Recalculate equipment power state from remaining transactions
     if (tx && (tx.transactionType === 'PoweredUp' || tx.transactionType === 'PoweredDown')) {
-      const remainingTxs = await db.transactions
+      const remainingTxs = (await db.transactions
         .where('equipmentId')
         .equals(tx.equipmentId)
-        .toArray();
-
-      const remainingPowerTxs = remainingTxs
-        .filter((t) => t.id !== transactionId && (t.transactionType === 'PoweredUp' || t.transactionType === 'PoweredDown'))
-        .sort((a, b) => new Date(b.transactionTimestamp).getTime() - new Date(a.transactionTimestamp).getTime());
+        .toArray()).filter((t) => t.id !== transactionId);
 
       const eq = await db.equipments.get(tx.equipmentId);
       if (eq) {
-        if (remainingPowerTxs.length > 0) {
-          const latest = remainingPowerTxs[0];
-          if (latest.transactionType === 'PoweredUp') {
-            eq.poweredUpTimestamp = latest.transactionTimestamp;
-            delete eq.poweredDownTimestamp;
-          } else {
-            eq.poweredDownTimestamp = latest.transactionTimestamp;
-          }
-        } else {
-          delete eq.poweredUpTimestamp;
+        const powerState = getGeneratorPowerState(tx.equipmentId, remainingTxs);
+        if (powerState.isOn) {
+          eq.poweredUpTimestamp = powerState.poweredUpTimestamp;
           delete eq.poweredDownTimestamp;
+        } else {
+          eq.poweredDownTimestamp = powerState.poweredDownTimestamp;
+          delete eq.poweredUpTimestamp;
         }
         eq.updatedAt = new Date().toISOString();
         await db.equipments.put(eq);
@@ -216,6 +209,7 @@ class SyncEngine {
         delete currentEq.poweredDownTimestamp;
       } else if (tx.transactionType === 'PoweredDown') {
         currentEq.poweredDownTimestamp = tx.transactionTimestamp;
+        delete currentEq.poweredUpTimestamp;
       }
       currentEq.updatedAt = new Date().toISOString();
       await db.equipments.put(currentEq);
@@ -262,12 +256,15 @@ class SyncEngine {
 
     // 3. Update local equipment power state cleanly if this was a power event
     const currentEq = await db.equipments.get(updatedTx.equipmentId);
-    if (currentEq) {
-      if (updatedTx.transactionType === 'PoweredUp') {
-        currentEq.poweredUpTimestamp = updatedTx.transactionTimestamp;
+    if (currentEq && currentEq.type === 'GENERATOR') {
+      const allTxForEq = await db.transactions.where('equipmentId').equals(updatedTx.equipmentId).toArray();
+      const powerState = getGeneratorPowerState(updatedTx.equipmentId, allTxForEq);
+      if (powerState.isOn) {
+        currentEq.poweredUpTimestamp = powerState.poweredUpTimestamp;
         delete currentEq.poweredDownTimestamp;
-      } else if (updatedTx.transactionType === 'PoweredDown') {
-        currentEq.poweredDownTimestamp = updatedTx.transactionTimestamp;
+      } else {
+        currentEq.poweredDownTimestamp = powerState.poweredDownTimestamp;
+        delete currentEq.poweredUpTimestamp;
       }
       currentEq.updatedAt = new Date().toISOString();
       await db.equipments.put(currentEq);
@@ -368,7 +365,9 @@ class SyncEngine {
       }
 
       if (remoteEquipment && Array.isArray(remoteEquipment) && remoteEquipment.length > 0) {
-        await db.equipments.bulkPut(remoteEquipment);
+        const allLocalTxs = await db.transactions.toArray();
+        const reconciled = reconcileEquipmentPowerStates(remoteEquipment, allLocalTxs);
+        await db.equipments.bulkPut(reconciled);
         hadUpdates = true;
       }
 
