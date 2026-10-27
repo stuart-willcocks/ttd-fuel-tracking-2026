@@ -414,7 +414,49 @@ export async function uploadTransactionToCloud(
   }
 }
 
-export const SUPABASE_SQL_MIGRATION = `-- TTD Fuel Tracking: Migration to enable transaction deletion and device tracking
+/**
+ * Subscribes to real-time database changes in Supabase (e.g. transactions logged by PDAs).
+ * Invokes callback whenever rows in `transactions` or `equipment_list` are inserted, updated, or deleted.
+ * Returns an unsubscribe teardown function.
+ */
+export function subscribeToCloudChanges(
+  onDataChange: (table: 'transactions' | 'equipment_list', eventType: string) => void
+): () => void {
+  const client = getSupabaseClient();
+  if (!client) return () => {};
+
+  const channel = client
+    .channel('ttd-cloud-realtime')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'transactions' },
+      (payload) => {
+        onDataChange('transactions', payload.eventType);
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'equipment_list' },
+      (payload) => {
+        onDataChange('equipment_list', payload.eventType);
+      }
+    )
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('[Supabase Realtime] Connected to live transaction feed from field PDAs');
+      }
+    });
+
+  return () => {
+    try {
+      client.removeChannel(channel);
+    } catch (err) {
+      console.warn('Error removing Supabase realtime channel:', err);
+    }
+  };
+}
+
+export const SUPABASE_SQL_MIGRATION = `-- TTD Fuel Tracking: Migration to enable transaction deletion, device tracking & Realtime
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS device_id text;
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS device_id text;
 
@@ -424,6 +466,24 @@ CREATE POLICY "Allow delete transactions for anon" ON public.transactions FOR DE
 
 DROP POLICY IF EXISTS "Allow update transactions for anon" ON public.transactions;
 CREATE POLICY "Allow update transactions for anon" ON public.transactions FOR UPDATE USING (true) WITH CHECK (true);
+
+-- Enable Realtime publication so Admin console updates instantly when PDAs write transactions
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'transactions'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.transactions;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'equipment_list'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.equipment_list;
+  END IF;
+END $$;
 `;
 
 export const SUPABASE_SQL_SCHEMA = `-- TTD Fuel Tracking 2026 - Supabase PostgreSQL Schema
@@ -481,7 +541,11 @@ create policy "Allow insert/upsert transactions for anon" on public.transactions
 create policy "Allow update transactions for anon" on public.transactions for update using (true) with check (true);
 create policy "Allow delete transactions for anon" on public.transactions for delete using (true);
 
--- 6. Insert initial fleet equipment
+-- 6. Enable Supabase Realtime for instant Admin console auto-refresh
+alter publication supabase_realtime add table public.transactions;
+alter publication supabase_realtime add table public.equipment_list;
+
+-- 7. Insert initial fleet equipment
 insert into public.equipment_list (equipment_id, area, location, what3words, type, capacity, rental_serial_number, powered_up_timestamp)
 values
   ('TTD-MAT-0001', 'North Zone', 'Stage Alpha Power Compound', '///puzzle.stages.daring', 'GENERATOR', 100, 'RSN-40291', '2026-10-14 08:30:00Z'),

@@ -20,7 +20,7 @@ import {
   postRemoteTransaction,
   resetRemoteData,
 } from '../services/api';
-import { isSupabaseConfigured } from '../services/supabase';
+import { isSupabaseConfigured, subscribeToCloudChanges } from '../services/supabase';
 
 export const AdminApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<AdminViewType>('ASSETS');
@@ -86,6 +86,28 @@ export const AdminApp: React.FC = () => {
     return () => {
       document.body.classList.remove('admin-body');
       clearInterval(interval);
+    };
+  }, [loadFleetData, isCreateModalOpen, editingAsset]);
+
+  // Real-time listener for database transactions and telemetry logged by field PDAs
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = subscribeToCloudChanges((table, eventType) => {
+      // Avoid clobbering user input when an asset creation or edit modal is active
+      if (isCreateModalOpen || Boolean(editingAsset)) return;
+
+      console.log(`[Realtime Sync] ${table} event (${eventType}) from field PDA - refreshing`);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        loadFleetData(true);
+      }, 300);
+    });
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      unsubscribe();
     };
   }, [loadFleetData, isCreateModalOpen, editingAsset]);
 
