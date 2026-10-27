@@ -9,6 +9,7 @@ import {
   clearAllCloudData,
   bulkImportEquipmentToSupabase,
   bulkImportTransactionsToSupabase,
+  uploadTransactionToCloud,
 } from './supabase';
 
 export async function fetchRemoteEquipment(): Promise<Equipment[]> {
@@ -76,6 +77,14 @@ export async function fetchRemoteTransactions(): Promise<Transaction[]> {
 export async function postRemoteTransaction(
   tx: Transaction
 ): Promise<{ success: boolean; uploadTimestamp: string }> {
+  if (isSupabaseConfigured()) {
+    const res = await uploadTransactionToCloud(tx);
+    if (!res.success) {
+      throw new Error(res.error || 'Failed to post transaction to cloud');
+    }
+    return { success: true, uploadTimestamp: res.uploadTimestamp };
+  }
+
   const res = await fetch('/api/transactions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

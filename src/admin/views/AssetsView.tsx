@@ -146,11 +146,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.65rem', fontWeight: 800, color: '#ffffff' }}>
-            Fleet Asset Management
+            Equipment
           </h1>
-          <p style={{ fontSize: '0.86rem', color: 'var(--adm-text-secondary)', marginTop: '2px' }}>
-            Comprehensive CRUD control for generators, bulk fuel tanks, and plant machinery
-          </p>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -243,8 +240,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           { key: 'GENERATOR', label: 'Generators', icon: <EquipmentTypeIcon type="GENERATOR" size={13} />, count: counts.generator },
           { key: 'TANK', label: 'Fuel Tanks', icon: <EquipmentTypeIcon type="TANK" size={13} />, count: counts.tank },
           { key: 'PLANT', label: 'Plant', icon: <EquipmentTypeIcon type="PLANT" size={13} />, count: counts.plant },
-          { key: 'RUNNING', label: 'Energized (Running)', icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ADE80', display: 'inline-block' }} />, count: counts.running },
-          { key: 'STANDBY', label: 'Standby Generators', icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94A3B8', display: 'inline-block' }} />, count: counts.standby },
+          { key: 'RUNNING', label: 'Generators (ON)', icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ADE80', display: 'inline-block' }} />, count: counts.running },
+          { key: 'STANDBY', label: 'Generators (OFF)', icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94A3B8', display: 'inline-block' }} />, count: counts.standby },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -399,7 +396,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                       {asset.type === 'GENERATOR' ? (
                         <span className={`admin-badge ${isRunning ? 'admin-badge-running' : 'admin-badge-standby'}`}>
                           <span className={`pulse-dot ${isRunning ? 'green' : 'slate'}`} />
-                          {isRunning ? 'RUNNING' : 'STANDBY'}
+                          {isRunning ? 'ON' : 'OFF'}
                         </span>
                       ) : (
                         <span style={{ fontSize: '0.78rem', color: 'var(--adm-text-muted)' }}>—</span>
@@ -435,7 +432,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                           <button
                             onClick={() => onTogglePower(asset)}
                             className="admin-btn admin-btn-outline admin-btn-sm"
-                            title={isRunning ? 'De-energize (Power Down)' : 'Energize (Power Up)'}
+                            title={isRunning ? 'Turn OFF' : 'Turn ON'}
                             style={{ padding: '5px 8px', color: isRunning ? '#F87171' : '#4ADE80' }}
                           >
                             <Zap size={14} />
@@ -497,7 +494,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     {asset.type === 'GENERATOR' && (
                       <span className={`admin-badge ${isRunning ? 'admin-badge-running' : 'admin-badge-standby'}`}>
                         <span className={`pulse-dot ${isRunning ? 'green' : 'slate'}`} />
-                        {isRunning ? 'RUNNING' : 'STANDBY'}
+                        {isRunning ? 'ON' : 'OFF'}
                       </span>
                     )}
                   </div>

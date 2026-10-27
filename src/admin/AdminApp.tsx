@@ -154,7 +154,7 @@ export const AdminApp: React.FC = () => {
       await postRemoteTransaction(newTx);
       await loadFleetData(true);
       showToast(
-        `${asset.equipmentId} is now ${isRunning ? 'Standby (Powered Down)' : 'Energized (Powered Up)'}`,
+        `${asset.equipmentId} is now ${isRunning ? 'OFF' : 'ON'}`,
         'success'
       );
     } catch (err: unknown) {
@@ -165,7 +165,7 @@ export const AdminApp: React.FC = () => {
 
   // Reset database handler
   const handleResetDatabase = async () => {
-    if (window.confirm('Reset all fleet assets and transactions to initial seed defaults?')) {
+    if (window.confirm('Reset all equipment and transactions to initial seed defaults?')) {
       try {
         await resetRemoteData();
         await loadFleetData();
@@ -180,13 +180,13 @@ export const AdminApp: React.FC = () => {
   const getPageTitle = () => {
     switch (currentView) {
       case 'ASSETS':
-        return 'Fleet Assets';
+        return 'Equipment';
       case 'TRANSACTIONS':
         return selectedAssetId ? `Transactions: ${selectedAssetId}` : 'All Transactions';
       case 'SETTINGS':
         return 'Cloud & Settings';
       default:
-        return 'Fleet Admin';
+        return 'Equipment';
     }
   };
 

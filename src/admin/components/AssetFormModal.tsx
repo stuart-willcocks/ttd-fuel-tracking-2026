@@ -153,13 +153,13 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>
           <div>
             <h2 className="admin-card-title" style={{ fontSize: '1.35rem' }}>
-              {isEditMode ? 'Edit Fleet Asset' : 'Register New Fleet Asset'}
+              {isEditMode ? 'Edit Equipment' : 'Register New Equipment'}
             </h2>
-            <p style={{ fontSize: '0.84rem', color: 'var(--adm-text-secondary)' }}>
-              {isEditMode
-                ? `Update equipment details and telemetry for ${initialAsset?.equipmentId}`
-                : 'Add a generator, tank, or plant to the master tracking database'}
-            </p>
+            {!isEditMode && (
+              <p style={{ fontSize: '0.84rem', color: 'var(--adm-text-secondary)' }}>
+                Add a generator, tank, or plant to the master tracking database
+              </p>
+            )}
           </div>
           <button onClick={onClose} className="admin-btn admin-btn-outline admin-btn-sm" style={{ padding: '6px' }}>
             <X size={18} />
@@ -209,9 +209,11 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 disabled={isEditMode}
                 required
               />
-              <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>
-                Printed on scannable QR label (format: TTD-vvv-nnnn)
-              </span>
+              {!isEditMode && (
+                <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>
+                  Printed on scannable QR label (format: TTD-vvv-nnnn)
+                </span>
+              )}
             </div>
 
             <div className="admin-input-group">
@@ -427,7 +429,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                     Generator Power Status
                   </div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--adm-text-secondary)' }}>
-                    {isPoweredUp ? 'Online & Energized (Running)' : 'Standby (Offline)'}
+                    {isPoweredUp ? 'ON' : 'OFF'}
                   </div>
                 </div>
               </div>
@@ -438,7 +440,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 className={`admin-btn ${isPoweredUp ? 'admin-btn-primary' : 'admin-btn-secondary'}`}
                 style={{ fontSize: '0.82rem', padding: '6px 14px' }}
               >
-                {isPoweredUp ? 'Running' : 'Standby'}
+                {isPoweredUp ? 'ON' : 'OFF'}
               </button>
             </div>
           )}

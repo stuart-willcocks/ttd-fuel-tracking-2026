@@ -208,10 +208,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             <button
               onClick={onBackToAssets}
               className="admin-btn admin-btn-secondary"
-              title="Return to Fleet Assets list"
+              title="Return to Equipment list"
             >
               <ArrowLeft size={16} />
-              <span>Back to Assets</span>
+              <span>Back to Equipment</span>
             </button>
           )}
 
@@ -284,7 +284,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               {currentAsset.type === 'GENERATOR' && (
                 <span className={`admin-badge ${isCurrentAssetRunning ? 'admin-badge-running' : 'admin-badge-standby'}`}>
                   <span className={`pulse-dot ${isCurrentAssetRunning ? 'green' : 'slate'}`} />
-                  {isCurrentAssetRunning ? 'RUNNING' : 'STANDBY'}
+                  {isCurrentAssetRunning ? 'ON' : 'OFF'}
                 </span>
               )}
 
@@ -328,11 +328,11 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 <button
                   onClick={() => onTogglePower(currentAsset)}
                   className="admin-btn admin-btn-outline admin-btn-sm"
-                  title={isCurrentAssetRunning ? 'Power Down (Standby)' : 'Power Up (Energize)'}
+                  title={isCurrentAssetRunning ? 'Turn OFF' : 'Turn ON'}
                   style={{ color: isCurrentAssetRunning ? '#F87171' : '#4ADE80' }}
                 >
                   <Zap size={14} />
-                  <span>{isCurrentAssetRunning ? 'Power Down' : 'Power Up'}</span>
+                  <span>{isCurrentAssetRunning ? 'Turn OFF' : 'Turn ON'}</span>
                 </button>
               )}
 
