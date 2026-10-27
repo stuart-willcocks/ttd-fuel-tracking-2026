@@ -22,6 +22,15 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setShowConfirm(false);
+      setIsDeleting(false);
+      setIsUploading(false);
+      setErrorMsg(null);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleClose = () => {
@@ -36,7 +45,9 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
     setErrorMsg(null);
     try {
       await onDeleteAll();
-      handleClose();
+      setIsDeleting(false);
+      setShowConfirm(false);
+      onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMsg(`Failed to delete records: ${msg}`);
@@ -53,12 +64,14 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
     try {
       const parsedEquipment = await parseEquipmentFile(file);
       await onBulkUpload(parsedEquipment);
-      handleClose();
+      setIsUploading(false);
+      setShowConfirm(false);
+      onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMsg(`Upload failed: ${msg}`);
-    } finally {
       setIsUploading(false);
+    } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -163,6 +176,9 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                 accept=".xlsx,.csv"
                 style={{ display: 'none' }}
                 onChange={handleFileChange}
+                onClick={(e) => {
+                  (e.target as HTMLInputElement).value = '';
+                }}
               />
 
               <button

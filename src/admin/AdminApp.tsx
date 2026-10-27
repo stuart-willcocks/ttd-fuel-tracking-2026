@@ -404,12 +404,14 @@ export const AdminApp: React.FC = () => {
         )}
 
         {/* Danger Zone Modal */}
-        <DangerZoneModal
-          isOpen={isDangerZoneOpen}
-          onClose={() => setIsDangerZoneOpen(false)}
-          onDeleteAll={handleDeleteAllRecords}
-          onBulkUpload={handleBulkUploadEquipment}
-        />
+        {isDangerZoneOpen && (
+          <DangerZoneModal
+            isOpen={isDangerZoneOpen}
+            onClose={() => setIsDangerZoneOpen(false)}
+            onDeleteAll={handleDeleteAllRecords}
+            onBulkUpload={handleBulkUploadEquipment}
+          />
+        )}
 
         {/* Toast Alerts */}
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />

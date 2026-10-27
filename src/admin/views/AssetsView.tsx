@@ -202,21 +202,22 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   return (
     <div className="admin-page-container">
       {/* Top Action Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginBottom: '20px' }}>
-        <button onClick={handleExportCsv} className="admin-btn admin-btn-secondary">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
+        <button type="button" onClick={handleExportCsv} className="admin-btn admin-btn-secondary">
           <Download size={15} />
           <span>Export CSV</span>
         </button>
 
-        <button onClick={onOpenCreateModal} className="admin-btn admin-btn-primary">
+        <button type="button" onClick={onOpenCreateModal} className="admin-btn admin-btn-primary">
           <Plus size={16} />
           <span>Add New Asset</span>
         </button>
 
         {onOpenDangerZone && (
           <button
+            type="button"
             onClick={onOpenDangerZone}
-            className="admin-btn"
+            className="admin-btn admin-btn-danger"
             style={{
               background: '#ef4444',
               color: '#ffffff',
