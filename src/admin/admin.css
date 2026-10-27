@@ -61,10 +61,18 @@
   padding: 0;
 }
 
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body.admin-body {
   font-family: var(--adm-font-body);
   background-color: var(--adm-bg);
   color: var(--adm-text-primary);
+  width: 100%;
+  max-width: 100%;
   min-height: 100vh;
   overflow-x: hidden;
   line-height: 1.5;
@@ -148,10 +156,13 @@ body.admin-body {
 .admin-shell {
   display: flex;
   flex-direction: column;
-  width: 100vw;
+  width: 100%;
+  max-width: 100%;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: var(--adm-bg);
+  box-sizing: border-box;
 }
 
 /* ==========================================================================
@@ -355,12 +366,23 @@ body.admin-body {
 /* Main Content Area */
 .admin-main-wrap {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  height: calc(100vh - 60px);
+  width: 100%;
+  max-width: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   background: var(--adm-bg);
+  box-sizing: border-box;
+}
+
+/* Page content wrapper with clean padding */
+.admin-page-container {
+  width: 100%;
+  max-width: 100%;
+  padding: 20px 24px;
+  box-sizing: border-box;
 }
 
 /* Top Header Bar */

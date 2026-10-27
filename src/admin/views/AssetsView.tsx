@@ -401,7 +401,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     {renderSortIndicator('powerState')}
                   </div>
                 </th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -490,7 +490,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     </td>
 
                     {/* Action buttons */}
-                    <td style={{ textAlign: 'right' }}>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end' }}>
                         {/* View Transactions for this asset */}
                         <button

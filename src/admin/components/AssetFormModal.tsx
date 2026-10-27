@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { X, Plus, Sparkles, MapPin, Check, Zap, Trash2 } from 'lucide-react';
+import { X, Plus, Sparkles, MapPin, Check, Zap, Trash2, ChevronDown } from 'lucide-react';
 import type { Equipment, AssetType } from '../../types';
 
 interface AssetFormModalProps {
@@ -27,6 +27,182 @@ const GEN_CAPACITIES = [60, 100, 150, 200, 250, 500, 1000];
 const TANK_CAPACITIES = [1000, 2000, 2500, 3000, 4500, 5000, 10000];
 
 const stripW3wPrefix = (str: string): string => str.replace(/^\/{1,3}/, '');
+
+interface ComboBoxProps {
+  value: string;
+  onChange: (val: string) => void;
+  options: (string | number)[];
+  placeholder?: string;
+  disabled?: boolean;
+  type?: 'text' | 'number';
+  unit?: string;
+  style?: React.CSSProperties;
+  inputStyle?: React.CSSProperties;
+  min?: string | number;
+  required?: boolean;
+}
+
+const ComboBox: React.FC<ComboBoxProps> = ({
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled = false,
+  type = 'text',
+  unit,
+  style,
+  inputStyle,
+  min,
+  required = false,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isOpen]);
+
+  const filteredOptions = useMemo(() => {
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed) return options;
+    const matching = options.filter((opt) => String(opt).toLowerCase().includes(trimmed));
+    return matching.length > 0 ? matching : options;
+  }, [options, value]);
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', ...style }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <input
+          type={type}
+          min={min}
+          className="admin-input"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          required={required}
+          onFocus={() => {
+            if (!disabled && options.length > 0) setIsOpen(true);
+          }}
+          style={{
+            width: '100%',
+            height: '38px',
+            paddingRight: unit ? '64px' : '34px',
+            ...inputStyle,
+          }}
+        />
+
+        {unit && (
+          <span
+            style={{
+              position: 'absolute',
+              right: '28px',
+              fontSize: '0.72rem',
+              fontFamily: 'var(--adm-font-mono)',
+              fontWeight: 600,
+              color: 'var(--adm-text-muted)',
+              pointerEvents: 'none',
+            }}
+          >
+            {unit}
+          </span>
+        )}
+
+        {!disabled && options.length > 0 && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => setIsOpen((prev) => !prev)}
+            style={{
+              position: 'absolute',
+              right: '4px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--adm-text-secondary)',
+            }}
+            title="Select existing value from database"
+          >
+            <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+          </button>
+        )}
+      </div>
+
+      {isOpen && !disabled && options.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 2px)',
+            left: 0,
+            right: 0,
+            maxHeight: '180px',
+            overflowY: 'auto',
+            background: '#FFFFFF',
+            border: '1px solid var(--adm-border-medium)',
+            boxShadow: 'var(--adm-shadow-lg)',
+            zIndex: 1000,
+          }}
+        >
+          {filteredOptions.map((opt) => (
+            <div
+              key={String(opt)}
+              onClick={() => {
+                onChange(String(opt));
+                setIsOpen(false);
+              }}
+              style={{
+                padding: '8px 12px',
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                background: String(opt) === value ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
+                color: String(opt) === value ? '#2563EB' : 'var(--adm-text-primary)',
+                fontWeight: String(opt) === value ? 700 : 400,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--adm-surface-2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = String(opt) === value ? 'rgba(37, 99, 235, 0.08)' : 'transparent';
+              }}
+            >
+              <span>{opt}</span>
+              {unit && <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>{unit}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface FormState {
+  equipmentId: string;
+  type: AssetType;
+  capacity: string;
+  area: string;
+  location: string;
+  what3words: string;
+  rentalSerialNumber: string;
+}
 
 export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   isOpen,
@@ -58,83 +234,127 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   };
 
   // Form input states
-  const [equipmentId, setEquipmentId] = useState<string>(() => {
-    return initialAsset?.equipmentId || suggestNextId();
-  });
+  const [equipmentId, setEquipmentId] = useState<string>('');
+  const [type, setType] = useState<AssetType>('GENERATOR');
+  const [capacity, setCapacity] = useState<string>('100');
+  const [area, setArea] = useState<string>('North Zone');
+  const [location, setLocation] = useState<string>('');
+  const [what3words, setWhat3words] = useState<string>('field.power.setup');
+  const [rentalSerialNumber, setRentalSerialNumber] = useState<string>('');
 
-  const [type, setType] = useState<AssetType>(() => {
-    return initialAsset?.type || 'GENERATOR';
-  });
-
-  const [capacity, setCapacity] = useState<string>(() => {
-    if (initialAsset) {
-      return initialAsset.capacity !== undefined ? String(initialAsset.capacity) : '';
-    }
-    return '100';
-  });
-
-  const [area, setArea] = useState<string>(() => {
-    return initialAsset?.area || 'North Zone';
-  });
-
-  const [location, setLocation] = useState<string>(() => {
-    return initialAsset?.location || '';
-  });
-
-  const [what3words, setWhat3words] = useState<string>(() => {
-    return initialAsset?.what3words ? stripW3wPrefix(initialAsset.what3words) : 'field.power.setup';
-  });
-
-  const [rentalSerialNumber, setRentalSerialNumber] = useState<string>(() => {
-    if (initialAsset) return initialAsset.rentalSerialNumber || '';
-    return `RSN-${Math.floor(10000 + Math.random() * 90000)}`;
-  });
+  const [initialFormState, setInitialFormState] = useState<FormState | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Database options for Capacity combo box based on current equipment type
+  const capacityOptions = useMemo(() => {
+    if (type === 'PLANT') return [];
+    const dbCapacities = existingAssets
+      .filter((a) => a.type === type && typeof a.capacity === 'number' && a.capacity > 0)
+      .map((a) => a.capacity as number);
+
+    const defaultCaps = type === 'GENERATOR' ? GEN_CAPACITIES : TANK_CAPACITIES;
+    const combined = Array.from(new Set([...dbCapacities, ...defaultCaps]));
+    return combined.sort((a, b) => a - b);
+  }, [existingAssets, type]);
+
+  // Database options for Zone/area combo box
+  const areaOptions = useMemo(() => {
+    const dbAreas = existingAssets
+      .map((a) => a.area?.trim())
+      .filter((a): a is string => Boolean(a));
+    const combined = Array.from(new Set([...dbAreas, ...COMMON_AREAS]));
+    return combined.sort((a, b) => a.localeCompare(b));
+  }, [existingAssets]);
+
   // Synchronize state when initialAsset changes or modal opens
   useEffect(() => {
+    let initId = '';
+    let initType: AssetType = 'GENERATOR';
+    let initCap = '100';
+    let initArea = 'North Zone';
+    let initLoc = '';
+    let initW3w = 'field.power.setup';
+    let initRsn = '';
+
     if (initialAsset) {
-      setEquipmentId(initialAsset.equipmentId);
-      setType(initialAsset.type);
-      setCapacity(initialAsset.capacity !== undefined ? String(initialAsset.capacity) : '');
-      setArea(initialAsset.area || 'North Zone');
-      setLocation(initialAsset.location || '');
-      setWhat3words(stripW3wPrefix(initialAsset.what3words || 'field.power.setup'));
-      setRentalSerialNumber(initialAsset.rentalSerialNumber || '');
+      initId = initialAsset.equipmentId;
+      initType = initialAsset.type;
+      initCap = initialAsset.capacity !== undefined ? String(initialAsset.capacity) : '';
+      initArea = initialAsset.area || 'North Zone';
+      initLoc = initialAsset.location || '';
+      initW3w = stripW3wPrefix(initialAsset.what3words || 'field.power.setup');
+      initRsn = initialAsset.rentalSerialNumber || '';
     } else {
-      setEquipmentId(suggestNextId());
-      setType('GENERATOR');
-      setCapacity('100');
-      setArea('North Zone');
-      setLocation('');
-      setWhat3words('field.power.setup');
-      setRentalSerialNumber(`RSN-${Math.floor(10000 + Math.random() * 90000)}`);
+      initId = suggestNextId();
+      initType = 'GENERATOR';
+      initCap = '100';
+      initArea = 'North Zone';
+      initLoc = '';
+      initW3w = 'field.power.setup';
+      initRsn = `RSN-${Math.floor(10000 + Math.random() * 90000)}`;
     }
+
+    setEquipmentId(initId);
+    setType(initType);
+    setCapacity(initCap);
+    setArea(initArea);
+    setLocation(initLoc);
+    setWhat3words(initW3w);
+    setRentalSerialNumber(initRsn);
+
+    setInitialFormState({
+      equipmentId: initId,
+      type: initType,
+      capacity: initCap,
+      area: initArea,
+      location: initLoc,
+      what3words: initW3w,
+      rentalSerialNumber: initRsn,
+    });
+
     setErrorMsg(null);
   }, [initialAsset, isOpen]);
 
-  // Form dirty check: only true if any value differs from initialAsset
+  // Form dirty check: true if any field differs from the initial form state
   const isDirty = useMemo(() => {
-    if (!isEditMode || !initialAsset) return true;
+    if (!initialFormState) return false;
 
-    const parsedCap = type === 'PLANT' ? undefined : capacity ? parseInt(capacity, 10) : undefined;
-    const initCap = initialAsset.capacity;
-    const capMatches = (parsedCap === undefined && initCap === undefined) || parsedCap === initCap;
-
-    const currentW3w = stripW3wPrefix(what3words.trim());
-    const initW3w = stripW3wPrefix((initialAsset.what3words || '').trim());
+    const normCap = (t: AssetType, c: string) => (t === 'PLANT' ? '' : c.trim());
+    const normW3w = (w: string) => stripW3wPrefix(w.trim());
 
     return (
-      type !== initialAsset.type ||
-      !capMatches ||
-      area.trim() !== (initialAsset.area || '').trim() ||
-      location.trim() !== (initialAsset.location || '').trim() ||
-      currentW3w !== initW3w ||
-      rentalSerialNumber.trim().toUpperCase() !== (initialAsset.rentalSerialNumber || '').trim().toUpperCase()
+      equipmentId.trim().toUpperCase() !== initialFormState.equipmentId.trim().toUpperCase() ||
+      type !== initialFormState.type ||
+      normCap(type, capacity) !== normCap(initialFormState.type, initialFormState.capacity) ||
+      area.trim() !== initialFormState.area.trim() ||
+      location.trim() !== initialFormState.location.trim() ||
+      normW3w(what3words) !== normW3w(initialFormState.what3words) ||
+      rentalSerialNumber.trim().toUpperCase() !== initialFormState.rentalSerialNumber.trim().toUpperCase()
     );
-  }, [isEditMode, initialAsset, type, capacity, area, location, what3words, rentalSerialNumber]);
+  }, [initialFormState, equipmentId, type, capacity, area, location, what3words, rentalSerialNumber]);
+
+  // Mandatory fields validation
+  const isValid = useMemo(() => {
+    const cleanId = equipmentId.trim().toUpperCase();
+    if (!cleanId) return false;
+    if (!isEditMode && existingAssets.some((a) => a.equipmentId.toUpperCase() === cleanId)) {
+      return false;
+    }
+    if (!type) return false;
+    if (type !== 'PLANT') {
+      const capNum = parseInt(capacity, 10);
+      if (isNaN(capNum) || capNum <= 0) return false;
+    }
+    if (!area.trim()) return false;
+    if (!location.trim()) return false;
+    if (!stripW3wPrefix(what3words.trim())) return false;
+    if (!rentalSerialNumber.trim()) return false;
+    return true;
+  }, [equipmentId, isEditMode, existingAssets, type, capacity, area, location, what3words, rentalSerialNumber]);
+
+  const canSubmit = isDirty && isValid && !isSubmitting;
 
   if (!isOpen) return null;
 
@@ -153,6 +373,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canSubmit) return;
     setErrorMsg(null);
 
     const cleanId = equipmentId.trim().toUpperCase();
@@ -209,6 +430,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
           isMouseDownOnBackdrop.current = false;
         }}
         onClick={(e) => e.stopPropagation()}
+        style={{ minHeight: '520px' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <div>
@@ -249,7 +471,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 onChange={(e) => setEquipmentId(e.target.value.toUpperCase())}
                 placeholder="TTD-MAT-0001"
                 disabled={isEditMode}
-                style={{ width: '25%', minWidth: '130px' }}
+                style={{ width: '25%', minWidth: '130px', height: '38px' }}
                 required
               />
               {!isEditMode && (
@@ -257,7 +479,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                   type="button"
                   onClick={() => setEquipmentId(suggestNextId())}
                   className="admin-btn admin-btn-outline admin-btn-sm"
-                  style={{ fontSize: '0.74rem', padding: '6px 10px', gap: '4px', height: '36px' }}
+                  style={{ fontSize: '0.74rem', padding: '6px 10px', gap: '4px', height: '38px' }}
                 >
                   <Sparkles size={12} color="#f59e0b" />
                   <span>Next ID</span>
@@ -266,14 +488,14 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
             </div>
           </div>
 
-          {/* Row 2: Equipment type dropdown (1/3 of current width) with capacity to the right */}
+          {/* Row 2: Equipment type dropdown (1/3 of current width) with capacity combo box to the right */}
           <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', marginBottom: '16px' }}>
             {/* Equipment Type Dropdown (1/3 width) */}
             <div className="admin-input-group" style={{ width: '140px', flexShrink: 0, marginBottom: 0 }}>
               <label className="admin-label">Equipment type *</label>
               <select
                 className="admin-select"
-                style={{ width: '100%' }}
+                style={{ width: '100%', height: '38px' }}
                 value={type}
                 onChange={(e) => {
                   const newType = e.target.value as AssetType;
@@ -288,98 +510,49 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               </select>
             </div>
 
-            {/* Capacity Text Box */}
-            <div className="admin-input-group" style={{ width: '110px', flexShrink: 0, marginBottom: 0 }}>
+            {/* Capacity Combo Box (Select from DB or create new) */}
+            <div className="admin-input-group" style={{ width: '130px', flexShrink: 0, marginBottom: 0 }}>
               <label className="admin-label">Capacity *</label>
               {type !== 'PLANT' ? (
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
-                    type="number"
-                    min="1"
-                    className="admin-input admin-mono"
-                    value={capacity}
-                    onChange={(e) => setCapacity(e.target.value)}
-                    placeholder={type === 'GENERATOR' ? '100' : '3000'}
-                    style={{ paddingRight: type === 'GENERATOR' ? '36px' : '26px' }}
-                    required
-                  />
-                  <span
-                    style={{
-                      position: 'absolute',
-                      right: '8px',
-                      fontSize: '0.72rem',
-                      fontFamily: 'var(--adm-font-mono)',
-                      fontWeight: 600,
-                      color: 'var(--adm-text-muted)',
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    {type === 'GENERATOR' ? 'kVA' : 'L'}
-                  </span>
-                </div>
+                <ComboBox
+                  type="number"
+                  min="1"
+                  value={capacity}
+                  onChange={(val) => setCapacity(val)}
+                  options={capacityOptions}
+                  placeholder={type === 'GENERATOR' ? '100' : '3000'}
+                  unit={type === 'GENERATOR' ? 'kVA' : 'L'}
+                  required
+                />
               ) : (
                 <input
                   type="text"
                   className="admin-input"
                   value="Unrated"
                   disabled
-                  style={{ color: 'var(--adm-text-muted)', background: 'var(--adm-surface-2)', textAlign: 'center' }}
+                  style={{
+                    color: 'var(--adm-text-muted)',
+                    background: 'var(--adm-surface-2)',
+                    textAlign: 'center',
+                    height: '38px',
+                  }}
                 />
               )}
             </div>
           </div>
 
-          {/* Quick presets for Capacity */}
-          {type !== 'PLANT' && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
-              <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)', alignSelf: 'center', marginRight: '4px' }}>
-                Presets:
-              </span>
-              {(type === 'GENERATOR' ? GEN_CAPACITIES : TANK_CAPACITIES).map((cap) => (
-                <button
-                  key={cap}
-                  type="button"
-                  onClick={() => setCapacity(String(cap))}
-                  className="admin-btn admin-btn-outline admin-btn-sm"
-                  style={{
-                    padding: '2px 7px',
-                    fontSize: '0.7rem',
-                    background: capacity === String(cap) ? 'rgba(37, 99, 235, 0.15)' : undefined,
-                    borderColor: capacity === String(cap) ? '#2563EB' : undefined,
-                    color: capacity === String(cap) ? '#2563EB' : undefined,
-                  }}
-                >
-                  {cap} {type === 'GENERATOR' ? 'kVA' : 'L'}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Row 3: Zone/area on its own line, 90% width */}
+          {/* Row 3: Zone/area combo box on its own line, 90% width (Select from DB or create new) */}
           <div className="admin-input-group" style={{ marginBottom: '16px' }}>
             <label className="admin-label">Zone/area *</label>
-            <input
+            <ComboBox
               type="text"
-              className="admin-input"
-              style={{ width: '90%' }}
               value={area}
-              onChange={(e) => setArea(e.target.value)}
+              onChange={(val) => setArea(val)}
+              options={areaOptions}
               placeholder="e.g. North Zone"
+              style={{ width: '90%' }}
               required
             />
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
-              {COMMON_AREAS.slice(0, 4).map((a) => (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() => setArea(a)}
-                  className="admin-btn admin-btn-outline admin-btn-sm"
-                  style={{ padding: '2px 7px', fontSize: '0.7rem' }}
-                >
-                  {a}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Row 4: Location on its own line, 90% width */}
@@ -388,7 +561,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
             <input
               type="text"
               className="admin-input"
-              style={{ width: '90%' }}
+              style={{ width: '90%', height: '38px' }}
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="e.g. Stage Alpha Power Compound"
@@ -418,7 +591,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 value={what3words}
                 onChange={(e) => setWhat3words(stripW3wPrefix(e.target.value))}
                 placeholder="puzzle.stages.daring"
-                style={{ paddingLeft: '32px', width: '100%' }}
+                style={{ paddingLeft: '32px', width: '100%', height: '38px' }}
                 required
               />
               <MapPin
@@ -440,7 +613,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
             <input
               type="text"
               className="admin-input admin-mono"
-              style={{ width: '90%' }}
+              style={{ width: '90%', height: '38px' }}
               value={rentalSerialNumber}
               onChange={(e) => setRentalSerialNumber(e.target.value.toUpperCase())}
               placeholder="RSN-40291"
@@ -518,10 +691,10 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               <button
                 type="submit"
                 className="admin-btn admin-btn-primary"
-                disabled={isSubmitting || (isEditMode && !isDirty)}
+                disabled={!canSubmit}
                 style={{
-                  opacity: isEditMode && !isDirty ? 0.45 : 1,
-                  cursor: isEditMode && !isDirty ? 'not-allowed' : 'pointer',
+                  opacity: canSubmit ? 1 : 0.45,
+                  cursor: canSubmit ? 'pointer' : 'not-allowed',
                 }}
               >
                 {isSubmitting ? (
@@ -529,7 +702,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 ) : (
                   <>
                     {isEditMode ? <Check size={16} /> : <Plus size={16} />}
-                    <span>{isEditMode ? 'Update Asset' : 'Save New Asset'}</span>
+                    <span>{isEditMode ? 'Update Asset' : 'Save new asset'}</span>
                   </>
                 )}
               </button>
@@ -540,3 +713,4 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     </div>
   );
 };
+
