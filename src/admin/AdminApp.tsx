@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Boxes, ReceiptText } from 'lucide-react';
 import './admin.css';
 import { LaptopOnlyGuard } from './components/LaptopOnlyGuard';
 import { AdminTopNav, type AdminViewType } from './components/AdminTopNav';
@@ -258,20 +259,40 @@ export const AdminApp: React.FC = () => {
       <div className="admin-shell">
         {/* Full-Width Orange Top Navigation Menu */}
         <AdminTopNav
-          currentView={currentView}
-          onSelectView={(view) => {
-            if (view === 'TRANSACTIONS') {
-              setSelectedAssetId(null);
-            }
-            setCurrentView(view);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          assetCount={assets.length}
-          transactionCount={transactions.length}
           isSupabaseOnline={isSupabaseOnline}
           isRefreshing={isRefreshing}
           onRefresh={() => loadFleetData()}
         />
+
+        {/* Navigation Tabs Bar directly below top banner */}
+        <div className="admin-nav-tabs-bar">
+          <button
+            type="button"
+            onClick={() => {
+              setCurrentView('ASSETS');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`admin-nav-tab ${currentView === 'ASSETS' ? 'active' : ''}`}
+          >
+            <Boxes size={18} />
+            <span>Equipment</span>
+            <span className="admin-nav-tab-badge">{assets.length}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedAssetId(null);
+              setCurrentView('TRANSACTIONS');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`admin-nav-tab ${currentView === 'TRANSACTIONS' ? 'active' : ''}`}
+          >
+            <ReceiptText size={18} />
+            <span>Transactions</span>
+            <span className="admin-nav-tab-badge">{transactions.length}</span>
+          </button>
+        </div>
 
         {/* Main Content Viewport spanning full width */}
         <div className="admin-main-wrap">

@@ -1,52 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Boxes,
-  ReceiptText,
-  Clock,
   RefreshCw,
   Smartphone,
   ExternalLink,
 } from 'lucide-react';
-import { APP_VERSION } from '../../version';
+import { APP_VERSION, BUILD_NUMBER, getIsStaging } from '../../version';
 
 export type AdminViewType = 'ASSETS' | 'TRANSACTIONS' | 'SETTINGS';
 
 interface AdminTopNavProps {
-  currentView: AdminViewType;
-  onSelectView: (view: AdminViewType) => void;
-  assetCount: number;
-  transactionCount: number;
   isSupabaseOnline: boolean;
   isRefreshing: boolean;
   onRefresh: () => void;
 }
 
 export const AdminTopNav: React.FC<AdminTopNavProps> = ({
-  currentView,
-  onSelectView,
-  assetCount,
-  transactionCount,
   isSupabaseOnline,
   isRefreshing,
   onRefresh,
 }) => {
-  const [currentTime, setCurrentTime] = useState<string>('');
+  const [hasNewVersion, setHasNewVersion] = useState(false);
+  const isStaging = getIsStaging();
 
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-      const dateStr = now.toLocaleDateString(undefined, {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      });
-      setCurrentTime(`${dateStr} • ${timeStr}`);
+    const checkVersion = async () => {
+      try {
+        const res = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' });
+        if (res.ok) {
+          const remoteData = await res.json();
+          const remoteBuild = Number(remoteData.build || remoteData.version);
+          if (remoteBuild && remoteBuild > BUILD_NUMBER) {
+            setHasNewVersion(true);
+          }
+        }
+      } catch {
+        // Offline or network error
+      }
     };
 
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
+    checkVersion();
+    const interval = setInterval(checkVersion, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -54,10 +47,7 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
     <header className="admin-top-menu-bar">
       {/* Left Navigation Zone */}
       <div className="admin-top-menu-left">
-        {/* Version tag */}
-        <span className="admin-version-tag">V{APP_VERSION}</span>
-
-        {/* TTD Brand Logo top left */}
+        {/* TTD Brand Logo top left - 2.5x current size (80px) */}
         <img
           src="/logo-01.png"
           alt="The Technical Department Ltd"
@@ -68,32 +58,20 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
         <span className="admin-top-brand-title">TTD Fuel Tracking</span>
 
         {/* Admin Console Label */}
-        <span className="admin-console-label">Admin console</span>
+        <span className="admin-console-label">ADMIN CONSOLE</span>
 
-        {/* Menu Buttons Divider */}
-        <div className="admin-top-nav-divider" />
-
-        {/* Equipment Menu Button */}
-        <button
-          type="button"
-          onClick={() => onSelectView('ASSETS')}
-          className={`admin-top-nav-btn ${currentView === 'ASSETS' ? 'active' : ''}`}
-        >
-          <Boxes size={16} />
-          <span>Equipment</span>
-          <span className="admin-top-nav-counter">{assetCount}</span>
-        </button>
-
-        {/* Transactions Menu Button */}
-        <button
-          type="button"
-          onClick={() => onSelectView('TRANSACTIONS')}
-          className={`admin-top-nav-btn ${currentView === 'TRANSACTIONS' ? 'active' : ''}`}
-        >
-          <ReceiptText size={16} />
-          <span>Transactions</span>
-          <span className="admin-top-nav-counter">{transactionCount}</span>
-        </button>
+        {/* Version number with optional (STAGING) and update exclamation mark */}
+        <span className="admin-version-tag">
+          <span>V{APP_VERSION}{isStaging ? ' (STAGING)' : ''}</span>
+          {hasNewVersion && (
+            <span
+              className="admin-version-alert-mark"
+              title="A new app version is available. Click refresh to update."
+            >
+              !
+            </span>
+          )}
+        </span>
       </div>
 
       {/* Right Action & Status Zone */}
@@ -107,35 +85,28 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
           <span>{isSupabaseOnline ? 'Online' : 'Offline'}</span>
         </div>
 
-        {/* Refresh button */}
+        {/* Narrow Refresh button (icon only, no word "refresh") */}
         <button
           type="button"
           onClick={onRefresh}
-          className="admin-top-tool-btn"
+          className="admin-top-tool-btn admin-top-refresh-btn"
           disabled={isRefreshing}
           title="Reload fresh equipment & transactions"
         >
-          <RefreshCw size={13} className={isRefreshing ? 'admin-spin' : ''} />
-          <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+          <RefreshCw size={15} className={isRefreshing ? 'admin-spin' : ''} />
         </button>
 
-        {/* Live Clock */}
-        <div className="admin-top-clock-chip">
-          <Clock size={12} />
-          <span>{currentTime || 'Syncing...'}</span>
-        </div>
-
-        {/* Link to Zebra Handheld Field Web App */}
+        {/* Link to Zebra Handheld Field Web App relabeled as "PDA app" */}
         <a
           href="/"
           target="_blank"
           rel="noreferrer"
           className="admin-top-tool-btn"
-          title="Open handheld scanner interface in new tab"
+          title="Open PDA scanner interface in new tab"
         >
-          <Smartphone size={13} />
-          <span>Handheld App</span>
-          <ExternalLink size={11} />
+          <Smartphone size={14} />
+          <span>PDA App</span>
+          <ExternalLink size={12} />
         </a>
       </div>
     </header>

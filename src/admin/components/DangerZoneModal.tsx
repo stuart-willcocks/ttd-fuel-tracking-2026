@@ -99,7 +99,7 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
             >
               {showConfirm ? <AlertOctagon size={20} /> : <AlertTriangle size={20} />}
             </div>
-            <h2 className="admin-card-title" style={{ fontSize: '1.25rem', color: '#ffffff' }}>
+            <h2 className="admin-card-title" style={{ fontSize: '1.25rem', color: 'var(--adm-text-primary)' }}>
               {showConfirm ? 'Confirm Deletion' : 'Danger Zone'}
             </h2>
           </div>
@@ -203,8 +203,8 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
             <p
               style={{
                 fontSize: '1rem',
-                color: '#f8fafc',
-                fontWeight: 500,
+                color: 'var(--adm-text-primary)',
+                fontWeight: 600,
                 lineHeight: 1.5,
                 margin: '12px 0 24px 0',
               }}

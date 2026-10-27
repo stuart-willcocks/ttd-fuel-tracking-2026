@@ -36,11 +36,33 @@ try {
   // Ignore if public directory not found
 }
 
+import { execSync } from 'child_process';
+
+let branch = '';
+try {
+  branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim();
+} catch (e) {
+  branch = process.env.VERCEL_GIT_COMMIT_REF || '';
+}
+const isStaging = branch === 'staging' || process.env.VERCEL_ENV === 'preview' || Boolean(process.env.VITE_IS_STAGING);
+
 // Write src/version.ts
 const tsContent = `// Auto-generated build version - DO NOT EDIT MANUALLY
 export const APP_VERSION = '${versionData.version}';
 export const BUILD_NUMBER = ${versionData.build};
 export const BUILD_TIME = '${versionData.buildTime}';
+export const GIT_BRANCH = '${branch}';
+export const IS_STAGING = ${isStaging};
+
+export function getIsStaging(): boolean {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase();
+    if (host.includes('staging') || host.includes('preview') || host === 'localhost' || host === '127.0.0.1') {
+      return true;
+    }
+  }
+  return IS_STAGING;
+}
 `;
 fs.writeFileSync(versionTsPath, tsContent, 'utf-8');
 

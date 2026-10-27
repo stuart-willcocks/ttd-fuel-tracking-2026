@@ -13,6 +13,9 @@ import {
   Table as TableIcon,
   ReceiptText,
   AlertTriangle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import type { Equipment, Transaction } from '../../types';
 import { EquipmentTypeIcon } from '../../components/EquipmentTypeIcon';
@@ -106,6 +109,70 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     };
   }, [assets, transactions]);
 
+  // Sorting State
+  type AssetSortField = 'equipmentId' | 'type' | 'capacity' | 'location' | 'what3words' | 'rentalSerialNumber' | 'powerState';
+  type SortDirection = 'asc' | 'desc';
+
+  const [sortField, setSortField] = useState<AssetSortField>('equipmentId');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const handleSort = (field: AssetSortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sorted Assets
+  const sortedAssets = useMemo(() => {
+    return [...filteredAssets].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'equipmentId':
+          comparison = a.equipmentId.localeCompare(b.equipmentId, undefined, { numeric: true, sensitivity: 'base' });
+          break;
+        case 'type':
+          comparison = a.type.localeCompare(b.type);
+          break;
+        case 'capacity':
+          comparison = (a.capacity || 0) - (b.capacity || 0);
+          break;
+        case 'location': {
+          const locA = `${a.area} ${a.location}`;
+          const locB = `${b.area} ${b.location}`;
+          comparison = locA.localeCompare(locB);
+          break;
+        }
+        case 'what3words':
+          comparison = (a.what3words || '').localeCompare(b.what3words || '');
+          break;
+        case 'rentalSerialNumber':
+          comparison = (a.rentalSerialNumber || '').localeCompare(b.rentalSerialNumber || '');
+          break;
+        case 'powerState': {
+          const aOn = a.type === 'GENERATOR' && getGeneratorPowerState(a.equipmentId, transactions).isOn ? 1 : 0;
+          const bOn = b.type === 'GENERATOR' && getGeneratorPowerState(b.equipmentId, transactions).isOn ? 1 : 0;
+          comparison = aOn - bOn;
+          break;
+        }
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [filteredAssets, sortField, sortDirection, transactions]);
+
+  const renderSortIndicator = (field: AssetSortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown size={12} style={{ opacity: 0.35, marginLeft: '6px' }} />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp size={12} style={{ color: 'var(--adm-accent-yellow)', marginLeft: '6px' }} />
+    ) : (
+      <ArrowDown size={12} style={{ color: 'var(--adm-accent-yellow)', marginLeft: '6px' }} />
+    );
+  };
+
   // Export to CSV
   const handleExportCsv = () => {
     const headers = [
@@ -121,7 +188,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       'UpdatedAt',
     ];
 
-    const rows = filteredAssets.map((a) => [
+    const rows = sortedAssets.map((a) => [
       `"${a.equipmentId}"`,
       `"${a.type}"`,
       a.capacity !== undefined ? a.capacity : '""',
@@ -149,7 +216,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       {/* Page Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.65rem', fontWeight: 800, color: '#ffffff' }}>
+          <h1 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.65rem', fontWeight: 800, color: 'var(--adm-text-primary)' }}>
             Equipment
           </h1>
         </div>
@@ -273,7 +340,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             className={`admin-btn ${activeFilter === tab.key ? 'admin-btn-secondary' : 'admin-btn-outline'} admin-btn-sm`}
             style={{
               borderColor: activeFilter === tab.key ? 'var(--adm-accent-yellow)' : undefined,
-              color: activeFilter === tab.key ? '#ffffff' : undefined,
+              color: activeFilter === tab.key ? 'var(--adm-text-primary)' : undefined,
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
@@ -309,7 +376,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           }}
         >
           <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🔍</div>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff', marginBottom: '6px' }}>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--adm-text-primary)', marginBottom: '6px' }}>
             No assets match your search criteria
           </h3>
           <p style={{ color: 'var(--adm-text-secondary)', fontSize: '0.9rem', marginBottom: '18px' }}>
@@ -332,18 +399,53 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Equipment ID</th>
-                <th>Equipment type</th>
-                <th>Capacity</th>
-                <th>Zone &amp; Location</th>
-                <th>What3Words</th>
-                <th>Rental Serial</th>
-                <th>Power State</th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('equipmentId')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Equipment ID</span>
+                    {renderSortIndicator('equipmentId')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('type')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Equipment type</span>
+                    {renderSortIndicator('type')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('capacity')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Capacity</span>
+                    {renderSortIndicator('capacity')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('location')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Zone &amp; Location</span>
+                    {renderSortIndicator('location')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('what3words')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>What3Words</span>
+                    {renderSortIndicator('what3words')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('rentalSerialNumber')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Rental Serial</span>
+                    {renderSortIndicator('rentalSerialNumber')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('powerState')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Power State</span>
+                    {renderSortIndicator('powerState')}
+                  </div>
+                </th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredAssets.map((asset) => {
+              {sortedAssets.map((asset) => {
                 const isRunning = asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
                 return (
                   <tr key={asset.equipmentId}>
@@ -493,7 +595,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       ) : (
         /* Card Grid View */
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-          {filteredAssets.map((asset) => {
+          {sortedAssets.map((asset) => {
             const isRunning = asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
             return (
               <div

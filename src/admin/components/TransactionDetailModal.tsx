@@ -45,7 +45,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               <ReceiptText size={20} />
             </div>
             <div>
-              <h3 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>
+              <h3 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--adm-text-primary)' }}>
                 Transaction Telemetry
               </h3>
               <p style={{ fontSize: '0.8rem', color: 'var(--adm-text-secondary)', fontFamily: 'var(--adm-font-mono)' }}>
@@ -102,21 +102,21 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
           <div style={{ background: 'var(--adm-surface-2)', padding: '14px', borderRadius: '8px' }}>
             <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>Action Type</span>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#ffffff' }}>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--adm-text-primary)' }}>
               {transaction.transactionType}
             </div>
           </div>
 
           <div style={{ background: 'var(--adm-surface-2)', padding: '14px', borderRadius: '8px' }}>
             <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>PDA Handheld Device</span>
-            <div style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.9rem', color: '#38bdf8' }}>
+            <div style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.9rem', color: '#0284c7' }}>
               {transaction.deviceId || 'Field PDA (Zebra)'}
             </div>
           </div>
 
           <div style={{ background: 'var(--adm-surface-2)', padding: '14px', borderRadius: '8px' }}>
             <span style={{ fontSize: '0.74rem', color: 'var(--adm-text-muted)' }}>Transaction Time (Local)</span>
-            <div style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.86rem', color: '#ffffff' }}>
+            <div style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.86rem', color: 'var(--adm-text-primary)' }}>
               {formatAdminTimestamp(transaction.transactionTimestamp)}
             </div>
           </div>
@@ -165,7 +165,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             {transaction.checkInFuelPercentage !== undefined && (
               <div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-in Fuel</span>
-                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--adm-text-primary)' }}>
                   {transaction.checkInFuelPercentage}%
                 </p>
               </div>
@@ -174,7 +174,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             {transaction.checkOutFuelPercentage !== undefined && (
               <div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-out Fuel</span>
-                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--adm-text-primary)' }}>
                   {transaction.checkOutFuelPercentage}%
                 </p>
               </div>
@@ -183,7 +183,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             {transaction.checkInDefPercentage !== undefined && (
               <div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-in DEF</span>
-                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--adm-text-primary)' }}>
                   {transaction.checkInDefPercentage}%
                 </p>
               </div>
@@ -192,7 +192,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             {transaction.checkOutDefPercentage !== undefined && (
               <div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-out DEF</span>
-                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--adm-text-primary)' }}>
                   {transaction.checkOutDefPercentage}%
                 </p>
               </div>
@@ -201,7 +201,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             {transaction.checkInFuelEighths !== undefined && (
               <div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-in Eighths</span>
-                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--adm-text-primary)' }}>
                   {transaction.checkInFuelEighths}/8
                 </p>
               </div>
@@ -210,7 +210,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             {transaction.checkOutFuelEighths !== undefined && (
               <div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-out Eighths</span>
-                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--adm-text-primary)' }}>
                   {transaction.checkOutFuelEighths}/8
                 </p>
               </div>

@@ -96,13 +96,13 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               {transactionData.fuelTransferLitres !== undefined && (
                 <tr>
                   <td className="lbl">Fuel Transferred</td>
-                  <td className="val font-bold">+{transactionData.fuelTransferLitres} Litres</td>
+                  <td className="val font-bold">{transactionData.fuelTransferLitres} Litres</td>
                 </tr>
               )}
               {transactionData.defTransferLitres !== undefined && (
                 <tr>
                   <td className="lbl">DEF Transferred</td>
-                  <td className="val font-bold">+{transactionData.defTransferLitres} Litres</td>
+                  <td className="val font-bold">{transactionData.defTransferLitres} Litres</td>
                 </tr>
               )}
             </tbody>

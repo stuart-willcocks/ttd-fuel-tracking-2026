@@ -14,6 +14,9 @@ import {
   Trash2,
   MapPin,
   Boxes,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import type { Transaction, Equipment } from '../../types';
 import { formatAdminTimestamp } from '../../utils/dateFormat';
@@ -70,13 +73,13 @@ const renderTransactionValues = (tx: Transaction, eq?: Equipment) => {
         {isSet(tx.fuelTransferLitres) && (
           <span>
             <span style={{ color: '#000000', fontWeight: 600 }}>Fuel: </span>
-            <span style={{ color: '#2563EB', fontWeight: 600 }}>+{tx.fuelTransferLitres} L</span>
+            <span style={{ color: '#2563EB', fontWeight: 600 }}>{tx.fuelTransferLitres} L</span>
           </span>
         )}
         {isSet(tx.defTransferLitres) && (
           <span>
             <span style={{ color: '#000000', fontWeight: 600 }}>DEF: </span>
-            <span style={{ color: '#2563EB', fontWeight: 600 }}>+{tx.defTransferLitres} L</span>
+            <span style={{ color: '#2563EB', fontWeight: 600 }}>{tx.defTransferLitres} L</span>
           </span>
         )}
       </span>
@@ -243,6 +246,73 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     });
   }, [transactions, selectedAssetId, searchQuery, selectedTypeFilter, selectedDevice, selectedDateFilter, todayStr, sevenDaysAgoTime]);
 
+  // Sorting State
+  type TxSortField = 'timestamp' | 'equipmentId' | 'type' | 'transactionType' | 'values' | 'deviceId' | 'syncStatus';
+  type SortDirection = 'asc' | 'desc';
+
+  const [sortField, setSortField] = useState<TxSortField>('timestamp');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const handleSort = (field: TxSortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection(field === 'timestamp' ? 'desc' : 'asc');
+    }
+  };
+
+  const renderSortIndicator = (field: TxSortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown size={12} style={{ opacity: 0.35, marginLeft: '6px' }} />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp size={12} style={{ color: 'var(--adm-accent-yellow)', marginLeft: '6px' }} />
+    ) : (
+      <ArrowDown size={12} style={{ color: 'var(--adm-accent-yellow)', marginLeft: '6px' }} />
+    );
+  };
+
+  // Sorted Transactions
+  const sortedTransactions = useMemo(() => {
+    return [...filteredTransactions].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'timestamp': {
+          const timeA = new Date(a.transactionTimestamp).getTime();
+          const timeB = new Date(b.transactionTimestamp).getTime();
+          comparison = timeA - timeB;
+          break;
+        }
+        case 'equipmentId':
+          comparison = a.equipmentId.localeCompare(b.equipmentId, undefined, { numeric: true, sensitivity: 'base' });
+          break;
+        case 'type': {
+          const typeA = assetMap.get(a.equipmentId)?.type || '';
+          const typeB = assetMap.get(b.equipmentId)?.type || '';
+          comparison = typeA.localeCompare(typeB);
+          break;
+        }
+        case 'transactionType':
+          comparison = a.transactionType.localeCompare(b.transactionType);
+          break;
+        case 'values': {
+          const valA = (a.fuelTransferLitres || 0) + (a.defTransferLitres || 0) + (a.checkInFuelPercentage || a.checkOutFuelPercentage || 0) + (a.checkInKWH || a.checkOutKWH || 0);
+          const valB = (b.fuelTransferLitres || 0) + (b.defTransferLitres || 0) + (b.checkInFuelPercentage || b.checkOutFuelPercentage || 0) + (b.checkInKWH || b.checkOutKWH || 0);
+          comparison = valA - valB;
+          break;
+        }
+        case 'deviceId':
+          comparison = (a.deviceId || '').localeCompare(b.deviceId || '');
+          break;
+        case 'syncStatus':
+          comparison = (a.syncStatus || '').localeCompare(b.syncStatus || '');
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [filteredTransactions, sortField, sortDirection, assetMap]);
+
   // Fuel telemetry totals for currently filtered transactions
   const summaryFuelLitres = useMemo(() => {
     return filteredTransactions.reduce((acc, t) => acc + (t.fuelTransferLitres || 0), 0);
@@ -275,7 +345,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       'SyncStatus',
     ];
 
-    const rows = filteredTransactions.map((t) => {
+    const rows = sortedTransactions.map((t) => {
       const eq = assetMap.get(t.equipmentId);
       return [
         `"${t.id}"`,
@@ -334,7 +404,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h1 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.65rem', fontWeight: 800, color: '#ffffff', margin: 0 }}>
+              <h1 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.65rem', fontWeight: 800, color: 'var(--adm-text-primary)', margin: 0 }}>
                 {currentAsset ? `Transactions: ${currentAsset.equipmentId}` : 'All Fleet Transactions'}
               </h1>
               <span
@@ -478,7 +548,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
                 Zone &amp; Location
               </span>
-              <p style={{ fontWeight: 600, fontSize: '0.88rem', color: '#ffffff', margin: '3px 0 0' }}>
+              <p style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--adm-text-primary)', margin: '3px 0 0' }}>
                 {currentAsset.area}
               </p>
               <p style={{ fontSize: '0.78rem', color: 'var(--adm-text-secondary)', margin: '1px 0 0' }}>
@@ -490,7 +560,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
                 Capacity / Rating
               </span>
-              <p style={{ fontWeight: 600, fontSize: '0.88rem', color: '#ffffff', margin: '3px 0 0' }}>
+              <p style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--adm-text-primary)', margin: '3px 0 0' }}>
                 {currentAsset.type === 'GENERATOR' && currentAsset.capacity ? `${currentAsset.capacity} kVA` : null}
                 {currentAsset.type === 'TANK' && currentAsset.capacity ? `${currentAsset.capacity.toLocaleString()} Litres` : null}
                 {currentAsset.type === 'PLANT' ? 'Unrated' : null}
@@ -650,7 +720,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           }}
         >
           <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>📋</div>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#ffffff', marginBottom: '6px' }}>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--adm-text-primary)', marginBottom: '6px' }}>
             No transactions match current filters
           </h3>
           <p style={{ color: 'var(--adm-text-secondary)', fontSize: '0.9rem', marginBottom: '18px' }}>
@@ -682,17 +752,52 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           <table className="admin-table" style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th>Timestamp (Local)</th>
-                <th>Equipment ID</th>
-                <th>Equipment type</th>
-                <th>Transaction type</th>
-                <th>Transaction values</th>
-                <th>Device</th>
-                <th>Sync Status</th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('timestamp')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Timestamp (Local)</span>
+                    {renderSortIndicator('timestamp')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('equipmentId')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Equipment ID</span>
+                    {renderSortIndicator('equipmentId')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('type')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Equipment type</span>
+                    {renderSortIndicator('type')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('transactionType')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Transaction type</span>
+                    {renderSortIndicator('transactionType')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('values')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Transaction values</span>
+                    {renderSortIndicator('values')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('deviceId')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Device</span>
+                    {renderSortIndicator('deviceId')}
+                  </div>
+                </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('syncStatus')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Sync Status</span>
+                    {renderSortIndicator('syncStatus')}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filteredTransactions.map((tx) => {
+              {sortedTransactions.map((tx) => {
                 const eq = assetMap.get(tx.equipmentId);
 
                 return (

@@ -55,7 +55,7 @@ export const DeleteAssetModal: React.FC<DeleteAssetModalProps> = ({
               <AlertOctagon size={24} />
             </div>
             <div>
-              <h3 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.25rem', fontWeight: 700, color: '#ffffff' }}>
+              <h3 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--adm-text-primary)' }}>
                 Decommission Asset?
               </h3>
               <p style={{ fontSize: '0.82rem', color: 'var(--adm-text-secondary)' }}>

@@ -173,7 +173,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   return (
     <div className="admin-page-container">
       <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.65rem', fontWeight: 800, color: '#ffffff' }}>
+        <h1 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.65rem', fontWeight: 800, color: 'var(--adm-text-primary)' }}>
           System Configuration &amp; Cloud Database
         </h1>
         <p style={{ fontSize: '0.86rem', color: 'var(--adm-text-secondary)', marginTop: '2px' }}>
