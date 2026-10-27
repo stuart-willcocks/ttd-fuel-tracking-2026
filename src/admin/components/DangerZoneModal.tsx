@@ -106,60 +106,29 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
         {!showConfirm ? (
           /* Step 1: Danger Zone Dialog */
           <div>
-            <div
-              style={{
-                padding: '18px',
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
-                borderRadius: 'var(--adm-radius-md)',
-                marginBottom: '20px',
-              }}
-            >
-              <div
+            <div style={{ marginBottom: '20px' }}>
+              <button
+                type="button"
+                onClick={() => setShowConfirm(true)}
+                className="admin-btn"
                 style={{
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  padding: '10px 18px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '14px',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  width: '100%',
                 }}
               >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#ffffff' }}>
-                    Purge Master Database
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '0.8rem',
-                      color: 'var(--adm-text-secondary)',
-                      marginTop: '3px',
-                    }}
-                  >
-                    Permanently delete all fleet equipment records and transactions.
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm(true)}
-                  className="admin-btn"
-                  style={{
-                    background: '#ef4444',
-                    color: '#ffffff',
-                    fontWeight: 700,
-                    fontSize: '0.85rem',
-                    padding: '8px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Trash2 size={15} />
-                  <span>Delete all equipment records</span>
-                </button>
-              </div>
+                <Trash2 size={16} />
+                <span>Delete all equipment records</span>
+              </button>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

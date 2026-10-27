@@ -135,10 +135,37 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [
   },
 ];
 
+function hasCloudConfig(): boolean {
+  try {
+    const url =
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) ||
+      (typeof localStorage !== 'undefined' && localStorage.getItem('ttd_supabase_url'));
+    const anonKey =
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) ||
+      (typeof localStorage !== 'undefined' && localStorage.getItem('ttd_supabase_anon_key'));
+    return Boolean(url && anonKey);
+  } catch {
+    return false;
+  }
+}
+
 export async function initializeDatabase() {
+  // When Supabase is configured, Supabase is the single source of truth - do not inject mock seed data
+  if (hasCloudConfig()) {
+    return;
+  }
+
+  // Only seed mock data once on first offline run; never re-seed after database has been cleared
+  if (typeof localStorage !== 'undefined' && localStorage.getItem('ttd_pda_initialized')) {
+    return;
+  }
+
   const count = await db.equipments.count();
   if (count === 0) {
     await db.equipments.bulkAdd(INITIAL_EQUIPMENT);
+  }
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('ttd_pda_initialized', 'true');
   }
 }
 

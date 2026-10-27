@@ -1,5 +1,5 @@
 import { db } from '../db/indexedDB';
-import { uploadTransactionToCloud } from './supabase';
+import { uploadTransactionToCloud, isSupabaseConfigured, subscribeToCloudChanges } from './supabase';
 import { fetchRemoteEquipment, fetchRemoteTransactions, deleteRemoteTransaction } from './api';
 import type { Transaction } from '../types';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
@@ -52,6 +52,19 @@ class SyncEngine {
           this.syncWithRemote();
         }
       }, 3000);
+
+      // Subscribe to real-time cloud changes so PDAs update immediately
+      if (isSupabaseConfigured()) {
+        try {
+          subscribeToCloudChanges(() => {
+            if (this.isEffectivelyOnline() && !this.isSyncing) {
+              this.syncWithRemote();
+            }
+          });
+        } catch (e) {
+          console.warn('Realtime subscription error in syncEngine:', e);
+        }
+      }
     }
   }
 
@@ -364,11 +377,24 @@ class SyncEngine {
         }
       }
 
-      if (remoteEquipment && Array.isArray(remoteEquipment) && remoteEquipment.length > 0) {
-        const allLocalTxs = await db.transactions.toArray();
-        const reconciled = reconcileEquipmentPowerStates(remoteEquipment, allLocalTxs);
-        await db.equipments.bulkPut(reconciled);
-        hadUpdates = true;
+      if (remoteEquipment && Array.isArray(remoteEquipment)) {
+        const remoteEqIdSet = new Set(remoteEquipment.map((e) => e.equipmentId));
+        const allLocalEq = await db.equipments.toArray();
+        const eqIdsToDelete = allLocalEq
+          .filter((e) => !remoteEqIdSet.has(e.equipmentId))
+          .map((e) => e.equipmentId);
+
+        if (eqIdsToDelete.length > 0) {
+          await db.equipments.bulkDelete(eqIdsToDelete);
+          hadUpdates = true;
+        }
+
+        if (remoteEquipment.length > 0) {
+          const allLocalTxs = await db.transactions.toArray();
+          const reconciled = reconcileEquipmentPowerStates(remoteEquipment, allLocalTxs);
+          await db.equipments.bulkPut(reconciled);
+          hadUpdates = true;
+        }
       }
 
       this.lastSyncTime = new Date().toLocaleTimeString();
