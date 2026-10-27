@@ -586,15 +586,4 @@ create policy "Allow delete transactions for anon" on public.transactions for de
 -- 6. Enable Supabase Realtime for instant Admin console auto-refresh
 alter publication supabase_realtime add table public.transactions;
 alter publication supabase_realtime add table public.equipment_list;
-
--- 7. Insert initial fleet equipment
-insert into public.equipment_list (equipment_id, area, location, what3words, type, capacity, rental_serial_number, powered_up_timestamp)
-values
-  ('TTD-MAT-0001', 'North Zone', 'Stage Alpha Power Compound', '///puzzle.stages.daring', 'GENERATOR', 100, 'RSN-40291', '2026-10-14 08:30:00Z'),
-  ('TTD-MAT-0002', 'Main Arena', 'Main Sound & Light Generator', '///barks.flesh.gravel', 'GENERATOR', 250, 'RSN-40295', null),
-  ('TTD-MAT-0003', 'North Zone', 'Bulk Fuel Farm Alpha', '///tracks.sparks.silver', 'TANK', 3000, 'TNK-99211', null),
-  ('TTD-MAT-0004', 'Logistics Hub', 'Vehicle Refuel Station Tank 2', '///launch.bright.solid', 'TANK', 5000, 'TNK-88320', null),
-  ('TTD-MAT-0005', 'South Gate', 'Tower Light Unit 04', '///amber.tower.cliff', 'PLANT', null, 'PLT-11422', null),
-  ('TTD-MAT-0006', 'West Gate', 'Telehandler 02 - Rigging Team', '///cables.signal.entry', 'PLANT', null, 'PLT-77401', null)
-on conflict (equipment_id) do nothing;
 `;
