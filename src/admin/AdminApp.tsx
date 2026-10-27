@@ -303,7 +303,6 @@ export const AdminApp: React.FC = () => {
                 transactions={transactions}
                 onOpenCreateModal={() => setIsCreateModalOpen(true)}
                 onOpenEditModal={(asset) => setEditingAsset(asset)}
-                onOpenDeleteModal={(asset) => setAssetPendingDelete(asset)}
                 onOpenQRModal={(asset) => setQrAsset(asset)}
                 onOpenDangerZone={() => setIsDangerZoneOpen(true)}
                 onSelectAsset={(id) => {
@@ -311,7 +310,6 @@ export const AdminApp: React.FC = () => {
                   setCurrentView('TRANSACTIONS');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                onTogglePower={handleTogglePower}
               />
             )}
 
@@ -322,11 +320,6 @@ export const AdminApp: React.FC = () => {
                 selectedAssetId={selectedAssetId}
                 onSelectAsset={(id) => {
                   setSelectedAssetId(id);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                onBackToAssets={() => {
-                  setSelectedAssetId(null);
-                  setCurrentView('ASSETS');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 onInspectTransaction={(tx) => setInspectingTransaction(tx)}
@@ -361,6 +354,12 @@ export const AdminApp: React.FC = () => {
               setEditingAsset(null);
             }}
             onSave={handleSaveAsset}
+            onTogglePower={handleTogglePower}
+            onDelete={(asset) => {
+              setEditingAsset(null);
+              setAssetPendingDelete(asset);
+            }}
+            isPowerOn={editingAsset ? getGeneratorPowerState(editingAsset.equipmentId, transactions).isOn : false}
           />
         )}
 

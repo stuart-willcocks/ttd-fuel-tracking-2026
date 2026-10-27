@@ -3,11 +3,8 @@ import {
   Plus,
   Search,
   Download,
-  Filter,
   QrCode,
   Edit,
-  Trash2,
-  Zap,
   MapPin,
   LayoutGrid,
   Table as TableIcon,
@@ -26,10 +23,8 @@ interface AssetsViewProps {
   transactions: Transaction[];
   onOpenCreateModal: () => void;
   onOpenEditModal: (asset: Equipment) => void;
-  onOpenDeleteModal: (asset: Equipment) => void;
   onOpenQRModal: (asset: Equipment) => void;
   onSelectAsset: (equipmentId: string) => void;
-  onTogglePower: (asset: Equipment) => void;
   onOpenDangerZone?: () => void;
 }
 
@@ -40,15 +35,12 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   transactions,
   onOpenCreateModal,
   onOpenEditModal,
-  onOpenDeleteModal,
   onOpenQRModal,
   onSelectAsset,
-  onTogglePower,
   onOpenDangerZone,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
-  const [selectedArea, setSelectedArea] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'TABLE' | 'GRID'>('TABLE');
 
   // Transaction counts per asset
@@ -59,11 +51,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     }
     return map;
   }, [transactions]);
-
-  // Distinct areas for filter dropdown
-  const uniqueAreas = useMemo(() => {
-    return Array.from(new Set(assets.map((a) => a.area).filter(Boolean)));
-  }, [assets]);
 
   // Filtered Assets
   const filteredAssets = useMemo(() => {
@@ -80,11 +67,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
       if (!matchesSearch) return false;
 
-      // Area filter
-      if (selectedArea !== 'ALL' && asset.area !== selectedArea) {
-        return false;
-      }
-
       // Classification / Power filter
       const isRunning = asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
       if (activeFilter === 'GENERATOR' && asset.type !== 'GENERATOR') return false;
@@ -95,7 +77,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
       return true;
     });
-  }, [assets, transactions, searchQuery, activeFilter, selectedArea]);
+  }, [assets, transactions, searchQuery, activeFilter]);
 
   // Counts for pills
   const counts = useMemo(() => {
@@ -213,48 +195,40 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
   return (
     <div className="admin-page-container">
-      {/* Page Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.65rem', fontWeight: 800, color: 'var(--adm-text-primary)' }}>
-            Equipment
-          </h1>
-        </div>
+      {/* Top Action Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginBottom: '20px' }}>
+        <button onClick={handleExportCsv} className="admin-btn admin-btn-secondary">
+          <Download size={15} />
+          <span>Export CSV</span>
+        </button>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={handleExportCsv} className="admin-btn admin-btn-secondary">
-            <Download size={15} />
-            <span>Export CSV</span>
+        <button onClick={onOpenCreateModal} className="admin-btn admin-btn-primary">
+          <Plus size={16} />
+          <span>Add New Asset</span>
+        </button>
+
+        {onOpenDangerZone && (
+          <button
+            onClick={onOpenDangerZone}
+            className="admin-btn"
+            style={{
+              background: '#ef4444',
+              color: '#ffffff',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: '1px solid #dc2626',
+            }}
+            title="Open Danger Zone database management"
+          >
+            <AlertTriangle size={15} />
+            <span>Danger zone</span>
           </button>
-
-          <button onClick={onOpenCreateModal} className="admin-btn admin-btn-primary">
-            <Plus size={16} />
-            <span>Add New Asset</span>
-          </button>
-
-          {onOpenDangerZone && (
-            <button
-              onClick={onOpenDangerZone}
-              className="admin-btn"
-              style={{
-                background: '#ef4444',
-                color: '#ffffff',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                border: '1px solid #dc2626',
-              }}
-              title="Open Danger Zone database management"
-            >
-              <AlertTriangle size={15} />
-              <span>Danger zone</span>
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Control Bar: Search, Filters & View Toggle */}
+      {/* Control Bar: Search & View Toggle */}
       <div
         style={{
           display: 'flex',
@@ -280,24 +254,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search"
             />
-          </div>
-
-          {/* Area Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Filter size={15} color="#94a3b8" />
-            <select
-              className="admin-select"
-              style={{ width: '180px', padding: '9px 12px', fontSize: '0.85rem' }}
-              value={selectedArea}
-              onChange={(e) => setSelectedArea(e.target.value)}
-            >
-              <option value="ALL">All Zones ({assets.length})</option>
-              {uniqueAreas.map((area) => (
-                <option key={area} value={area}>
-                  {area} ({assets.filter((a) => a.area === area).length})
-                </option>
-              ))}
-            </select>
           </div>
         </div>
 
@@ -333,35 +289,40 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           { key: 'PLANT', label: 'Plant', icon: <EquipmentTypeIcon type="PLANT" size={13} />, count: counts.plant },
           { key: 'RUNNING', label: 'Generators (ON)', icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ADE80', display: 'inline-block' }} />, count: counts.running },
           { key: 'STANDBY', label: 'Generators (OFF)', icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94A3B8', display: 'inline-block' }} />, count: counts.standby },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveFilter(tab.key as FilterType)}
-            className={`admin-btn ${activeFilter === tab.key ? 'admin-btn-secondary' : 'admin-btn-outline'} admin-btn-sm`}
-            style={{
-              borderColor: activeFilter === tab.key ? 'var(--adm-accent-yellow)' : undefined,
-              color: activeFilter === tab.key ? 'var(--adm-text-primary)' : undefined,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-            <span
+        ].map((tab) => {
+          const isSelected = activeFilter === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveFilter(tab.key as FilterType)}
+              className={`admin-btn ${isSelected ? 'admin-btn-primary' : 'admin-btn-outline'} admin-btn-sm`}
               style={{
-                fontSize: '0.72rem',
-                padding: '1px 6px',
-                borderRadius: '999px',
-                background: activeFilter === tab.key ? 'rgba(250, 204, 21, 0.15)' : 'var(--adm-surface-3)',
-                color: activeFilter === tab.key ? 'var(--adm-accent-yellow)' : 'var(--adm-text-secondary)',
-                fontFamily: 'var(--adm-font-mono)',
+                background: isSelected ? '#2563EB' : 'transparent',
+                borderColor: isSelected ? '#2563EB' : 'var(--adm-border-medium)',
+                color: isSelected ? '#FFFFFF' : 'var(--adm-text-primary)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontWeight: isSelected ? 700 : 500,
               }}
             >
-              {tab.count}
-            </span>
-          </button>
-        ))}
+              {tab.icon}
+              <span>{tab.label}</span>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  padding: '1px 6px',
+                  borderRadius: '999px',
+                  background: isSelected ? 'rgba(255, 255, 255, 0.25)' : 'var(--adm-surface-3)',
+                  color: isSelected ? '#FFFFFF' : 'var(--adm-text-secondary)',
+                  fontFamily: 'var(--adm-font-mono)',
+                }}
+              >
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Main Content Area */}
@@ -380,13 +341,12 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             No assets match your search criteria
           </h3>
           <p style={{ color: 'var(--adm-text-secondary)', fontSize: '0.9rem', marginBottom: '18px' }}>
-            Try adjusting your search query, filter tabs, or area selection.
+            Try adjusting your search query or filter tabs.
           </p>
           <button
             onClick={() => {
               setSearchQuery('');
               setActiveFilter('ALL');
-              setSelectedArea('ALL');
             }}
             className="admin-btn admin-btn-secondary"
           >
@@ -553,18 +513,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                           <QrCode size={14} />
                         </button>
 
-                        {/* Power Toggle for Generator */}
-                        {asset.type === 'GENERATOR' && (
-                          <button
-                            onClick={() => onTogglePower(asset)}
-                            className="admin-btn admin-btn-outline admin-btn-sm"
-                            title={isRunning ? 'Turn OFF' : 'Turn ON'}
-                            style={{ padding: '5px 8px', color: isRunning ? '#F87171' : '#4ADE80' }}
-                          >
-                            <Zap size={14} />
-                          </button>
-                        )}
-
                         {/* Edit Asset */}
                         <button
                           onClick={() => onOpenEditModal(asset)}
@@ -573,16 +521,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                           style={{ padding: '5px 8px' }}
                         >
                           <Edit size={14} />
-                        </button>
-
-                        {/* Delete Asset */}
-                        <button
-                          onClick={() => onOpenDeleteModal(asset)}
-                          className="admin-btn admin-btn-outline admin-btn-sm"
-                          title="Decommission & Delete Asset"
-                          style={{ padding: '5px 8px', color: '#F87171' }}
-                        >
-                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -703,14 +641,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     >
                       <Edit size={14} />
                       <span>Edit</span>
-                    </button>
-
-                    <button
-                      onClick={() => onOpenDeleteModal(asset)}
-                      className="admin-btn admin-btn-outline admin-btn-sm"
-                      style={{ color: '#F87171' }}
-                    >
-                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>

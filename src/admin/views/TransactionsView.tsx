@@ -6,7 +6,6 @@ import {
   Clock,
   CheckCircle2,
   Smartphone,
-  ArrowLeft,
   X,
   Edit,
   QrCode,
@@ -27,7 +26,6 @@ interface TransactionsViewProps {
   assets: Equipment[];
   selectedAssetId?: string | null;
   onSelectAsset: (equipmentId: string | null) => void;
-  onBackToAssets?: () => void;
   onInspectTransaction?: (tx: Transaction) => void;
   onOpenEditModal?: (asset: Equipment) => void;
   onOpenDeleteModal?: (asset: Equipment) => void;
@@ -40,6 +38,15 @@ const isSet = (v: unknown): v is number =>
   v !== undefined && v !== null && v !== '' && !isNaN(Number(v));
 
 const renderTransactionValues = (tx: Transaction, eq?: Equipment) => {
+  // PoweredUp and PoweredDown transactions: leave Transaction values blank
+  if (
+    tx.transactionType === 'PoweredUp' ||
+    tx.transactionType === 'PoweredDown' ||
+    tx.transactionType.toLowerCase().includes('power')
+  ) {
+    return null;
+  }
+
   const isCheckOut = tx.transactionType.includes('CheckOut');
   const fuelPct = isCheckOut
     ? (tx.checkOutFuelPercentage ?? tx.checkInFuelPercentage)
@@ -156,7 +163,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   assets,
   selectedAssetId,
   onSelectAsset,
-  onBackToAssets,
   onOpenEditModal,
   onOpenDeleteModal,
   onOpenQRModal,
@@ -388,42 +394,15 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
   return (
     <div className="admin-page-container" style={{ width: '100%', maxWidth: '100%' }}>
-      {/* Top Navigation & Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          {onBackToAssets && (
-            <button
-              onClick={onBackToAssets}
-              className="admin-btn admin-btn-secondary"
-              title="Return to Equipment list"
-            >
-              <ArrowLeft size={16} />
-              <span>Back to Equipment</span>
-            </button>
-          )}
-
+      {/* Top Action Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: currentAsset ? 'space-between' : 'flex-end', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+        {currentAsset && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h1 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.65rem', fontWeight: 800, color: 'var(--adm-text-primary)', margin: 0 }}>
-                {currentAsset ? `Transactions: ${currentAsset.equipmentId}` : 'All Fleet Transactions'}
-              </h1>
-              <span
-                style={{
-                  fontSize: '0.78rem',
-                  fontFamily: 'var(--adm-font-mono)',
-                  fontWeight: 700,
-                  padding: '2px 8px',
-                  borderRadius: '999px',
-                  background: 'var(--adm-surface-3)',
-                  color: 'var(--adm-accent-yellow)',
-                  border: '1px solid var(--adm-border-subtle)',
-                }}
-              >
-                {filteredTransactions.length} records
-              </span>
-            </div>
+            <h2 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.35rem', fontWeight: 800, color: 'var(--adm-text-primary)', margin: 0 }}>
+              Transactions: {currentAsset.equipmentId}
+            </h2>
           </div>
-        </div>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {selectedAssetId && (
@@ -643,7 +622,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               value={selectedAssetId || 'ALL'}
               onChange={(e) => onSelectAsset(e.target.value === 'ALL' ? null : e.target.value)}
             >
-              <option value="ALL">All Equipment ({transactions.length} txs)</option>
+              <option value="ALL">All equipment IDs</option>
               {assets.map((a) => (
                 <option key={a.equipmentId} value={a.equipmentId}>
                   {a.equipmentId} • {a.area} ({txCountsByAsset[a.equipmentId] || 0})
@@ -661,7 +640,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               value={selectedTypeFilter}
               onChange={(e) => setSelectedTypeFilter(e.target.value)}
             >
-              <option value="ALL">All Action Types</option>
+              <option value="ALL">All transaction types</option>
               <option value="FUEL_TRANSFER">⛽ Fuel Transfers</option>
               <option value="CHECK_IN">📥 Check-Ins</option>
               <option value="CHECK_OUT">📤 Check-Outs</option>
@@ -679,7 +658,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 value={selectedDevice}
                 onChange={(e) => setSelectedDevice(e.target.value)}
               >
-                <option value="ALL">All Field PDAs</option>
+                <option value="ALL">All devices</option>
                 {uniqueDevices.map((dev) => (
                   <option key={dev} value={dev}>
                     {dev}
@@ -784,13 +763,13 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 </th>
                 <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('deviceId')}>
                   <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-                    <span>Device</span>
+                    <span>Device ID</span>
                     {renderSortIndicator('deviceId')}
                   </div>
                 </th>
                 <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('syncStatus')}>
                   <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-                    <span>Sync Status</span>
+                    <span>Sync to database</span>
                     {renderSortIndicator('syncStatus')}
                   </div>
                 </th>

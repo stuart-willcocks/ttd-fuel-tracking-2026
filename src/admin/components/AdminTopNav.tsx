@@ -57,21 +57,21 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
         {/* Brand Name */}
         <span className="admin-top-brand-title">TTD Fuel Tracking</span>
 
-        {/* Admin Console Label */}
-        <span className="admin-console-label">ADMIN CONSOLE</span>
-
-        {/* Version number with optional (STAGING) and update exclamation mark */}
-        <span className="admin-version-tag">
-          <span>V{APP_VERSION}{isStaging ? ' (STAGING)' : ''}</span>
-          {hasNewVersion && (
-            <span
-              className="admin-version-alert-mark"
-              title="A new app version is available. Click refresh to update."
-            >
-              !
-            </span>
-          )}
-        </span>
+        {/* Combined Admin Console & Version Box */}
+        <div className="admin-top-badge-box">
+          <span className="admin-badge-title">ADMIN CONSOLE</span>
+          <span className="admin-badge-version">
+            <span>V{APP_VERSION}{isStaging ? ' (STAGING)' : ''}</span>
+            {hasNewVersion && (
+              <span
+                className="admin-version-alert-mark"
+                title="A new app version is available. Click refresh to update."
+              >
+                !
+              </span>
+            )}
+          </span>
+        </div>
       </div>
 
       {/* Right Action & Status Zone */}
