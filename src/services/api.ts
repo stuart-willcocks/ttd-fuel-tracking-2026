@@ -167,3 +167,26 @@ export async function deleteAllFleetData(): Promise<void> {
     // Ignore
   }
 }
+
+export async function bulkUploadEquipment(equipmentList: Equipment[]): Promise<number> {
+  if (isSupabaseConfigured()) {
+    const count = await bulkImportEquipmentToSupabase(equipmentList);
+    try {
+      await db.equipments.bulkPut(equipmentList);
+    } catch (err) {
+      console.warn('Local indexedDB bulkPut error:', err);
+    }
+    return count;
+  }
+
+  // Fallback to local API and local IndexedDB
+  for (const eq of equipmentList) {
+    await postRemoteEquipment(eq);
+  }
+  try {
+    await db.equipments.bulkPut(equipmentList);
+  } catch (err) {
+    console.warn('Local indexedDB bulkPut error:', err);
+  }
+  return equipmentList.length;
+}

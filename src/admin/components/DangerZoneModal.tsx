@@ -1,25 +1,31 @@
-import React, { useState } from 'react';
-import { AlertTriangle, Trash2, X, AlertOctagon } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { AlertTriangle, Trash2, X, AlertOctagon, Upload } from 'lucide-react';
+import type { Equipment } from '../../types';
+import { parseEquipmentFile } from '../../utils/excelParser';
 
 interface DangerZoneModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDeleteAll: () => Promise<void>;
+  onBulkUpload: (equipmentList: Equipment[]) => Promise<void>;
 }
 
 export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
   isOpen,
   onClose,
   onDeleteAll,
+  onBulkUpload,
 }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
-    if (isDeleting) return;
+    if (isDeleting || isUploading) return;
     setShowConfirm(false);
     setErrorMsg(null);
     onClose();
@@ -35,6 +41,27 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMsg(`Failed to delete records: ${msg}`);
       setIsDeleting(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setErrorMsg(null);
+    setIsUploading(true);
+    try {
+      const parsedEquipment = await parseEquipmentFile(file);
+      await onBulkUpload(parsedEquipment);
+      handleClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(`Upload failed: ${msg}`);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -81,7 +108,7 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
             onClick={handleClose}
             className="admin-btn admin-btn-outline admin-btn-sm"
             style={{ padding: '6px' }}
-            disabled={isDeleting}
+            disabled={isDeleting || isUploading}
           >
             <X size={18} />
           </button>
@@ -106,11 +133,39 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
         {!showConfirm ? (
           /* Step 1: Danger Zone Dialog */
           <div>
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.csv"
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+              />
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="admin-btn admin-btn-secondary"
+                disabled={isDeleting || isUploading}
+                style={{
+                  padding: '10px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  cursor: isUploading ? 'not-allowed' : 'pointer',
+                  width: '100%',
+                }}
+              >
+                <Upload size={16} />
+                <span>{isUploading ? 'Uploading...' : 'Bulk upload equipment list'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowConfirm(true)}
                 className="admin-btn"
+                disabled={isDeleting || isUploading}
                 style={{
                   background: '#ef4444',
                   color: '#ffffff',
@@ -136,6 +191,7 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                 type="button"
                 onClick={handleClose}
                 className="admin-btn admin-btn-outline"
+                disabled={isDeleting || isUploading}
               >
                 Close
               </button>

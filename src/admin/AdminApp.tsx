@@ -22,6 +22,7 @@ import {
   deleteRemoteTransaction,
   resetRemoteData,
   deleteAllFleetData,
+  bulkUploadEquipment,
 } from '../services/api';
 import { isSupabaseConfigured, subscribeToCloudChanges } from '../services/supabase';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
@@ -237,6 +238,20 @@ export const AdminApp: React.FC = () => {
     }
   };
 
+  // Bulk upload equipment handler (Danger Zone)
+  const handleBulkUploadEquipment = async (uploadedAssets: Equipment[]) => {
+    try {
+      await bulkUploadEquipment(uploadedAssets);
+      await loadFleetData(true);
+      showToast(`Successfully uploaded ${uploadedAssets.length} equipment records.`, 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Failed to bulk upload equipment:', err);
+      showToast(`Bulk upload failed: ${msg}`, 'error');
+      throw err;
+    }
+  };
+
 
   return (
     <LaptopOnlyGuard>
@@ -373,6 +388,7 @@ export const AdminApp: React.FC = () => {
           isOpen={isDangerZoneOpen}
           onClose={() => setIsDangerZoneOpen(false)}
           onDeleteAll={handleDeleteAllRecords}
+          onBulkUpload={handleBulkUploadEquipment}
         />
 
         {/* Toast Alerts */}
