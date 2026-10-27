@@ -180,6 +180,24 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               </div>
             )}
 
+            {transaction.checkInDefPercentage !== undefined && (
+              <div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-in DEF</span>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                  {transaction.checkInDefPercentage}%
+                </p>
+              </div>
+            )}
+
+            {transaction.checkOutDefPercentage !== undefined && (
+              <div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-out DEF</span>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
+                  {transaction.checkOutDefPercentage}%
+                </p>
+              </div>
+            )}
+
             {transaction.checkInFuelEighths !== undefined && (
               <div>
                 <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Check-in Eighths</span>

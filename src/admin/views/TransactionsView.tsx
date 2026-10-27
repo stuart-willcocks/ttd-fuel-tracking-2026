@@ -579,6 +579,17 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             <tbody>
               {filteredTransactions.map((tx) => {
                 const eq = assetMap.get(tx.equipmentId);
+                const hasTelemetry =
+                  (tx.fuelTransferLitres !== undefined && tx.fuelTransferLitres !== null) ||
+                  (tx.defTransferLitres !== undefined && tx.defTransferLitres !== null) ||
+                  (tx.checkInFuelPercentage !== undefined && tx.checkInFuelPercentage !== null) ||
+                  (tx.checkOutFuelPercentage !== undefined && tx.checkOutFuelPercentage !== null) ||
+                  (tx.checkInDefPercentage !== undefined && tx.checkInDefPercentage !== null) ||
+                  (tx.checkOutDefPercentage !== undefined && tx.checkOutDefPercentage !== null) ||
+                  (tx.checkInFuelEighths !== undefined && tx.checkInFuelEighths !== null) ||
+                  (tx.checkOutFuelEighths !== undefined && tx.checkOutFuelEighths !== null) ||
+                  (tx.checkInKWH !== undefined && tx.checkInKWH !== null) ||
+                  (tx.checkOutKWH !== undefined && tx.checkOutKWH !== null);
 
                 return (
                   <tr key={tx.id}>
@@ -637,37 +648,47 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
                     {/* Telemetry Readout */}
                     <td style={{ fontSize: '0.82rem' }}>
-                      {tx.fuelTransferLitres && (
+                      {tx.fuelTransferLitres !== undefined && tx.fuelTransferLitres !== null && (
                         <span style={{ color: 'var(--adm-accent-yellow)', fontWeight: 600 }}>
                           +{tx.fuelTransferLitres} L Fuel{' '}
                         </span>
                       )}
-                      {tx.defTransferLitres && (
+                      {tx.defTransferLitres !== undefined && tx.defTransferLitres !== null && (
                         <span style={{ color: 'var(--adm-text-secondary)', fontWeight: 500 }}>
                           +{tx.defTransferLitres} L DEF{' '}
                         </span>
                       )}
-                      {tx.checkInFuelPercentage !== undefined && (
+                      {tx.checkInFuelPercentage !== undefined && tx.checkInFuelPercentage !== null && (
                         <span>{tx.checkInFuelPercentage}% in </span>
                       )}
-                      {tx.checkOutFuelPercentage !== undefined && (
+                      {tx.checkOutFuelPercentage !== undefined && tx.checkOutFuelPercentage !== null && (
                         <span>{tx.checkOutFuelPercentage}% out </span>
                       )}
-                      {tx.checkInFuelEighths !== undefined && (
+                      {tx.checkInDefPercentage !== undefined && tx.checkInDefPercentage !== null && (
+                        <span style={{ color: 'var(--adm-text-secondary)', fontWeight: 500 }}>
+                          {tx.checkInDefPercentage}% DEF{' '}
+                        </span>
+                      )}
+                      {tx.checkOutDefPercentage !== undefined && tx.checkOutDefPercentage !== null && (
+                        <span style={{ color: 'var(--adm-text-secondary)', fontWeight: 500 }}>
+                          {tx.checkOutDefPercentage}% DEF{' '}
+                        </span>
+                      )}
+                      {tx.checkInFuelEighths !== undefined && tx.checkInFuelEighths !== null && (
                         <span>{tx.checkInFuelEighths}/8 in </span>
                       )}
-                      {tx.checkOutFuelEighths !== undefined && (
+                      {tx.checkOutFuelEighths !== undefined && tx.checkOutFuelEighths !== null && (
                         <span>{tx.checkOutFuelEighths}/8 out </span>
                       )}
-                      {tx.checkInKWH !== undefined && (
+                      {tx.checkInKWH !== undefined && tx.checkInKWH !== null && (
                         <span style={{ color: '#4ADE80' }}>{tx.checkInKWH.toLocaleString()} kWh </span>
                       )}
-                      {!tx.fuelTransferLitres &&
-                        tx.checkInFuelPercentage === undefined &&
-                        tx.checkInFuelEighths === undefined &&
-                        tx.checkInKWH === undefined && (
-                          <span style={{ color: 'var(--adm-text-muted)' }}>Status Recorded</span>
-                        )}
+                      {tx.checkOutKWH !== undefined && tx.checkOutKWH !== null && (
+                        <span style={{ color: '#4ADE80' }}>{tx.checkOutKWH.toLocaleString()} kWh </span>
+                      )}
+                      {!hasTelemetry && (
+                        <span style={{ color: 'var(--adm-text-muted)' }}>Status Recorded</span>
+                      )}
                     </td>
 
                     {/* Device ID */}
