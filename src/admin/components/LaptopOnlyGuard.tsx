@@ -1,28 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { Laptop, Smartphone, AlertTriangle, ArrowRight, Eye } from 'lucide-react';
+import { isMobileDevice, getDeviceClassification } from '../../utils/deviceDetector';
 
 interface LaptopOnlyGuardProps {
   children: React.ReactNode;
 }
 
 export const LaptopOnlyGuard: React.FC<LaptopOnlyGuardProps> = ({ children }) => {
-  const [isMobileScreen, setIsMobileScreen] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return window.innerWidth < 1024;
+  const [isRestrictedMobile, setIsRestrictedMobile] = useState<boolean>(() => {
+    return isMobileDevice();
   });
 
   const [bypassLockout, setBypassLockout] = useState<boolean>(false);
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobileScreen(window.innerWidth < 1024);
+    const handleDeviceCheck = () => {
+      setIsRestrictedMobile(isMobileDevice());
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('resize', handleDeviceCheck);
+    return () => window.removeEventListener('resize', handleDeviceCheck);
   }, []);
 
-  if (isMobileScreen && !bypassLockout) {
+  if (isRestrictedMobile && !bypassLockout) {
+    const devInfo = getDeviceClassification();
+
     return (
       <div className="laptop-guard-overlay">
         <div className="laptop-guard-card">
@@ -32,17 +34,17 @@ export const LaptopOnlyGuard: React.FC<LaptopOnlyGuardProps> = ({ children }) =>
 
           <div className="laptop-guard-badge">
             <AlertTriangle size={15} />
-            <span>LAPTOP / WORKSTATION ONLY (MIN 1024px)</span>
+            <span>MOBILE HANDHELD DETECTED (USE SCANNER APP)</span>
           </div>
 
           <h2 className="laptop-guard-title">Workstation Display Required</h2>
 
           <p className="laptop-guard-text">
-            The <strong>TTD Fleet Administrator Portal</strong> is designed exclusively for laptop and desktop screens. It provides comprehensive data tables, fleet telemetry analytics, and asset CRUD controls that require a wider display.
+            The <strong>TTD Fuel Tracking Admin Portal</strong> is designed for laptop, desktop, and Microsoft Surface workstations. It provides comprehensive data tables, telemetry analytics, and equipment management tools.
           </p>
 
           <p className="laptop-guard-text" style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-            If you are a field technician using a <strong>Zebra TC26 Handheld</strong> or mobile smartphone, please use the Field Scanner App.
+            Current device: <em>{devInfo.reason}</em>. Field technicians should use the dedicated Zebra Mobile Field App.
           </p>
 
           <div className="laptop-guard-actions" style={{ marginTop: '20px' }}>

@@ -843,3 +843,64 @@ body.admin-body {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ==========================================================================
+   RESPONSIVE WORKSTATION / SURFACE / TABLET OPTIMIZATIONS
+   Ensures seamless viewing on Microsoft Surface (portrait & snapped views)
+   ========================================================================== */
+@media (max-width: 960px) {
+  .admin-sidebar {
+    width: 220px;
+    min-width: 220px;
+  }
+
+  .admin-topbar {
+    padding: 0 16px;
+  }
+
+  .admin-view-container {
+    padding: 18px 18px !important;
+  }
+
+  .admin-kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-sidebar {
+    width: 72px;
+    min-width: 72px;
+  }
+
+  .admin-sidebar-header {
+    align-items: center;
+    padding: 12px 6px;
+  }
+
+  .admin-version-tag {
+    font-size: 0.65rem;
+    padding: 2px 4px;
+    align-self: center;
+  }
+
+  .admin-sidebar-logo {
+    max-width: 48px;
+  }
+
+  .admin-brand-info,
+  .admin-sidebar-nav span,
+  .admin-nav-badge {
+    display: none;
+  }
+
+  .admin-nav-item {
+    justify-content: center;
+    padding: 12px;
+  }
+
+  .admin-nav-item-left {
+    justify-content: center;
+  }
+}
+

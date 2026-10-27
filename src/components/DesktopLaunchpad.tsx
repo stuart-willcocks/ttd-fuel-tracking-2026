@@ -52,7 +52,7 @@ export const DesktopLaunchpad: React.FC<DesktopLaunchpadProps> = ({
             className="desktop-launchpad-secondary-btn"
           >
             <LayoutDashboard size={15} />
-            <span>Open Fleet Admin Portal</span>
+            <span>Open Admin Portal</span>
             <ArrowRight size={14} className="launchpad-arrow" />
           </a>
         </div>

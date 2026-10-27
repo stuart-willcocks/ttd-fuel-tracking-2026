@@ -16,20 +16,13 @@ import { PowerEventModal } from './components/PowerEventModal';
 import { getDeviceName } from './services/device';
 import { Smartphone, ExternalLink } from 'lucide-react';
 import { DesktopLaunchpad } from './components/DesktopLaunchpad';
+import { isMobileDevice, isDesktopOrSurface } from './utils/deviceDetector';
 
 export type AppView = 'SPLASH_SCREEN' | 'SCAN_SCREEN' | 'ASSET_DETAIL_VIEW';
 
 export const App: React.FC = () => {
-  const isMobileDevice = useCallback(() => {
-    return (
-      typeof navigator !== 'undefined' &&
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Zebra|TC26/i.test(navigator.userAgent)
-    );
-  }, []);
-
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Zebra|TC26/i.test(navigator.userAgent);
+    return isDesktopOrSurface();
   });
 
   // Check if this window is the dedicated detached PDA popup
@@ -113,7 +106,7 @@ export const App: React.FC = () => {
     } catch (err) {
       console.warn('Fullscreen toggle failed:', err);
     }
-  }, [isMobileDevice]);
+  }, []);
 
   useEffect(() => {
     // If running on a desktop browser, ensure we NEVER enter fullscreen mode
@@ -145,7 +138,7 @@ export const App: React.FC = () => {
       document.removeEventListener('fullscreenchange', handleFsChange);
       document.removeEventListener('webkitfullscreenchange', handleFsChange);
     };
-  }, [isMobileDevice]);
+  }, []);
 
   // Detect desktop browser to constrain UI to PDA screen display and lock window dimensions
   useEffect(() => {
@@ -213,7 +206,7 @@ export const App: React.FC = () => {
       if (lockTimer) clearTimeout(lockTimer);
       window.removeEventListener('resize', handleResize);
     };
-  }, [isMobileDevice]);
+  }, []);
 
   // On desktop workstations in a normal browser tab, attempt to launch detached window automatically
   useEffect(() => {
