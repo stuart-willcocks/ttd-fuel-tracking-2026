@@ -92,7 +92,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   }, [assets, transactions]);
 
   // Sorting State
-  type AssetSortField = 'equipmentId' | 'type' | 'capacity' | 'location' | 'what3words' | 'rentalSerialNumber' | 'powerState';
+  type AssetSortField = 'equipmentId' | 'type' | 'capacity' | 'location' | 'what3words' | 'rentalSerialNumber' | 'powerState' | 'transactions';
   type SortDirection = 'asc' | 'desc';
 
   const [sortField, setSortField] = useState<AssetSortField>('equipmentId');
@@ -139,10 +139,16 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           comparison = aOn - bOn;
           break;
         }
+        case 'transactions': {
+          const aCount = txCounts[a.equipmentId] || 0;
+          const bCount = txCounts[b.equipmentId] || 0;
+          comparison = aCount - bCount;
+          break;
+        }
       }
       return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [filteredAssets, sortField, sortDirection, transactions]);
+  }, [filteredAssets, sortField, sortDirection, transactions, txCounts]);
 
   const renderSortIndicator = (field: AssetSortField) => {
     if (sortField !== field) {
@@ -401,6 +407,12 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     {renderSortIndicator('powerState')}
                   </div>
                 </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('transactions')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Transactions</span>
+                    {renderSortIndicator('transactions')}
+                  </div>
+                </th>
                 <th style={{ textAlign: 'right', whiteSpace: 'nowrap', paddingRight: '20px' }}>Actions</th>
               </tr>
             </thead>
@@ -489,20 +501,34 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                       )}
                     </td>
 
+                    {/* Transactions */}
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => onSelectAsset(asset.equipmentId)}
+                        className="admin-mono"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          fontFamily: 'var(--adm-font-mono)',
+                          fontWeight: 700,
+                          color: (txCounts[asset.equipmentId] || 0) > 0 ? 'var(--adm-accent-yellow)' : 'var(--adm-text-muted)',
+                          cursor: 'pointer',
+                          fontSize: '0.88rem',
+                          padding: '2px 4px',
+                          textDecoration: (txCounts[asset.equipmentId] || 0) > 0 ? 'underline' : 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                        }}
+                        title={`View ${txCounts[asset.equipmentId] || 0} transactions for ${asset.equipmentId}`}
+                      >
+                        {txCounts[asset.equipmentId] || 0}
+                      </button>
+                    </td>
+
                     {/* Action buttons */}
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap', paddingRight: '20px' }}>
-                      <div style={{ display: 'inline-flex', gap: '5px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                        {/* View Transactions for this asset */}
-                        <button
-                          onClick={() => onSelectAsset(asset.equipmentId)}
-                          className="admin-btn admin-btn-secondary admin-btn-sm"
-                          title={`View transactions for ${asset.equipmentId}`}
-                          style={{ padding: '4px 8px', fontSize: '0.78rem', gap: '4px' }}
-                        >
-                          <ReceiptText size={13} color="var(--adm-accent-yellow)" />
-                          <span>Transactions ({txCounts[asset.equipmentId] || 0})</span>
-                        </button>
-
+                      <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
                         {/* QR Label Print */}
                         <button
                           onClick={() => onOpenQRModal(asset)}
