@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './admin.css';
 import { LaptopOnlyGuard } from './components/LaptopOnlyGuard';
-import { AdminSidebar, type AdminViewType } from './components/AdminSidebar';
-import { AdminHeader } from './components/AdminHeader';
+import { AdminTopNav, type AdminViewType } from './components/AdminTopNav';
 import { AssetsView } from './views/AssetsView';
 import { TransactionsView } from './views/TransactionsView';
 import { SettingsView } from './views/SettingsView';
@@ -177,24 +176,12 @@ export const AdminApp: React.FC = () => {
     }
   };
 
-  const getPageTitle = () => {
-    switch (currentView) {
-      case 'ASSETS':
-        return 'Equipment';
-      case 'TRANSACTIONS':
-        return selectedAssetId ? `Transactions: ${selectedAssetId}` : 'All Transactions';
-      case 'SETTINGS':
-        return 'Cloud & Settings';
-      default:
-        return 'Equipment';
-    }
-  };
 
   return (
     <LaptopOnlyGuard>
       <div className="admin-shell">
-        {/* Left Navigation Sidebar */}
-        <AdminSidebar
+        {/* Full-Width Orange Top Navigation Menu */}
+        <AdminTopNav
           currentView={currentView}
           onSelectView={(view) => {
             if (view === 'TRANSACTIONS') {
@@ -203,22 +190,15 @@ export const AdminApp: React.FC = () => {
             setCurrentView(view);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          assets={assets}
-          transactions={transactions}
+          assetCount={assets.length}
+          transactionCount={transactions.length}
+          isSupabaseOnline={isSupabaseOnline}
+          isRefreshing={isRefreshing}
+          onRefresh={() => loadFleetData()}
         />
 
-        {/* Main Content Viewport */}
+        {/* Main Content Viewport spanning full width */}
         <div className="admin-main-wrap">
-          {/* Header Bar */}
-          <AdminHeader
-            title={getPageTitle()}
-            isSupabaseOnline={isSupabaseOnline}
-            isRefreshing={isRefreshing}
-            onRefresh={() => loadFleetData()}
-            onOpenCreateAsset={() => setIsCreateModalOpen(true)}
-          />
-
-          {/* Dynamic Views */}
           <main style={{ flex: 1 }}>
             {currentView === 'ASSETS' && (
               <AssetsView

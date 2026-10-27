@@ -147,138 +147,186 @@ body.admin-body {
    ========================================================================== */
 .admin-shell {
   display: flex;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
   background: var(--adm-bg);
 }
 
-/* Left Navigation Sidebar - Brand Orange Aesthetic */
-.admin-sidebar {
-  width: 255px;
-  min-width: 255px;
-  height: 100vh;
+/* ==========================================================================
+   TOP NAVIGATION MENU BAR - Brand Orange Aesthetic (#EC721E)
+   Spans full width across top of display
+   ========================================================================== */
+.admin-top-menu-bar {
+  width: 100%;
+  height: 60px;
+  min-height: 60px;
   background: #EC721E !important;
-  border-right: none;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
   flex-shrink: 0;
   z-index: 100;
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
-.admin-sidebar-header {
-  padding: 16px 18px 18px;
+.admin-top-menu-left {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
 .admin-version-tag {
   font-family: var(--adm-font-mono);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: #FFFFFF;
-  background: rgba(0, 0, 0, 0.22);
-  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 2px 7px;
   border-radius: 4px !important;
   letter-spacing: 0.5px;
-  align-self: flex-start;
+  white-space: nowrap;
 }
 
-.admin-sidebar-logo-wrap {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin-top: 2px;
-}
-
-.admin-sidebar-logo {
-  max-width: 155px;
-  height: auto;
+.admin-top-logo {
+  height: 32px;
+  width: auto;
   object-fit: contain;
   display: block;
 }
 
-.admin-brand-info h1 {
+.admin-top-brand-title {
   font-family: var(--adm-font-display);
   font-size: 1.15rem;
   font-weight: 800;
   color: #FFFFFF;
-  line-height: 1.2;
-  margin-top: 4px;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
-.admin-brand-info p {
+.admin-console-label {
+  font-family: var(--adm-font-mono);
   font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.85);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-top: 2px;
-  font-weight: 600;
-}
-
-.admin-sidebar-nav {
-  padding: 18px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-}
-
-.admin-nav-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.22);
+  padding: 3px 8px;
   border-radius: 4px !important;
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.admin-top-nav-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.28);
+  margin: 0 4px;
+}
+
+.admin-top-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 4px !important;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #FFFFFF;
+  font-size: 0.88rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
-  text-align: left;
   font-family: var(--adm-font-body);
+  white-space: nowrap;
 }
 
-.admin-nav-item-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.admin-nav-item:hover {
-  background: rgba(255, 255, 255, 0.18);
+.admin-top-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
   color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.45);
 }
 
-.admin-nav-item.active {
+.admin-top-nav-btn.active {
   background: #FFFFFF !important;
   color: #EC721E !important;
+  border-color: #FFFFFF;
   font-weight: 700;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
-.admin-nav-badge {
-  font-size: 0.74rem;
+.admin-top-nav-counter {
+  font-size: 0.72rem;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 4px !important;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.22);
   color: #FFFFFF;
   font-family: var(--adm-font-mono);
 }
 
-.admin-nav-item.active .admin-nav-badge {
+.admin-top-nav-btn.active .admin-top-nav-counter {
   background: #EC721E;
   color: #FFFFFF;
+}
+
+.admin-top-menu-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.admin-top-online-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 4px !important;
+  background: rgba(0, 0, 0, 0.22);
+  color: #FFFFFF;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: var(--adm-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-top-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 4px !important;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #FFFFFF;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.admin-top-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  color: #FFFFFF;
+}
+
+.admin-top-clock-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 4px !important;
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.76rem;
+  font-family: var(--adm-font-mono);
+  font-weight: 600;
 }
 
 /* Main Content Area */
@@ -287,7 +335,7 @@ body.admin-body {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  height: 100vh;
+  height: calc(100vh - 60px);
   overflow-y: auto;
   background: var(--adm-bg);
 }
@@ -849,13 +897,12 @@ body.admin-body {
    Ensures seamless viewing on Microsoft Surface (portrait & snapped views)
    ========================================================================== */
 @media (max-width: 960px) {
-  .admin-sidebar {
-    width: 220px;
-    min-width: 220px;
+  .admin-top-brand-title {
+    font-size: 1rem;
   }
 
-  .admin-topbar {
-    padding: 0 16px;
+  .admin-top-clock-chip {
+    display: none;
   }
 
   .admin-view-container {
@@ -868,39 +915,22 @@ body.admin-body {
 }
 
 @media (max-width: 768px) {
-  .admin-sidebar {
-    width: 72px;
-    min-width: 72px;
+  .admin-top-menu-bar {
+    padding: 0 12px;
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 6px;
+    padding-bottom: 6px;
   }
 
-  .admin-sidebar-header {
-    align-items: center;
-    padding: 12px 6px;
-  }
-
-  .admin-version-tag {
-    font-size: 0.65rem;
-    padding: 2px 4px;
-    align-self: center;
-  }
-
-  .admin-sidebar-logo {
-    max-width: 48px;
-  }
-
-  .admin-brand-info,
-  .admin-sidebar-nav span,
-  .admin-nav-badge {
+  .admin-console-label {
     display: none;
   }
 
-  .admin-nav-item {
-    justify-content: center;
-    padding: 12px;
-  }
-
-  .admin-nav-item-left {
-    justify-content: center;
+  .admin-top-tool-btn span {
+    display: none;
   }
 }
 
