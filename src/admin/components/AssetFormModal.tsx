@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Sparkles, MapPin, Check, Zap } from 'lucide-react';
+import { X, Plus, Sparkles, MapPin, Check } from 'lucide-react';
 import type { Equipment, AssetType } from '../../types';
 
 interface AssetFormModalProps {
@@ -81,10 +81,6 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     return `RSN-${Math.floor(10000 + Math.random() * 90000)}`;
   });
 
-  const [isPoweredUp, setIsPoweredUp] = useState<boolean>(() => {
-    return Boolean(initialAsset?.poweredUpTimestamp && !initialAsset?.poweredDownTimestamp);
-  });
-
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -112,8 +108,6 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
 
     const parsedCap = type === 'PLANT' ? undefined : capacity ? parseInt(capacity, 10) : undefined;
 
-    const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19);
-
     const updatedEquipment: Equipment = {
       equipmentId: cleanId,
       type,
@@ -122,14 +116,8 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       location: location.trim() || 'Field Station',
       what3words: w3w || '///field.power.setup',
       rentalSerialNumber: rentalSerialNumber.trim() || 'RSN-UNKNOWN',
-      poweredUpTimestamp:
-        type === 'GENERATOR' && isPoweredUp
-          ? initialAsset?.poweredUpTimestamp || nowIso
-          : undefined,
-      poweredDownTimestamp:
-        type === 'GENERATOR' && !isPoweredUp
-          ? initialAsset?.poweredDownTimestamp || nowIso
-          : undefined,
+      poweredUpTimestamp: initialAsset?.poweredUpTimestamp,
+      poweredDownTimestamp: initialAsset?.poweredDownTimestamp,
       updatedAt: new Date().toISOString(),
     };
 
@@ -151,13 +139,8 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px' }}>
           <div>
             <h2 className="admin-card-title" style={{ fontSize: '1.35rem' }}>
-              {isEditMode ? 'Edit Equipment' : 'Register New Equipment'}
+              {isEditMode ? 'Edit Equipment' : 'Register new equipment ID'}
             </h2>
-            {!isEditMode && (
-              <p style={{ fontSize: '0.84rem', color: 'var(--adm-text-secondary)' }}>
-                Add a generator, tank, or plant to the master tracking database
-              </p>
-            )}
           </div>
           <button onClick={onClose} className="admin-btn admin-btn-outline admin-btn-sm" style={{ padding: '6px' }}>
             <X size={18} />
@@ -215,7 +198,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
             </div>
 
             <div className="admin-input-group">
-              <label className="admin-label">Asset Classification *</label>
+              <label className="admin-label">Equipment type *</label>
               <select
                 className="admin-select"
                 value={type}
@@ -234,11 +217,9 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
           </div>
 
           {/* Capacity rating */}
-          {type !== 'PLANT' ? (
+          {type !== 'PLANT' && (
             <div className="admin-input-group">
-              <label className="admin-label">
-                {type === 'GENERATOR' ? 'Power Capacity (kVA) *' : 'Fuel Storage Capacity (Litres) *'}
-              </label>
+              <label className="admin-label">Capacity *</label>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <input
                   type="number"
@@ -285,20 +266,6 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 ))}
               </div>
             </div>
-          ) : (
-            <div
-              style={{
-                padding: '12px 16px',
-                background: 'var(--adm-surface-2)',
-                borderRadius: '8px',
-                marginBottom: '18px',
-                border: '1px solid var(--adm-border-subtle)',
-                fontSize: '0.84rem',
-                color: 'var(--adm-text-secondary)',
-              }}
-            >
-              ℹ️ Plant machinery (e.g. Telehandlers, Tower Lights) does not use a fixed capacity rating.
-            </div>
           )}
 
           {/* Area & Location */}
@@ -329,7 +296,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
             </div>
 
             <div className="admin-input-group">
-              <label className="admin-label">Specific Location Description *</label>
+              <label className="admin-label">Location *</label>
               <input
                 type="text"
                 className="admin-input"
@@ -392,56 +359,6 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               />
             </div>
           </div>
-
-          {/* Generator Power Status Switch */}
-          {type === 'GENERATOR' && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '16px',
-                background: 'var(--adm-surface-2)',
-                borderRadius: 'var(--adm-radius-md)',
-                border: '1px solid var(--adm-border-subtle)',
-                marginBottom: '24px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '8px',
-                    background: isPoweredUp ? 'rgba(16, 185, 129, 0.2)' : 'rgba(100, 116, 139, 0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isPoweredUp ? '#10b981' : '#94a3b8',
-                  }}
-                >
-                  <Zap size={20} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#ffffff' }}>
-                    Generator Power Status
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--adm-text-secondary)' }}>
-                    {isPoweredUp ? 'ON' : 'OFF'}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsPoweredUp(!isPoweredUp)}
-                className={`admin-btn ${isPoweredUp ? 'admin-btn-primary' : 'admin-btn-secondary'}`}
-                style={{ fontSize: '0.82rem', padding: '6px 14px' }}
-              >
-                {isPoweredUp ? 'ON' : 'OFF'}
-              </button>
-            </div>
-          )}
 
           {/* Form Actions */}
           <div

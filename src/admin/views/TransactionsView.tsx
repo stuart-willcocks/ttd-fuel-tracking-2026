@@ -6,7 +6,6 @@ import {
   Clock,
   CheckCircle2,
   Smartphone,
-  Eye,
   ArrowLeft,
   X,
   Edit,
@@ -26,7 +25,7 @@ interface TransactionsViewProps {
   selectedAssetId?: string | null;
   onSelectAsset: (equipmentId: string | null) => void;
   onBackToAssets?: () => void;
-  onInspectTransaction: (tx: Transaction) => void;
+  onInspectTransaction?: (tx: Transaction) => void;
   onOpenEditModal?: (asset: Equipment) => void;
   onOpenDeleteModal?: (asset: Equipment) => void;
   onOpenQRModal?: (asset: Equipment) => void;
@@ -40,12 +39,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   selectedAssetId,
   onSelectAsset,
   onBackToAssets,
-  onInspectTransaction,
   onOpenEditModal,
   onOpenDeleteModal,
   onOpenQRModal,
   onTogglePower,
-  onDeleteTransaction,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('ALL');
@@ -240,11 +237,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 {filteredTransactions.length} records
               </span>
             </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--adm-text-secondary)', marginTop: '3px', margin: 0 }}>
-              {currentAsset
-                ? `Full-width audit trail and telemetry log for ${currentAsset.equipmentId} (${currentAsset.type})`
-                : 'Full-width master audit trail of fuel transfers, gauge inspections, and generator runtime events'}
-            </p>
           </div>
         </div>
 
@@ -453,7 +445,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               className="admin-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search UUID, asset ID, PDA, notes..."
+              placeholder="Search"
             />
           </div>
 
@@ -576,13 +568,12 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             <thead>
               <tr>
                 <th>Timestamp (Local)</th>
-                <th>Target Asset ID</th>
-                <th>Classification</th>
-                <th>Transaction Action</th>
-                <th>Telemetry Readout</th>
-                <th>Field PDA Device</th>
+                <th>Equipment ID</th>
+                <th>Equipment type</th>
+                <th>Transaction type</th>
+                <th>Transaction values</th>
+                <th>Device</th>
                 <th>Sync Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -690,36 +681,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                         <CheckCircle2 size={12} />
                         <span>Synced</span>
                       </span>
-                    </td>
-
-                    {/* Actions */}
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'inline-flex', gap: '6px' }}>
-                        <button
-                          onClick={() => onInspectTransaction(tx)}
-                          className="admin-btn admin-btn-outline admin-btn-sm"
-                          style={{ padding: '4px 8px' }}
-                          title="View raw transaction telemetry & payload"
-                        >
-                          <Eye size={13} />
-                          <span>Inspect</span>
-                        </button>
-
-                        {onDeleteTransaction && (
-                          <button
-                            onClick={async () => {
-                              if (window.confirm(`Delete transaction ${tx.id}? If this was a power event, generator state will recalculate from the remaining history.`)) {
-                                await onDeleteTransaction(tx.id);
-                              }
-                            }}
-                            className="admin-btn admin-btn-outline admin-btn-sm"
-                            style={{ padding: '4px 8px', color: '#F87171' }}
-                            title="Delete transaction and recalculate equipment state"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        )}
-                      </div>
                     </td>
                   </tr>
                 );

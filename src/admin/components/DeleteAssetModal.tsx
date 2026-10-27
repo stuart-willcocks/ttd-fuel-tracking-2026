@@ -84,7 +84,7 @@ export const DeleteAssetModal: React.FC<DeleteAssetModalProps> = ({
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', color: 'var(--adm-text-muted)' }}>Classification:</span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--adm-text-muted)' }}>Equipment type:</span>
             <span style={{ fontWeight: 600 }}>{asset.type} ({asset.capacity ? `${asset.capacity} ${asset.type === 'GENERATOR' ? 'kVA' : 'L'}` : 'N/A'})</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>

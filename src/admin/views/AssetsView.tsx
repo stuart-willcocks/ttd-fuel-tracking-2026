@@ -188,7 +188,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
               className="admin-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search ID, location, serial, w3w..."
+              placeholder="Search"
             />
           </div>
 
@@ -310,7 +310,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             <thead>
               <tr>
                 <th>Equipment ID</th>
-                <th>Classification</th>
+                <th>Equipment type</th>
                 <th>Capacity</th>
                 <th>Zone &amp; Location</th>
                 <th>What3Words</th>
