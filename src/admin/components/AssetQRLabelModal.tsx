@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import QRCode from 'qrcode';
 import { Printer, Download, X } from 'lucide-react';
 import type { Equipment } from '../../types';
@@ -11,6 +11,7 @@ interface AssetQRLabelModalProps {
 
 export const AssetQRLabelModal: React.FC<AssetQRLabelModalProps> = ({ asset, isOpen, onClose }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const isMouseDownOnBackdrop = useRef<boolean>(false);
 
   useEffect(() => {
     if (!asset) return;
@@ -30,6 +31,19 @@ export const AssetQRLabelModal: React.FC<AssetQRLabelModalProps> = ({ asset, isO
 
   if (!isOpen || !asset) return null;
 
+  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    isMouseDownOnBackdrop.current = e.target === e.currentTarget;
+  };
+
+  const handleBackdropMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if (isMouseDownOnBackdrop.current && e.target === e.currentTarget) {
+      onClose();
+    }
+    isMouseDownOnBackdrop.current = false;
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -45,9 +59,17 @@ export const AssetQRLabelModal: React.FC<AssetQRLabelModalProps> = ({ asset, isO
   };
 
   return (
-    <div className="admin-modal-backdrop" onClick={onClose}>
+    <div
+      className="admin-modal-backdrop"
+      onMouseDown={handleBackdropMouseDown}
+      onMouseUp={handleBackdropMouseUp}
+    >
       <div
         className="admin-modal-panel"
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          isMouseDownOnBackdrop.current = false;
+        }}
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '420px', background: '#FFFFFF', textAlign: 'center' }}
       >

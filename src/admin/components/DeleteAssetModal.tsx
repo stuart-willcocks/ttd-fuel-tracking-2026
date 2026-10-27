@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AlertOctagon, Trash2, X } from 'lucide-react';
 import type { Equipment, Transaction } from '../../types';
 
@@ -18,8 +18,22 @@ export const DeleteAssetModal: React.FC<DeleteAssetModalProps> = ({
   onConfirmDelete,
 }) => {
   const [isDeleting, setIsDeleting] = useState(false);
+  const isMouseDownOnBackdrop = useRef<boolean>(false);
 
   if (!isOpen || !asset) return null;
+
+  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    isMouseDownOnBackdrop.current = e.target === e.currentTarget;
+  };
+
+  const handleBackdropMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if (isMouseDownOnBackdrop.current && e.target === e.currentTarget) {
+      onClose();
+    }
+    isMouseDownOnBackdrop.current = false;
+  };
 
   const assetTxs = transactions.filter((t) => t.equipmentId === asset.equipmentId);
 
@@ -36,8 +50,20 @@ export const DeleteAssetModal: React.FC<DeleteAssetModalProps> = ({
   };
 
   return (
-    <div className="admin-modal-backdrop" onClick={onClose}>
-      <div className="admin-modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+    <div
+      className="admin-modal-backdrop"
+      onMouseDown={handleBackdropMouseDown}
+      onMouseUp={handleBackdropMouseUp}
+    >
+      <div
+        className="admin-modal-panel"
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          isMouseDownOnBackdrop.current = false;
+        }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '500px' }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div

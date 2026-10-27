@@ -1,7 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { X, Plus, Sparkles, MapPin, Check, Zap, Trash2 } from 'lucide-react';
 import type { Equipment, AssetType } from '../../types';
-import { EquipmentTypeIcon } from '../../components/EquipmentTypeIcon';
 
 interface AssetFormModalProps {
   isOpen: boolean;
@@ -27,6 +26,8 @@ const COMMON_AREAS = [
 const GEN_CAPACITIES = [60, 100, 150, 200, 250, 500, 1000];
 const TANK_CAPACITIES = [1000, 2000, 2500, 3000, 4500, 5000, 10000];
 
+const stripW3wPrefix = (str: string): string => str.replace(/^\/{1,3}/, '');
+
 export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   isOpen,
   onClose,
@@ -38,6 +39,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   isPowerOn = false,
 }) => {
   const isEditMode = Boolean(initialAsset);
+  const isMouseDownOnBackdrop = useRef<boolean>(false);
 
   // Auto-suggest next sequential Equipment ID based on latest fleet
   const suggestNextId = (preferredPrefix = 'TTD-MAT-') => {
@@ -80,7 +82,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   });
 
   const [what3words, setWhat3words] = useState<string>(() => {
-    return initialAsset?.what3words || '///field.power.setup';
+    return initialAsset?.what3words ? stripW3wPrefix(initialAsset.what3words) : 'field.power.setup';
   });
 
   const [rentalSerialNumber, setRentalSerialNumber] = useState<string>(() => {
@@ -99,7 +101,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       setCapacity(initialAsset.capacity !== undefined ? String(initialAsset.capacity) : '');
       setArea(initialAsset.area || 'North Zone');
       setLocation(initialAsset.location || '');
-      setWhat3words(initialAsset.what3words || '///field.power.setup');
+      setWhat3words(stripW3wPrefix(initialAsset.what3words || 'field.power.setup'));
       setRentalSerialNumber(initialAsset.rentalSerialNumber || '');
     } else {
       setEquipmentId(suggestNextId());
@@ -107,7 +109,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       setCapacity('100');
       setArea('North Zone');
       setLocation('');
-      setWhat3words('///field.power.setup');
+      setWhat3words('field.power.setup');
       setRentalSerialNumber(`RSN-${Math.floor(10000 + Math.random() * 90000)}`);
     }
     setErrorMsg(null);
@@ -121,21 +123,33 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     const initCap = initialAsset.capacity;
     const capMatches = (parsedCap === undefined && initCap === undefined) || parsedCap === initCap;
 
-    const currentW3w = what3words.trim();
-    const normW3w = currentW3w ? (currentW3w.startsWith('///') ? currentW3w : `///${currentW3w}`) : '';
-    const initW3w = (initialAsset.what3words || '').trim();
+    const currentW3w = stripW3wPrefix(what3words.trim());
+    const initW3w = stripW3wPrefix((initialAsset.what3words || '').trim());
 
     return (
       type !== initialAsset.type ||
       !capMatches ||
       area.trim() !== (initialAsset.area || '').trim() ||
       location.trim() !== (initialAsset.location || '').trim() ||
-      normW3w !== initW3w ||
+      currentW3w !== initW3w ||
       rentalSerialNumber.trim().toUpperCase() !== (initialAsset.rentalSerialNumber || '').trim().toUpperCase()
     );
   }, [isEditMode, initialAsset, type, capacity, area, location, what3words, rentalSerialNumber]);
 
   if (!isOpen) return null;
+
+  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    isMouseDownOnBackdrop.current = e.target === e.currentTarget;
+  };
+
+  const handleBackdropMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if (isMouseDownOnBackdrop.current && e.target === e.currentTarget) {
+      onClose();
+    }
+    isMouseDownOnBackdrop.current = false;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,10 +166,8 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       return;
     }
 
-    let w3w = what3words.trim();
-    if (w3w && !w3w.startsWith('///')) {
-      w3w = `///${w3w}`;
-    }
+    const cleanW3w = stripW3wPrefix(what3words.trim());
+    const finalW3w = cleanW3w ? `///${cleanW3w}` : '///field.power.setup';
 
     const parsedCap = type === 'PLANT' ? undefined : capacity ? parseInt(capacity, 10) : undefined;
 
@@ -165,7 +177,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       capacity: parsedCap,
       area: area.trim() || 'Site Area',
       location: location.trim() || 'Field Station',
-      what3words: w3w || '///field.power.setup',
+      what3words: finalW3w,
       rentalSerialNumber: rentalSerialNumber.trim() || 'RSN-UNKNOWN',
       poweredUpTimestamp: initialAsset?.poweredUpTimestamp,
       poweredDownTimestamp: initialAsset?.poweredDownTimestamp,
@@ -185,13 +197,23 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   };
 
   return (
-    <div className="admin-modal-backdrop" onClick={onClose}>
-      <div className="admin-modal-panel" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="admin-modal-backdrop"
+      onMouseDown={handleBackdropMouseDown}
+      onMouseUp={handleBackdropMouseUp}
+    >
+      <div
+        className="admin-modal-panel"
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          isMouseDownOnBackdrop.current = false;
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <div>
-            <h2 className="admin-card-title" style={{ fontSize: '1.35rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h2 className="admin-card-title" style={{ fontSize: '1.35rem' }}>
               {isEditMode ? 'Edit Equipment' : 'Register new equipment ID'}
-              {isEditMode && <EquipmentTypeIcon type={type} size={20} />}
             </h2>
           </div>
           <button onClick={onClose} className="admin-btn admin-btn-outline admin-btn-sm" style={{ padding: '6px' }}>
@@ -216,73 +238,57 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* Row 1: Equipment ID */}
+          {/* Row 1: Equipment ID (25% width) */}
           <div className="admin-input-group" style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label className="admin-label">Equipment ID *</label>
+            <label className="admin-label">Equipment ID *</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="text"
+                className="admin-input admin-mono"
+                value={equipmentId}
+                onChange={(e) => setEquipmentId(e.target.value.toUpperCase())}
+                placeholder="TTD-MAT-0001"
+                disabled={isEditMode}
+                style={{ width: '25%', minWidth: '130px' }}
+                required
+              />
               {!isEditMode && (
                 <button
                   type="button"
                   onClick={() => setEquipmentId(suggestNextId())}
                   className="admin-btn admin-btn-outline admin-btn-sm"
-                  style={{ fontSize: '0.72rem', padding: '2px 8px', gap: '4px' }}
+                  style={{ fontSize: '0.74rem', padding: '6px 10px', gap: '4px', height: '36px' }}
                 >
                   <Sparkles size={12} color="#f59e0b" />
                   <span>Next ID</span>
                 </button>
               )}
             </div>
-            <input
-              type="text"
-              className="admin-input admin-mono"
-              value={equipmentId}
-              onChange={(e) => setEquipmentId(e.target.value.toUpperCase())}
-              placeholder="TTD-MAT-0001"
-              disabled={isEditMode}
-              required
-            />
           </div>
 
-          {/* Row 2: Equipment type dropdown with capacity to the right (~20% width) */}
+          {/* Row 2: Equipment type dropdown (1/3 of current width) with capacity to the right */}
           <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', marginBottom: '16px' }}>
-            {/* Equipment Type Dropdown */}
-            <div className="admin-input-group" style={{ flex: 1, marginBottom: 0 }}>
+            {/* Equipment Type Dropdown (1/3 width) */}
+            <div className="admin-input-group" style={{ width: '140px', flexShrink: 0, marginBottom: 0 }}>
               <label className="admin-label">Equipment type *</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '38px',
-                    height: '38px',
-                    background: 'var(--adm-surface-2)',
-                    borderRadius: '6px',
-                    border: '1px solid var(--adm-border-subtle)',
-                    flexShrink: 0,
-                  }}
-                >
-                  <EquipmentTypeIcon type={type} size={20} />
-                </div>
-                <select
-                  className="admin-select"
-                  style={{ flex: 1 }}
-                  value={type}
-                  onChange={(e) => {
-                    const newType = e.target.value as AssetType;
-                    setType(newType);
-                    if (newType === 'GENERATOR' && !capacity) setCapacity('100');
-                    if (newType === 'TANK' && !capacity) setCapacity('3000');
-                  }}
-                >
-                  <option value="GENERATOR">Generator</option>
-                  <option value="TANK">Bulk Fuel Tank</option>
-                  <option value="PLANT">Plant Machinery</option>
-                </select>
-              </div>
+              <select
+                className="admin-select"
+                style={{ width: '100%' }}
+                value={type}
+                onChange={(e) => {
+                  const newType = e.target.value as AssetType;
+                  setType(newType);
+                  if (newType === 'GENERATOR' && !capacity) setCapacity('100');
+                  if (newType === 'TANK' && !capacity) setCapacity('3000');
+                }}
+              >
+                <option value="GENERATOR">Generator</option>
+                <option value="TANK">Tank</option>
+                <option value="PLANT">Plant</option>
+              </select>
             </div>
 
-            {/* Capacity Text Box (reduced width to ~20% of modal) */}
+            {/* Capacity Text Box */}
             <div className="admin-input-group" style={{ width: '110px', flexShrink: 0, marginBottom: 0 }}>
               <label className="admin-label">Capacity *</label>
               {type !== 'PLANT' ? (
@@ -349,96 +355,97 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
             </div>
           )}
 
-          {/* Area & Location */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-            <div className="admin-input-group" style={{ marginBottom: 0 }}>
-              <label className="admin-label">Zone / Area *</label>
+          {/* Row 3: Zone/area on its own line, 90% width */}
+          <div className="admin-input-group" style={{ marginBottom: '16px' }}>
+            <label className="admin-label">Zone/area *</label>
+            <input
+              type="text"
+              className="admin-input"
+              style={{ width: '90%' }}
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              placeholder="e.g. North Zone"
+              required
+            />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+              {COMMON_AREAS.slice(0, 4).map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => setArea(a)}
+                  className="admin-btn admin-btn-outline admin-btn-sm"
+                  style={{ padding: '2px 7px', fontSize: '0.7rem' }}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Row 4: Location on its own line, 90% width */}
+          <div className="admin-input-group" style={{ marginBottom: '16px' }}>
+            <label className="admin-label">Location *</label>
+            <input
+              type="text"
+              className="admin-input"
+              style={{ width: '90%' }}
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Stage Alpha Power Compound"
+              required
+            />
+          </div>
+
+          {/* Row 5: What3Words on its own line, 90% width, no prefix /// characters */}
+          <div className="admin-input-group" style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '90%' }}>
+              <label className="admin-label">What3Words Reference *</label>
+              {what3words && (
+                <a
+                  href={`https://what3words.com/${stripW3wPrefix(what3words)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: '0.72rem', color: '#2563EB', textDecoration: 'none' }}
+                >
+                  View Map ↗
+                </a>
+              )}
+            </div>
+            <div style={{ position: 'relative', width: '90%' }}>
               <input
                 type="text"
-                className="admin-input"
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-                placeholder="e.g. North Zone"
+                className="admin-input admin-mono"
+                value={what3words}
+                onChange={(e) => setWhat3words(stripW3wPrefix(e.target.value))}
+                placeholder="puzzle.stages.daring"
+                style={{ paddingLeft: '32px', width: '100%' }}
                 required
               />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
-                {COMMON_AREAS.slice(0, 4).map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => setArea(a)}
-                    className="admin-btn admin-btn-outline admin-btn-sm"
-                    style={{ padding: '2px 7px', fontSize: '0.7rem' }}
-                  >
-                    {a}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="admin-input-group" style={{ marginBottom: 0 }}>
-              <label className="admin-label">Location *</label>
-              <input
-                type="text"
-                className="admin-input"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. Stage Alpha Power Compound"
-                required
+              <MapPin
+                size={15}
+                style={{
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#ef4444',
+                }}
               />
             </div>
           </div>
 
-          {/* What3Words & Serial Number */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-            <div className="admin-input-group" style={{ marginBottom: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <label className="admin-label">What3Words Reference *</label>
-                {what3words && (
-                  <a
-                    href={`https://what3words.com/${what3words.replace(/^\/\/\//, '')}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ fontSize: '0.72rem', color: '#2563EB', textDecoration: 'none' }}
-                  >
-                    View Map ↗
-                  </a>
-                )}
-              </div>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  className="admin-input admin-mono"
-                  value={what3words}
-                  onChange={(e) => setWhat3words(e.target.value)}
-                  placeholder="///puzzle.stages.daring"
-                  style={{ paddingLeft: '32px' }}
-                  required
-                />
-                <MapPin
-                  size={15}
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#ef4444',
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="admin-input-group" style={{ marginBottom: 0 }}>
-              <label className="admin-label">Rental Serial Number *</label>
-              <input
-                type="text"
-                className="admin-input admin-mono"
-                value={rentalSerialNumber}
-                onChange={(e) => setRentalSerialNumber(e.target.value.toUpperCase())}
-                placeholder="RSN-40291"
-                required
-              />
-            </div>
+          {/* Row 6: Rental Serial Number on its own line, 90% width */}
+          <div className="admin-input-group" style={{ marginBottom: '20px' }}>
+            <label className="admin-label">Rental Serial Number *</label>
+            <input
+              type="text"
+              className="admin-input admin-mono"
+              style={{ width: '90%' }}
+              value={rentalSerialNumber}
+              onChange={(e) => setRentalSerialNumber(e.target.value.toUpperCase())}
+              placeholder="RSN-40291"
+              required
+            />
           </div>
 
           {/* Form Actions: Turn On/Off and Delete buttons in edit mode on left; Cancel and Update Asset on right */}
@@ -446,7 +453,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: isEditMode ? 'space-between' : 'flex-end',
+              justifyContent: isEditMode && (onTogglePower || onDelete) ? 'space-between' : 'flex-end',
               paddingTop: '20px',
               borderTop: '1px solid var(--adm-border-subtle)',
             }}

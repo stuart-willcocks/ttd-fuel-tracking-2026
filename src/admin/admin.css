@@ -195,33 +195,29 @@ body.admin-body {
   letter-spacing: -0.01em;
 }
 
-.admin-top-badge-box {
-  display: inline-flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 6px 12px;
+.admin-console-label {
+  font-family: var(--adm-font-mono);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.95);
   background: rgba(0, 0, 0, 0.25);
+  padding: 4px 10px;
   border-radius: 4px !important;
-  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   white-space: nowrap;
 }
 
-.admin-top-badge-box .admin-badge-title {
-  font-family: var(--adm-font-mono);
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.95);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.admin-top-badge-box .admin-badge-version {
+.admin-version-tag {
   font-family: var(--adm-font-mono);
   font-size: 0.76rem;
   font-weight: 700;
   color: #FFFFFF;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 4px 10px;
+  border-radius: 4px !important;
   letter-spacing: 0.5px;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 6px;

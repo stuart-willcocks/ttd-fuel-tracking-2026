@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, ReceiptText, Code, Trash2 } from 'lucide-react';
 import type { Transaction, Equipment } from '../../types';
 import { formatAdminTimestamp } from '../../utils/dateFormat';
@@ -21,12 +21,38 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   onDeleteTransaction,
 }) => {
   const [showJson, setShowJson] = useState(false);
+  const isMouseDownOnBackdrop = useRef<boolean>(false);
 
   if (!isOpen || !transaction) return null;
 
+  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    isMouseDownOnBackdrop.current = e.target === e.currentTarget;
+  };
+
+  const handleBackdropMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if (isMouseDownOnBackdrop.current && e.target === e.currentTarget) {
+      onClose();
+    }
+    isMouseDownOnBackdrop.current = false;
+  };
+
   return (
-    <div className="admin-modal-backdrop" onClick={onClose}>
-      <div className="admin-modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+    <div
+      className="admin-modal-backdrop"
+      onMouseDown={handleBackdropMouseDown}
+      onMouseUp={handleBackdropMouseUp}
+    >
+      <div
+        className="admin-modal-panel"
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          isMouseDownOnBackdrop.current = false;
+        }}
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '600px' }}
+      >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

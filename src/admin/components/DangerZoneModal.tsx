@@ -65,10 +65,33 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
     }
   };
 
+  const isMouseDownOnBackdrop = useRef<boolean>(false);
+
+  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    isMouseDownOnBackdrop.current = e.target === e.currentTarget;
+  };
+
+  const handleBackdropMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if (isMouseDownOnBackdrop.current && e.target === e.currentTarget) {
+      handleClose();
+    }
+    isMouseDownOnBackdrop.current = false;
+  };
+
   return (
-    <div className="admin-modal-backdrop" onClick={handleClose}>
+    <div
+      className="admin-modal-backdrop"
+      onMouseDown={handleBackdropMouseDown}
+      onMouseUp={handleBackdropMouseUp}
+    >
       <div
         className="admin-modal-panel"
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          isMouseDownOnBackdrop.current = false;
+        }}
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: showConfirm ? '460px' : '520px',
