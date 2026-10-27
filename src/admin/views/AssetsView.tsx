@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   Table as TableIcon,
   ReceiptText,
+  AlertTriangle,
 } from 'lucide-react';
 import type { Equipment, Transaction } from '../../types';
 import { EquipmentTypeIcon } from '../../components/EquipmentTypeIcon';
@@ -26,6 +27,7 @@ interface AssetsViewProps {
   onOpenQRModal: (asset: Equipment) => void;
   onSelectAsset: (equipmentId: string) => void;
   onTogglePower: (asset: Equipment) => void;
+  onOpenDangerZone?: () => void;
 }
 
 type FilterType = 'ALL' | 'GENERATOR' | 'TANK' | 'PLANT' | 'RUNNING' | 'STANDBY';
@@ -39,6 +41,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   onOpenQRModal,
   onSelectAsset,
   onTogglePower,
+  onOpenDangerZone,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
@@ -161,6 +164,26 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             <Plus size={16} />
             <span>Add New Asset</span>
           </button>
+
+          {onOpenDangerZone && (
+            <button
+              onClick={onOpenDangerZone}
+              className="admin-btn"
+              style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                border: '1px solid #dc2626',
+              }}
+              title="Open Danger Zone database management"
+            >
+              <AlertTriangle size={15} />
+              <span>Danger zone</span>
+            </button>
+          )}
         </div>
       </div>
 

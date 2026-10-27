@@ -341,6 +341,14 @@ export function apiMiddleware(): Connect.NextHandleFunction {
         return;
       }
 
+      // POST /api/clear
+      if (pathname === '/api/clear' && req.method === 'POST') {
+        writeData({ equipments: [], transactions: [] });
+        res.statusCode = 200;
+        res.end(JSON.stringify({ success: true, message: 'All equipment and transactions cleared' }));
+        return;
+      }
+
       res.statusCode = 404;
       res.end(JSON.stringify({ error: 'Endpoint not found' }));
     } catch (err: any) {

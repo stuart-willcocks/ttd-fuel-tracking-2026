@@ -9,6 +9,7 @@ import { AssetFormModal } from './components/AssetFormModal';
 import { DeleteAssetModal } from './components/DeleteAssetModal';
 import { AssetQRLabelModal } from './components/AssetQRLabelModal';
 import { TransactionDetailModal } from './components/TransactionDetailModal';
+import { DangerZoneModal } from './components/DangerZoneModal';
 import { ToastContainer, type ToastMessage } from './components/Toast';
 
 import type { Equipment, Transaction } from '../types';
@@ -20,6 +21,7 @@ import {
   postRemoteTransaction,
   deleteRemoteTransaction,
   resetRemoteData,
+  deleteAllFleetData,
 } from '../services/api';
 import { isSupabaseConfigured, subscribeToCloudChanges } from '../services/supabase';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
@@ -38,6 +40,7 @@ export const AdminApp: React.FC = () => {
   const [assetPendingDelete, setAssetPendingDelete] = useState<Equipment | null>(null);
   const [qrAsset, setQrAsset] = useState<Equipment | null>(null);
   const [inspectingTransaction, setInspectingTransaction] = useState<Transaction | null>(null);
+  const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -217,6 +220,23 @@ export const AdminApp: React.FC = () => {
     }
   };
 
+  // Delete all equipment and transactions handler (Danger Zone)
+  const handleDeleteAllRecords = async () => {
+    try {
+      await deleteAllFleetData();
+      setAssets([]);
+      setTransactions([]);
+      setSelectedAssetId(null);
+      await loadFleetData(true);
+      showToast('All equipment IDs and transactions have been deleted.', 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Failed to delete all records:', err);
+      showToast(`Failed to delete records: ${msg}`, 'error');
+      throw err;
+    }
+  };
+
 
   return (
     <LaptopOnlyGuard>
@@ -249,6 +269,7 @@ export const AdminApp: React.FC = () => {
                 onOpenEditModal={(asset) => setEditingAsset(asset)}
                 onOpenDeleteModal={(asset) => setAssetPendingDelete(asset)}
                 onOpenQRModal={(asset) => setQrAsset(asset)}
+                onOpenDangerZone={() => setIsDangerZoneOpen(true)}
                 onSelectAsset={(id) => {
                   setSelectedAssetId(id);
                   setCurrentView('TRANSACTIONS');
@@ -346,6 +367,13 @@ export const AdminApp: React.FC = () => {
             }}
           />
         )}
+
+        {/* Danger Zone Modal */}
+        <DangerZoneModal
+          isOpen={isDangerZoneOpen}
+          onClose={() => setIsDangerZoneOpen(false)}
+          onDeleteAll={handleDeleteAllRecords}
+        />
 
         {/* Toast Alerts */}
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />

@@ -1,4 +1,5 @@
 import type { Equipment, Transaction } from '../types';
+import { db } from '../db/indexedDB';
 import {
   isSupabaseConfigured,
   fetchEquipmentFromSupabase,
@@ -137,4 +138,32 @@ export async function wipeAndImportFleet(
     await postRemoteTransaction(tx);
   }
   return { equipmentCount: equipmentList.length, transactionCount: transactions.length };
+}
+
+export async function deleteAllFleetData(): Promise<void> {
+  if (isSupabaseConfigured()) {
+    await clearAllCloudData();
+  }
+
+  try {
+    await fetch('/api/clear', { method: 'POST' });
+  } catch {
+    // Ignore in static hosting environments
+  }
+
+  // Clear local IndexedDB and outbox
+  try {
+    await db.transactions.clear();
+    await db.equipments.clear();
+    await db.outbox.clear();
+  } catch (err) {
+    console.warn('Local indexedDB clear error:', err);
+  }
+
+  // Clear tombstone cache
+  try {
+    localStorage.removeItem('ttd_deleted_tx_ids');
+  } catch {
+    // Ignore
+  }
 }
