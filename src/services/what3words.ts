@@ -183,7 +183,7 @@ export async function resolveEquipmentCoordinates(
 }
 
 /**
- * Returns a Google Maps URL with Satellite layer enabled (`t=k` / `data=!3m1!1e3`)
+ * Returns a fallback href for What3Words links
  */
 export function getGoogleMapsExternalUrl(w3w?: string | null, lat?: number | null, lng?: number | null): string {
   if (typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)) {
@@ -194,30 +194,133 @@ export function getGoogleMapsExternalUrl(w3w?: string | null, lat?: number | nul
     return `https://maps.google.com/maps?q=${cached.lat},${cached.lng}&t=k&z=19&output=embed`;
   }
   const clean = normalizeWhat3Words(w3w);
-  return `https://maps.google.com/maps?q=${encodeURIComponent(clean)}&t=k&z=18&output=embed`;
+  return `#w3w-${encodeURIComponent(clean)}`;
 }
 
 /**
- * Returns a clutter-free embeddable Google Maps iframe URL with the Satellite layer (`t=k`) visible.
- * Using `output=embed` with `t=k` removes the left-hand Places/Directions/Save/Nearby drawer and
- * top Restaurants/Hotels category buttons while keeping the satellite layer and location pin active.
+ * Generates a self-contained HTML document (`srcDoc`) that renders Google Maps' pure Satellite
+ * raster layer (`https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}`, `lyrs=s` = pure satellite
+ * imagery with ALL POI icons — photo locations, hotels, hospitals, restaurants, businesses — suppressed)
+ * and places a single location pin at the exact converted coordinates.
  */
-export function getGoogleMapsEmbedUrl(w3w?: string | null, lat?: number | null, lng?: number | null): string {
-  if (typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)) {
-    return `https://maps.google.com/maps?q=${lat},${lng}&t=k&z=19&ie=UTF8&iwloc=near&output=embed`;
-  }
-  const cached = getCachedWhat3WordsCoordinates(w3w);
-  if (cached) {
-    return `https://maps.google.com/maps?q=${cached.lat},${cached.lng}&t=k&z=19&ie=UTF8&iwloc=near&output=embed`;
-  }
+export function getGoogleSatelliteMapSrcDoc(
+  w3w?: string | null,
+  lat?: number | null,
+  lng?: number | null
+): string {
   const clean = normalizeWhat3Words(w3w);
-  return `https://maps.google.com/maps?q=${encodeURIComponent(clean)}&t=k&z=18&ie=UTF8&iwloc=near&output=embed`;
+  const cached =
+    typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)
+      ? { lat, lng }
+      : getCachedWhat3WordsCoordinates(clean);
+
+  const targetLat = cached ? cached.lat : 52.0733;
+  const targetLng = cached ? cached.lng : -1.0147;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #0F172A;
+      overflow: hidden;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    .leaflet-control-attribution {
+      font-size: 10px !important;
+      background: rgba(15, 23, 42, 0.65) !important;
+      color: #CBD5E1 !important;
+      padding: 2px 6px !important;
+      border-top-left-radius: 4px;
+    }
+    .leaflet-control-attribution a {
+      color: #93C5FD !important;
+    }
+    .recenter-btn {
+      position: absolute;
+      bottom: 24px;
+      right: 12px;
+      z-index: 1000;
+      background: #FFFFFF;
+      color: #0F172A;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .recenter-btn:hover {
+      background: #F8FAFC;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <button type="button" class="recenter-btn" id="recenterBtn" title="Re-center on pin">
+    <span>⌖ Center Pin</span>
+  </button>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    (function() {
+      var target = [${targetLat}, ${targetLng}];
+      var map = L.map('map', {
+        center: target,
+        zoom: 19,
+        maxZoom: 21,
+        minZoom: 3,
+        zoomControl: true
+      });
+
+      // Pure Google Satellite layer (lyrs=s) - zero POI icons (no photos, hotels, hospitals, etc.)
+      L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        maxZoom: 21,
+        maxNativeZoom: 20,
+        subdomains: ['0', '1', '2', '3'],
+        attribution: 'Map data &copy; Google Satellite'
+      }).addTo(map);
+
+      var pinSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 34 44">' +
+        '<defs><filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">' +
+        '<feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.55"/>' +
+        '</filter></defs>' +
+        '<path filter="url(#shadow)" d="M17 2C9.27 2 3 8.27 3 16c0 10.5 14 25 14 25s14-14.5 14-25c0-7.73-6.27-14-14-14z" fill="#EA4335" stroke="#FFFFFF" stroke-width="2"/>' +
+        '<circle cx="17" cy="16" r="5.5" fill="#960A0A"/>' +
+        '</svg>';
+
+      var pinIcon = L.divIcon({
+        html: pinSvg,
+        className: '',
+        iconSize: [34, 44],
+        iconAnchor: [17, 41]
+      });
+
+      L.marker(target, { icon: pinIcon }).addTo(map);
+
+      document.getElementById('recenterBtn').addEventListener('click', function() {
+        map.setView(target, 19, { animate: true });
+      });
+    })();
+  </script>
+</body>
+</html>`;
 }
 
 /**
- * Opens a clutter-free Google Maps Satellite modal overlay in the Admin Console.
- * Eliminates the Google Maps left-hand info drawer (Directions, Save, Nearby) and top category chips
- * (Restaurants, Hotels, etc.) and always displays the Satellite layer (`t=k`).
+ * Opens a clutter-free Google Maps pure Satellite modal overlay in the Admin Console.
+ * Uses pure Google Satellite tiles (`lyrs=s`) so all POI icons (photo locations, hotels,
+ * hospitals, restaurants) and Google sidebars are completely suppressed.
  */
 function openCleanGoogleMapsModal(
   rawW3w: string,
@@ -354,7 +457,7 @@ function openCleanGoogleMapsModal(
   const renderIframe = (coords: W3WCoordinates | null) => {
     bodyWrap.innerHTML = '';
     const iframe = document.createElement('iframe');
-    iframe.src = getGoogleMapsEmbedUrl(clean, coords?.lat, coords?.lng);
+    iframe.srcdoc = getGoogleSatelliteMapSrcDoc(clean, coords?.lat, coords?.lng);
     iframe.title = `Satellite Map for ///${clean}`;
     iframe.setAttribute('allow', 'geolocation');
     Object.assign(iframe.style, {
@@ -399,7 +502,7 @@ function openCleanGoogleMapsModal(
 
 /**
  * Click handler for What3Words links:
- * Opens a clutter-free Google Maps Satellite view with no left-hand drawer and no category pills.
+ * Opens a clutter-free Google Maps pure Satellite view with all POI icons suppressed.
  */
 export async function handleWhat3WordsLinkClick(
   e: React.MouseEvent<HTMLElement>,

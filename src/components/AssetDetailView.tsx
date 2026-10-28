@@ -10,7 +10,7 @@ import { ActionConfirmModal } from './ActionConfirmModal';
 import {
   convertWhat3WordsToCoordinates,
   getCachedWhat3WordsCoordinates,
-  getGoogleMapsEmbedUrl,
+  getGoogleSatelliteMapSrcDoc,
   type W3WCoordinates,
 } from '../services/what3words';
 import { db } from '../db/indexedDB';
@@ -455,7 +455,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
                 </div>
               ) : (
                 <iframe
-                  src={getGoogleMapsEmbedUrl(cleanW3w, resolvedCoords?.lat, resolvedCoords?.lng)}
+                  srcDoc={getGoogleSatelliteMapSrcDoc(cleanW3w, resolvedCoords?.lat, resolvedCoords?.lng)}
                   title={`Google Map for ${cleanW3w}`}
                   className="w3w-map-iframe"
                   allow="geolocation"
