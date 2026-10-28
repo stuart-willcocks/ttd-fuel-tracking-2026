@@ -63,7 +63,10 @@ export const IS_STAGING = ${isStaging};
 export function getIsStaging(): boolean {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname.toLowerCase();
-    if (host.includes('staging') || host.includes('preview') || host === 'localhost' || host === '127.0.0.1') {
+    if (host === 'ttd-fuel-tracking-2026.vercel.app') {
+      return false;
+    }
+    if (host.includes('staging') || host.includes('preview') || host === 'localhost' || host === '127.0.0.1' || host.endsWith('.vercel.app')) {
       return true;
     }
   }

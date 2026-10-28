@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getDeviceName } from '../services/device';
-import { APP_VERSION, BUILD_NUMBER } from '../version';
+import { APP_VERSION, BUILD_NUMBER, getIsStaging } from '../version';
 import { checkRemoteAppVersion, performAppUpdate } from '../services/appUpdate';
 
 interface SplashScreenProps {
@@ -9,6 +9,7 @@ interface SplashScreenProps {
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
   const deviceName = getDeviceName();
+  const isStaging = getIsStaging();
   const [versionText, setVersionText] = useState<string>('Checking for updates...');
   const [isContinueEnabled, setIsContinueEnabled] = useState<boolean>(false);
   const isCheckingRef = useRef<boolean>(false);
@@ -93,7 +94,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
 
           <div className="splash-title-block">
             <h1 className="splash-main-title">The Technical Department Ltd</h1>
-            <h2 className="splash-sub-title">Fuel Tracking App (STAGING)</h2>
+            <h2 className="splash-sub-title">Fuel Tracking App{isStaging ? ' (STAGING)' : ''}</h2>
           </div>
         </div>
 

@@ -14,8 +14,9 @@ This repository enforces an autonomous, end-to-end development mode. The agent m
 
 3. **Automated Versioning & Deployment**:
    - The pre-commit hook automatically runs `node scripts/bump_build.js` on every commit, incrementing the build integer.
-   - Stage and commit all changes with a clear, concise commit message.
-   - Immediately push to `origin main` (`git push origin main`) to trigger the live Vercel production deployment.
+   - Stage and commit all changes on the `staging` branch with a clear, concise commit message.
+   - Immediately push to `origin staging` (`git push origin staging`) to trigger the Vercel staging deployment.
+   - **Never** merge or push to `origin main` (production) unless the user explicitly asks to promote or deploy to production.
    - Verify deployment status before concluding.
 
 4. **Concise Reporting**:
