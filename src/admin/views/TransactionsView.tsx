@@ -172,6 +172,42 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('ALL');
   const [selectedDevice, setSelectedDevice] = useState<string>('ALL');
   const [selectedDateFilter, setSelectedDateFilter] = useState<'ALL' | 'TODAY' | '7DAYS'>('ALL');
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+
+  React.useEffect(() => {
+    setNowMs(Date.now());
+  }, [transactions]);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTimeSinceTransaction = (isoString?: string) => {
+    if (!isoString) return '—';
+    const txMs = new Date(isoString).getTime();
+    if (Number.isNaN(txMs)) return '—';
+
+    const diffMs = Math.max(0, nowMs - txMs);
+    const totalMinutes = Math.floor(diffMs / 60000);
+
+    if (totalMinutes < 60) {
+      return `${totalMinutes} ${totalMinutes === 1 ? 'min' : 'mins'}`;
+    }
+
+    if (totalMinutes < 1440) {
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      return `${hours}h ${mins}m`;
+    }
+
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const mins = totalMinutes % 60;
+    return `${days}d ${hours}h ${mins}m`;
+  };
 
   // Asset lookup map for speed
   const assetMap = useMemo(() => {
@@ -737,6 +773,12 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     {renderSortIndicator('timestamp')}
                   </div>
                 </th>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('timestamp')}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <span>Time since transaction</span>
+                    {renderSortIndicator('timestamp')}
+                  </div>
+                </th>
                 <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('equipmentId')}>
                   <div style={{ display: 'inline-flex', alignItems: 'center' }}>
                     <span>Equipment ID</span>
@@ -785,6 +827,19 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }} className="admin-mono">
                       <Clock size={12} style={{ display: 'inline', marginRight: '6px', color: '#64748b' }} />
                       {formatAdminTimestamp(tx.transactionTimestamp)}
+                    </td>
+
+                    {/* Time since transaction */}
+                    <td
+                      style={{
+                        fontSize: '0.82rem',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontWeight: 600,
+                        color: 'var(--adm-text-primary)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {formatTimeSinceTransaction(tx.transactionTimestamp)}
                     </td>
 
                     {/* Equipment ID */}
