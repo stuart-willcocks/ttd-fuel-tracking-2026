@@ -43,7 +43,30 @@
           display: block !important;
         }
       }
+      /* Suppress Vercel Toolbar / Live Feedback widget */
+      vercel-live-feedback,
+      #vercel-live-feedback,
+      iframe[src*="vercel.live"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
     </style>
+    <script>
+      (function() {
+        var removeVercelToolbar = function() {
+          var els = document.querySelectorAll('vercel-live-feedback, #vercel-live-feedback, iframe[src*="vercel.live"], script[src*="vercel.live"]');
+          for (var i = 0; i < els.length; i++) {
+            if (els[i] && els[i].parentNode) els[i].parentNode.removeChild(els[i]);
+          }
+        };
+        removeVercelToolbar();
+        if (typeof MutationObserver !== 'undefined') {
+          new MutationObserver(removeVercelToolbar).observe(document.documentElement, { childList: true, subtree: true });
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="admin-root"></div>

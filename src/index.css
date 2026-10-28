@@ -325,6 +325,19 @@ html.is-desktop-browser .app-root {
   }
 }
 
+/* Suppress Vercel Toolbar / Live Feedback icon on preview/staging deployments */
+vercel-live-feedback,
+#vercel-live-feedback,
+iframe[src*="vercel.live"],
+[data-vercel-toolbar] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 /* ==========================================================================
    APP_HEADER (Brand Orange #EC721E matching Admin Console)
    ========================================================================== */
