@@ -557,34 +557,7 @@ export interface FleetMapMarkerItem {
  * at the resolved location for each equipment ID.
  */
 export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): string {
-  // Spread markers that share identical coordinates in a small ~4.5m circle so none overlap completely
-  const coordGroups = new Map<string, FleetMapMarkerItem[]>();
-  for (const m of markers) {
-    const key = `${m.lat.toFixed(6)},${m.lng.toFixed(6)}`;
-    const list = coordGroups.get(key) || [];
-    list.push(m);
-    coordGroups.set(key, list);
-  }
-
-  const adjustedMarkers: FleetMapMarkerItem[] = [];
-  for (const group of coordGroups.values()) {
-    if (group.length === 1) {
-      adjustedMarkers.push(group[0]);
-    } else {
-      const radiusLat = 0.000042;
-      const radiusLng = 0.000068;
-      group.forEach((item, idx) => {
-        const angle = (2 * Math.PI * idx) / group.length;
-        adjustedMarkers.push({
-          ...item,
-          lat: item.lat + radiusLat * Math.sin(angle),
-          lng: item.lng + radiusLng * Math.cos(angle),
-        });
-      });
-    }
-  }
-
-  const markersJson = JSON.stringify(adjustedMarkers).replace(/</g, '\\u003c');
+  const markersJson = JSON.stringify(markers).replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -920,91 +893,36 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       }
 
       var boundsPoints = [];
+      var markersById = {};
+      var hasFittedOnce = false;
 
-      items.forEach(function(item) {
-        var pt = [item.lat, item.lng];
-        boundsPoints.push(pt);
-
-        var borderColor = item.type === 'GENERATOR' ? '#2563EB' : item.type === 'TANK' ? '#EA580C' : '#0D9488';
-        var iconColor = '#EC721E';
-        var pwrDotHtml = item.type === 'GENERATOR'
-          ? '<span class="eq-map-pwr-dot" style="background:' + (item.isOn ? '#16A34A' : '#94A3B8') + '"></span>'
-          : '';
-
-        var html = '<div class="eq-map-marker">' +
-          '<div class="eq-map-icon-box" style="border-color:' + borderColor + '">' +
-            getEquipmentSvg(item.type, iconColor) +
-            pwrDotHtml +
-          '</div>' +
-          '<div class="eq-map-label">' + item.equipmentId + '</div>' +
-        '</div>';
-
-        var divIcon = L.divIcon({
-          html: html,
-          className: '',
-          iconSize: [0, 0],
-          iconAnchor: [0, 0]
+      function spreadOverlappingItems(rawList) {
+        var groups = {};
+        (rawList || []).forEach(function(m) {
+          var key = Number(m.lat).toFixed(6) + ',' + Number(m.lng).toFixed(6);
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(m);
         });
-
-        var capStr = item.type === 'GENERATOR' && item.capacity ? (item.capacity + ' kVA')
-          : item.type === 'TANK' && item.capacity ? (item.capacity + ' L')
-          : 'Unrated';
-
-        var txList = Array.isArray(item.recentTransactions) ? item.recentTransactions : [];
-        var maxBalloonTx = 6;
-        var visibleTx = txList.slice(0, maxBalloonTx);
-        var txRowsHtml = '';
-
-        if (visibleTx.length === 0) {
-          txRowsHtml = '<div class="tx-balloon-empty">No transactions recorded</div>';
-        } else {
-          txRowsHtml = '<div class="tx-balloon-list">';
-          visibleTx.forEach(function(tx) {
-            txRowsHtml += '<div class="tx-balloon-row">' +
-              '<span class="tx-balloon-icon">' + getTxTypeSvg(tx.type) + '</span>' +
-              '<span class="tx-balloon-ts">' + tx.timestamp + '</span>' +
-              '<span class="tx-balloon-val">' + tx.summary + '</span>' +
-            '</div>';
-          });
-          txRowsHtml += '</div>';
-          if ((item.txCount || txList.length) > visibleTx.length) {
-            var remaining = (item.txCount || txList.length) - visibleTx.length;
-            txRowsHtml += '<div class="tx-balloon-more">+' + remaining + ' earlier transaction' + (remaining === 1 ? '' : 's') + '</div>';
+        var result = [];
+        Object.keys(groups).forEach(function(key) {
+          var group = groups[key];
+          if (group.length === 1) {
+            result.push(group[0]);
+          } else {
+            var radiusLat = 0.000042;
+            var radiusLng = 0.000068;
+            group.forEach(function(item, idx) {
+              var angle = (2 * Math.PI * idx) / group.length;
+              var copy = {};
+              Object.keys(item).forEach(function(k) { copy[k] = item[k]; });
+              copy.lat = item.lat + radiusLat * Math.sin(angle);
+              copy.lng = item.lng + radiusLng * Math.cos(angle);
+              result.push(copy);
+            });
           }
-        }
-
-        var balloonHtml = '<div>' +
-          '<div class="tx-balloon-hdr">' +
-            '<span class="tx-balloon-id">' + item.equipmentId + '</span>' +
-            '<span class="tx-balloon-badge">' + (item.txCount || 0) + ' tx</span>' +
-          '</div>' +
-          '<div class="tx-balloon-sub">' + item.area + ' • ' + item.location + '</div>' +
-          txRowsHtml +
-        '</div>';
-
-        var popupHtml = '<div>' +
-          '<div class="popup-id">' + item.equipmentId + '</div>' +
-          '<div class="popup-meta"><strong>' + item.type + '</strong> • ' + capStr + (item.type === 'GENERATOR' ? (' • ' + (item.isOn ? '<span style="color:#16A34A;font-weight:700">ON</span>' : '<span style="color:#64748B;font-weight:700">OFF</span>')) : '') + '</div>' +
-          '<div class="popup-meta">' + item.area + ' • ' + item.location + '</div>' +
-          '<div class="popup-w3w">' + item.what3words + '</div>' +
-          '<div class="popup-actions">' +
-            '<button type="button" class="popup-btn popup-btn-primary" onclick="window.parent.postMessage({type:\\'TTD_MAP_SELECT_ASSET\\',equipmentId:\\'' + item.equipmentId + '\\'}, \\'*\\')">Transactions (' + (item.txCount || 0) + ')</button>' +
-            '<button type="button" class="popup-btn" onclick="window.parent.postMessage({type:\\'TTD_MAP_EDIT_ASSET\\',equipmentId:\\'' + item.equipmentId + '\\'}, \\'*\\')">Edit</button>' +
-          '</div>' +
-        '</div>';
-
-        var marker = L.marker(pt, { icon: divIcon }).addTo(map);
-        marker.bindTooltip(balloonHtml, {
-          direction: 'top',
-          offset: [0, -24],
-          opacity: 1,
-          className: 'eq-tx-balloon'
         });
-        marker.bindPopup(popupHtml, { offset: [0, -14] });
-        marker.on('popupopen', function() {
-          marker.closeTooltip();
-        });
-      });
+        return result;
+      }
 
       function fitAll() {
         if (boundsPoints.length === 1) {
@@ -1015,7 +933,130 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
         }
       }
 
-      fitAll();
+      function renderOrUpdateMarkers(rawList) {
+        var adjusted = spreadOverlappingItems(rawList);
+        boundsPoints = [];
+        var seenIds = {};
+
+        adjusted.forEach(function(item) {
+          var pt = [item.lat, item.lng];
+          boundsPoints.push(pt);
+          seenIds[item.equipmentId] = true;
+
+          var borderColor = item.type === 'GENERATOR' ? '#2563EB' : item.type === 'TANK' ? '#EA580C' : '#0D9488';
+          var iconColor = '#EC721E';
+          var pwrDotHtml = item.type === 'GENERATOR'
+            ? '<span class="eq-map-pwr-dot" style="background:' + (item.isOn ? '#16A34A' : '#94A3B8') + '"></span>'
+            : '';
+
+          var html = '<div class="eq-map-marker">' +
+            '<div class="eq-map-icon-box" style="border-color:' + borderColor + '">' +
+              getEquipmentSvg(item.type, iconColor) +
+              pwrDotHtml +
+            '</div>' +
+            '<div class="eq-map-label">' + item.equipmentId + '</div>' +
+          '</div>';
+
+          var divIcon = L.divIcon({
+            html: html,
+            className: '',
+            iconSize: [0, 0],
+            iconAnchor: [0, 0]
+          });
+
+          var capStr = item.type === 'GENERATOR' && item.capacity ? (item.capacity + ' kVA')
+            : item.type === 'TANK' && item.capacity ? (item.capacity + ' L')
+            : 'Unrated';
+
+          var txList = Array.isArray(item.recentTransactions) ? item.recentTransactions : [];
+          var maxBalloonTx = 6;
+          var visibleTx = txList.slice(0, maxBalloonTx);
+          var txRowsHtml = '';
+
+          if (visibleTx.length === 0) {
+            txRowsHtml = '<div class="tx-balloon-empty">No transactions recorded</div>';
+          } else {
+            txRowsHtml = '<div class="tx-balloon-list">';
+            visibleTx.forEach(function(tx) {
+              txRowsHtml += '<div class="tx-balloon-row">' +
+                '<span class="tx-balloon-icon">' + getTxTypeSvg(tx.type) + '</span>' +
+                '<span class="tx-balloon-ts">' + tx.timestamp + '</span>' +
+                '<span class="tx-balloon-val">' + tx.summary + '</span>' +
+              '</div>';
+            });
+            txRowsHtml += '</div>';
+            if ((item.txCount || txList.length) > visibleTx.length) {
+              var remaining = (item.txCount || txList.length) - visibleTx.length;
+              txRowsHtml += '<div class="tx-balloon-more">+' + remaining + ' earlier transaction' + (remaining === 1 ? '' : 's') + '</div>';
+            }
+          }
+
+          var balloonHtml = '<div>' +
+            '<div class="tx-balloon-hdr">' +
+              '<span class="tx-balloon-id">' + item.equipmentId + '</span>' +
+              '<span class="tx-balloon-badge">' + (item.txCount || 0) + ' tx</span>' +
+            '</div>' +
+            '<div class="tx-balloon-sub">' + item.area + ' • ' + item.location + '</div>' +
+            txRowsHtml +
+          '</div>';
+
+          var popupHtml = '<div>' +
+            '<div class="popup-id">' + item.equipmentId + '</div>' +
+            '<div class="popup-meta"><strong>' + item.type + '</strong> • ' + capStr + (item.type === 'GENERATOR' ? (' • ' + (item.isOn ? '<span style="color:#16A34A;font-weight:700">ON</span>' : '<span style="color:#64748B;font-weight:700">OFF</span>')) : '') + '</div>' +
+            '<div class="popup-meta">' + item.area + ' • ' + item.location + '</div>' +
+            '<div class="popup-w3w">' + item.what3words + '</div>' +
+            '<div class="popup-actions">' +
+              '<button type="button" class="popup-btn popup-btn-primary" onclick="window.parent.postMessage({type:\\'TTD_MAP_SELECT_ASSET\\',equipmentId:\\'' + item.equipmentId + '\\'}, \\'*\\')">Transactions (' + (item.txCount || 0) + ')</button>' +
+              '<button type="button" class="popup-btn" onclick="window.parent.postMessage({type:\\'TTD_MAP_EDIT_ASSET\\',equipmentId:\\'' + item.equipmentId + '\\'}, \\'*\\')">Edit</button>' +
+            '</div>' +
+          '</div>';
+
+          var existing = markersById[item.equipmentId];
+          if (existing) {
+            var oldLatLng = existing.getLatLng();
+            if (Math.abs(oldLatLng.lat - pt[0]) > 1e-7 || Math.abs(oldLatLng.lng - pt[1]) > 1e-7) {
+              existing.setLatLng(pt);
+            }
+            existing.setIcon(divIcon);
+            existing.setTooltipContent(balloonHtml);
+            existing.setPopupContent(popupHtml);
+          } else {
+            var marker = L.marker(pt, { icon: divIcon }).addTo(map);
+            marker.bindTooltip(balloonHtml, {
+              direction: 'top',
+              offset: [0, -24],
+              opacity: 1,
+              className: 'eq-tx-balloon'
+            });
+            marker.bindPopup(popupHtml, { offset: [0, -14] });
+            marker.on('popupopen', function() {
+              marker.closeTooltip();
+            });
+            markersById[item.equipmentId] = marker;
+          }
+        });
+
+        Object.keys(markersById).forEach(function(eqId) {
+          if (!seenIds[eqId]) {
+            map.removeLayer(markersById[eqId]);
+            delete markersById[eqId];
+          }
+        });
+
+        if (!hasFittedOnce && boundsPoints.length > 0) {
+          hasFittedOnce = true;
+          fitAll();
+        }
+      }
+
+      renderOrUpdateMarkers(items);
+
+      window.addEventListener('message', function(e) {
+        if (!e.data || typeof e.data !== 'object') return;
+        if (e.data.type === 'TTD_MAP_UPDATE_MARKERS' && Array.isArray(e.data.markers)) {
+          renderOrUpdateMarkers(e.data.markers);
+        }
+      });
 
       document.getElementById('fitBoundsBtn').addEventListener('click', function() {
         fitAll();

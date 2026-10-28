@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Plus,
   Search,
@@ -55,6 +55,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
   const [viewMode, setViewMode] = useState<'TABLE' | 'MAP'>('TABLE');
   const [coordResolveTick, setCoordResolveTick] = useState(0);
+  const mapIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const staticMapSrcDoc = useMemo(() => getFleetSatelliteMapSrcDoc([]), []);
 
   // Transaction counts per asset
   const txCounts = useMemo(() => {
@@ -305,6 +307,15 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     }
     return items;
   }, [sortedAssets, transactions, txCounts, coordResolveTick]);
+
+  // Push live marker/transaction updates into the map iframe without reloading or resetting center/zoom
+  useEffect(() => {
+    if (viewMode !== 'MAP') return;
+    mapIframeRef.current?.contentWindow?.postMessage(
+      { type: 'TTD_MAP_UPDATE_MARKERS', markers: fleetMapMarkers },
+      '*'
+    );
+  }, [viewMode, fleetMapMarkers]);
 
   // Export to CSV
   const handleExportCsv = () => {
@@ -733,7 +744,14 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           }}
         >
           <iframe
-            srcDoc={getFleetSatelliteMapSrcDoc(fleetMapMarkers)}
+            ref={mapIframeRef}
+            srcDoc={staticMapSrcDoc}
+            onLoad={() => {
+              mapIframeRef.current?.contentWindow?.postMessage(
+                { type: 'TTD_MAP_UPDATE_MARKERS', markers: fleetMapMarkers },
+                '*'
+              );
+            }}
             title="Fleet Equipment Satellite Map"
             style={{
               width: '100%',
