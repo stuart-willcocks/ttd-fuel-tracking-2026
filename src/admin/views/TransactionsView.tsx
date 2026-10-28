@@ -1,24 +1,18 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Search,
   Download,
-  Filter,
   Clock,
   CheckCircle2,
-  Smartphone,
   X,
   Edit,
   QrCode,
   Zap,
-  Trash2,
   MapPin,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Power,
-  ChevronDown,
 } from 'lucide-react';
-import { IconCheckIn, IconCheckOut, IconFuel } from '../../components/icons/AppIcons';
 import type { Transaction, Equipment } from '../../types';
 import { formatAdminTimestamp } from '../../utils/dateFormat';
 import { getGeneratorPowerState } from '../../utils/powerState';
@@ -166,27 +160,11 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   selectedAssetId,
   onSelectAsset,
   onOpenEditModal,
-  onOpenDeleteModal,
   onOpenQRModal,
   onTogglePower,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('ALL');
-  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState<boolean>(false);
-  const typeDropdownRef = useRef<HTMLDivElement>(null);
-  const [selectedDevice, setSelectedDevice] = useState<string>('ALL');
-  const [selectedDateFilter, setSelectedDateFilter] = useState<'ALL' | 'TODAY' | '7DAYS'>('ALL');
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node)) {
-        setIsTypeDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   React.useEffect(() => {
     setNowMs(Date.now());
@@ -234,30 +212,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     return assetMap.get(selectedAssetId) || null;
   }, [selectedAssetId, assetMap]);
 
-  // Transaction counts per asset
-  const txCountsByAsset = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const t of transactions) {
-      map[t.equipmentId] = (map[t.equipmentId] || 0) + 1;
-    }
-    return map;
-  }, [transactions]);
-
-  // Unique devices
-  const uniqueDevices = useMemo(() => {
-    return Array.from(new Set(transactions.map((t) => t.deviceId).filter(Boolean))) as string[];
-  }, [transactions]);
-
-  // Reference date values initialized on mount
-  const [dateReferences] = useState(() => {
-    const d = new Date();
-    return {
-      todayStr: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-      sevenDaysAgoTime: d.getTime() - 7 * 24 * 60 * 60 * 1000,
-    };
-  });
-  const { todayStr, sevenDaysAgoTime } = dateReferences;
-
   // Filtered transactions
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
@@ -277,30 +231,9 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
       if (!matchesSearch) return false;
 
-      // Type filter
-      if (selectedTypeFilter !== 'ALL') {
-        if (selectedTypeFilter === 'FUEL_TRANSFER' && !tx.transactionType.includes('FuelTransfer')) return false;
-        if (selectedTypeFilter === 'CHECK_IN' && !tx.transactionType.includes('CheckIn')) return false;
-        if (selectedTypeFilter === 'CHECK_OUT' && !tx.transactionType.includes('CheckOut')) return false;
-        if (selectedTypeFilter === 'POWER' && !tx.transactionType.includes('Power')) return false;
-      }
-
-      // Device filter
-      if (selectedDevice !== 'ALL' && tx.deviceId !== selectedDevice) {
-        return false;
-      }
-
-      // Date filter
-      if (selectedDateFilter === 'TODAY') {
-        if (!tx.transactionTimestamp.startsWith(todayStr)) return false;
-      } else if (selectedDateFilter === '7DAYS') {
-        const txTime = new Date(tx.transactionTimestamp).getTime();
-        if (txTime < sevenDaysAgoTime) return false;
-      }
-
       return true;
     });
-  }, [transactions, selectedAssetId, searchQuery, selectedTypeFilter, selectedDevice, selectedDateFilter, todayStr, sevenDaysAgoTime]);
+  }, [transactions, selectedAssetId, searchQuery]);
 
   // Sorting State
   type TxSortField = 'timestamp' | 'equipmentId' | 'type' | 'transactionType' | 'values' | 'deviceId' | 'syncStatus';
@@ -368,15 +301,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       return sortDirection === 'asc' ? comparison : -comparison;
     });
   }, [filteredTransactions, sortField, sortDirection, assetMap]);
-
-  // Fuel telemetry totals for currently filtered transactions
-  const summaryFuelLitres = useMemo(() => {
-    return filteredTransactions.reduce((acc, t) => acc + (t.fuelTransferLitres || 0), 0);
-  }, [filteredTransactions]);
-
-  const summaryDefLitres = useMemo(() => {
-    return filteredTransactions.reduce((acc, t) => acc + (t.defTransferLitres || 0), 0);
-  }, [filteredTransactions]);
 
   // CSV Export
   const handleExportCsv = () => {
@@ -546,18 +470,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                   <span>{isCurrentAssetRunning ? 'Turn OFF' : 'Turn ON'}</span>
                 </button>
               )}
-
-              {onOpenDeleteModal && (
-                <button
-                  onClick={() => onOpenDeleteModal(currentAsset)}
-                  className="admin-btn admin-btn-outline admin-btn-sm"
-                  title="Decommission & delete asset"
-                  style={{ color: '#F87171' }}
-                >
-                  <Trash2 size={14} />
-                  <span>Decommission</span>
-                </button>
-              )}
             </div>
           </div>
 
@@ -621,21 +533,11 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 {currentAsset.rentalSerialNumber || '—'}
               </p>
             </div>
-
-            <div>
-              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
-                Transferred Telemetry
-              </span>
-              <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '3px 0 0', color: 'var(--adm-text-primary)' }}>
-                {summaryFuelLitres > 0 ? `${summaryFuelLitres.toLocaleString()} L Diesel` : '0 L Diesel'}
-                {summaryDefLitres > 0 && ` • ${summaryDefLitres.toLocaleString()} L DEF`}
-              </p>
-            </div>
           </div>
         </div>
       )}
 
-      {/* Control Bar: Full-Width Search & Filter Toolbar */}
+      {/* Control Bar: Full-Width Search Toolbar */}
       <div
         style={{
           display: 'flex',
@@ -662,141 +564,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               placeholder="Search"
             />
           </div>
-
-          {/* Asset Dropdown Selector (100% wider: 440px, with QR Code icon) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <QrCode size={15} color="#94a3b8" />
-            <select
-              className="admin-select"
-              style={{ width: '440px', padding: '9px 12px', fontSize: '0.84rem' }}
-              value={selectedAssetId || 'ALL'}
-              onChange={(e) => onSelectAsset(e.target.value === 'ALL' ? null : e.target.value)}
-            >
-              <option value="ALL">All equipment IDs</option>
-              {assets.map((a) => (
-                <option key={a.equipmentId} value={a.equipmentId}>
-                  {a.equipmentId} • {a.area} ({txCountsByAsset[a.equipmentId] || 0})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Action Type Filter (with same SVG icons used elsewhere) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} ref={typeDropdownRef}>
-            <Filter size={14} color="#94a3b8" />
-            <div style={{ position: 'relative', width: '205px' }}>
-              <button
-                type="button"
-                className="admin-select"
-                onClick={() => setIsTypeDropdownOpen((prev) => !prev)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  fontSize: '0.84rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '8px',
-                  background: '#FFFFFF',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
-                  {selectedTypeFilter === 'FUEL_TRANSFER' && <IconFuel size={16} color="#2563EB" />}
-                  {selectedTypeFilter === 'CHECK_IN' && <IconCheckIn size={16} color="#16A34A" />}
-                  {selectedTypeFilter === 'CHECK_OUT' && <IconCheckOut size={16} color="#16A34A" />}
-                  {selectedTypeFilter === 'POWER' && <Power size={15} color="#16A34A" />}
-                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {selectedTypeFilter === 'FUEL_TRANSFER'
-                      ? 'Fuel Transfers'
-                      : selectedTypeFilter === 'CHECK_IN'
-                        ? 'Check-Ins'
-                        : selectedTypeFilter === 'CHECK_OUT'
-                          ? 'Check-Outs'
-                          : selectedTypeFilter === 'POWER'
-                            ? 'Power Events'
-                            : 'All transaction types'}
-                  </span>
-                </span>
-                <ChevronDown size={14} style={{ color: '#64748B', flexShrink: 0 }} />
-              </button>
-
-              {isTypeDropdownOpen && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 4px)',
-                    left: 0,
-                    width: '100%',
-                    background: '#FFFFFF',
-                    border: '1px solid var(--adm-border-medium)',
-                    boxShadow: 'var(--adm-shadow-md)',
-                    zIndex: 50,
-                    display: 'flex',
-                    flexDirection: 'column',
-                  }}
-                >
-                  {[
-                    { value: 'ALL', label: 'All transaction types', icon: null },
-                    { value: 'FUEL_TRANSFER', label: 'Fuel Transfers', icon: <IconFuel size={16} color="#2563EB" /> },
-                    { value: 'CHECK_IN', label: 'Check-Ins', icon: <IconCheckIn size={16} color="#16A34A" /> },
-                    { value: 'CHECK_OUT', label: 'Check-Outs', icon: <IconCheckOut size={16} color="#16A34A" /> },
-                    { value: 'POWER', label: 'Power Events', icon: <Power size={15} color="#16A34A" /> },
-                  ].map((opt) => {
-                    const isSelected = selectedTypeFilter === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => {
-                          setSelectedTypeFilter(opt.value);
-                          setIsTypeDropdownOpen(false);
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          width: '100%',
-                          padding: '9px 12px',
-                          border: 'none',
-                          background: isSelected ? 'var(--adm-surface-2)' : '#FFFFFF',
-                          color: 'var(--adm-text-primary)',
-                          fontSize: '0.84rem',
-                          fontWeight: isSelected ? 700 : 500,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                        }}
-                      >
-                        {opt.icon}
-                        <span>{opt.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Device Filter */}
-          {uniqueDevices.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Smartphone size={14} color="#94a3b8" />
-              <select
-                className="admin-select"
-                style={{ width: '160px', padding: '9px 12px', fontSize: '0.84rem' }}
-                value={selectedDevice}
-                onChange={(e) => setSelectedDevice(e.target.value)}
-              >
-                <option value="ALL">All devices</option>
-                {uniqueDevices.map((dev) => (
-                  <option key={dev} value={dev}>
-                    {dev}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
         </div>
       </div>
 
@@ -818,7 +585,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           <p style={{ color: 'var(--adm-text-secondary)', fontSize: '0.9rem', marginBottom: '18px' }}>
             {selectedAssetId
               ? `No transactions recorded yet for asset ${selectedAssetId}.`
-              : 'Try resetting your search query, action type filter, or date range.'}
+              : 'Try resetting your search query.'}
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
             {selectedAssetId && (
@@ -829,9 +596,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             <button
               onClick={() => {
                 setSearchQuery('');
-                setSelectedTypeFilter('ALL');
-                setSelectedDevice('ALL');
-                setSelectedDateFilter('ALL');
               }}
               className="admin-btn admin-btn-secondary"
             >
