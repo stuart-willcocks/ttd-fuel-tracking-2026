@@ -530,20 +530,45 @@ export async function fetchAuthorizedDevicesFromSupabase(): Promise<AuthorizedDe
     throw new Error(error.message || error.details || error.hint || `Supabase error (${error.code || 'unknown'})`);
   }
 
-  return (data || []).map((row: any) => ({
-    deviceId: row.device_id,
-    deviceName: row.device_name || row.device_id,
-    authToken: row.auth_token,
-    status: row.status as DeviceStatus,
-    registeredAt: row.registered_at,
-    lastSeenAt: row.last_seen_at,
-    batteryLevel: typeof row.battery_level === 'number' ? row.battery_level : null,
-    isCharging: typeof row.is_charging === 'boolean' ? row.is_charging : null,
-    latitude: typeof row.latitude === 'number' ? row.latitude : null,
-    longitude: typeof row.longitude === 'number' ? row.longitude : null,
-    locationAccuracy: typeof row.location_accuracy === 'number' ? row.location_accuracy : null,
-    lastTelemetryAt: row.last_telemetry_at || null,
-  }));
+  return (data || []).map((row: any) => {
+    let devName = row.device_name || row.device_id;
+    let batteryLevel = typeof row.battery_level === 'number' ? row.battery_level : null;
+    let isCharging = typeof row.is_charging === 'boolean' ? row.is_charging : null;
+    let latitude = typeof row.latitude === 'number' ? row.latitude : null;
+    let longitude = typeof row.longitude === 'number' ? row.longitude : null;
+    let locationAccuracy = typeof row.location_accuracy === 'number' ? row.location_accuracy : null;
+    let lastTelemetryAt = row.last_telemetry_at || null;
+
+    // Decode telemetry from device_name fallback if dedicated columns are not yet in Supabase
+    if (devName && typeof devName === 'string' && devName.includes('__TEL__')) {
+      const parts = devName.split('__TEL__');
+      devName = parts[0] || row.device_id;
+      try {
+        const parsed = JSON.parse(parts[1]);
+        if (batteryLevel === null && typeof parsed.batteryLevel === 'number') batteryLevel = parsed.batteryLevel;
+        if (isCharging === null && typeof parsed.isCharging === 'boolean') isCharging = parsed.isCharging;
+        if (latitude === null && typeof parsed.latitude === 'number') latitude = parsed.latitude;
+        if (longitude === null && typeof parsed.longitude === 'number') longitude = parsed.longitude;
+        if (locationAccuracy === null && typeof parsed.locationAccuracy === 'number') locationAccuracy = parsed.locationAccuracy;
+        if (!lastTelemetryAt && parsed.lastTelemetryAt) lastTelemetryAt = parsed.lastTelemetryAt;
+      } catch {}
+    }
+
+    return {
+      deviceId: row.device_id,
+      deviceName: devName,
+      authToken: row.auth_token,
+      status: row.status as DeviceStatus,
+      registeredAt: row.registered_at,
+      lastSeenAt: row.last_seen_at,
+      batteryLevel,
+      isCharging,
+      latitude,
+      longitude,
+      locationAccuracy,
+      lastTelemetryAt,
+    };
+  });
 }
 
 /**
@@ -553,9 +578,12 @@ export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): 
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
+  const rawName = device.deviceName || device.deviceId;
+  const cleanName = rawName.includes('__TEL__') ? rawName.split('__TEL__')[0] : rawName;
+
   const payload: Record<string, unknown> = {
     device_id: device.deviceId.trim().toUpperCase(),
-    device_name: device.deviceName || device.deviceId,
+    device_name: cleanName,
     auth_token: device.authToken.trim(),
     status: device.status,
     registered_at: device.registeredAt || new Date().toISOString(),
@@ -624,13 +652,29 @@ export async function updateDeviceTelemetryInSupabase(
     .update(payload)
     .eq('device_id', cleanId);
 
-  // If telemetry columns do not exist yet on Supabase table, update only last_seen_at
+  // If telemetry columns do not exist yet on Supabase table (PGRST204), store telemetry metadata in device_name fallback
   if (error && (error.code === 'PGRST204' || (error.message && (error.message.includes('column') || error.message.includes('battery'))))) {
-    const fallbackRes = await client
-      .from('authorized_devices')
-      .update({ last_seen_at: new Date().toISOString() })
-      .eq('device_id', cleanId);
-    error = fallbackRes.error;
+    try {
+      const { data: current } = await client
+        .from('authorized_devices')
+        .select('device_name')
+        .eq('device_id', cleanId)
+        .maybeSingle();
+
+      const raw = current?.device_name || cleanId;
+      const baseName = raw.includes('__TEL__') ? raw.split('__TEL__')[0] : raw;
+      const fallbackPayload = {
+        device_name: `${baseName}__TEL__${JSON.stringify(telemetry)}`,
+        last_seen_at: new Date().toISOString(),
+      };
+      const fallbackRes = await client
+        .from('authorized_devices')
+        .update(fallbackPayload)
+        .eq('device_id', cleanId);
+      error = fallbackRes.error;
+    } catch {
+      // Ignore fallback lookup errors
+    }
   }
 
   if (error) {

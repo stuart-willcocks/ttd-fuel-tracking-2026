@@ -38,6 +38,8 @@ class SyncEngine {
   private lastError: string | null = null;
   private syncTimer: ReturnType<typeof setInterval> | null = null;
   private authTimer: ReturnType<typeof setInterval> | null = null;
+  private lastAuthCheckResult: boolean = false;
+  private lastAuthCheckTime: number = 0;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -308,9 +310,8 @@ class SyncEngine {
     // 4. Immediately trigger flush in background if online
     if (this.isEffectivelyOnline()) {
       this.flushOutbox().catch((err) => {
-        console.error('Immediate flush error after queueing transaction:', err);
+        console.warn('Immediate background flush error after queueing transaction:', err);
       });
-      pushDeviceTelemetry(false).catch(() => {});
     }
   }
 
@@ -379,6 +380,8 @@ class SyncEngine {
    * and notifies all listeners to lock down the UI.
    */
   public async lockdownRevokedDevice(): Promise<void> {
+    this.lastAuthCheckResult = false;
+    this.lastAuthCheckTime = 0;
     const currentDevId = getDeviceId();
     console.warn(`[SyncEngine] Locking down device "${currentDevId}". Active token revoked.`);
     markDeviceRevoked();
@@ -395,8 +398,9 @@ class SyncEngine {
   /**
    * Verifies that this physical device has a valid active token on the central server.
    * If token is revoked or missing, triggers lockdown immediately.
+   * Caches positive verification for 8 seconds to avoid sluggish UI stalls.
    */
-  public async verifyDeviceAuthorization(): Promise<boolean> {
+  public async verifyDeviceAuthorization(force: boolean = false): Promise<boolean> {
     if (!isDeviceEnrolled()) {
       return false;
     }
@@ -407,20 +411,28 @@ class SyncEngine {
       return false;
     }
 
+    const now = Date.now();
+    if (!force && this.lastAuthCheckResult && now - this.lastAuthCheckTime < 8000) {
+      return true;
+    }
+
     try {
       const check = await verifyRemoteDeviceToken(currentDevId, currentToken);
       if (!check.valid || check.status !== 'active') {
         console.warn(`[SyncEngine] Device ${currentDevId} validation failed (valid=${check.valid}, status=${check.status}). Locking down.`);
+        this.lastAuthCheckResult = false;
         await this.lockdownRevokedDevice();
         return false;
       }
+      this.lastAuthCheckResult = true;
+      this.lastAuthCheckTime = now;
       return true;
     } catch (e) {
       if (!this.isEffectivelyOnline()) {
         return isDeviceEnrolled();
       }
       console.warn('[SyncEngine] Error during device verification while online:', e);
-      return false;
+      return this.lastAuthCheckResult && now - this.lastAuthCheckTime < 30000;
     }
   }
 

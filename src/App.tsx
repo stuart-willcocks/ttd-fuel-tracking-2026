@@ -470,17 +470,22 @@ export const App: React.FC = () => {
       createdAt: nowIso,
     };
 
-    // Store in IndexedDB and upload to shared central server
+    // Store in IndexedDB immediately for instant offline-first responsiveness
     await syncEngine.queueTransaction(newTx);
-    if (syncEngine.isEffectivelyOnline()) {
-      await syncEngine.flushOutbox();
-    }
 
+    // Close modal and update view immediately (< 15ms)
     setIsConfirmModalOpen(false);
     setPendingTxData(null);
     setActiveAction(null);
 
     await loadAssetDetails(currentAsset.equipmentId);
+
+    // Drain outbox in the background without freezing the UI
+    if (syncEngine.isEffectivelyOnline()) {
+      syncEngine.flushOutbox().catch((err) => {
+        console.warn('Background outbox flush error:', err);
+      });
+    }
   };
 
   const handleSelectAction = (action: ActionType) => {
@@ -512,14 +517,17 @@ export const App: React.FC = () => {
       createdAt: nowIso,
     };
 
-    // Store in IndexedDB and upload to shared central server
+    // Store in IndexedDB and close modal immediately
     await syncEngine.queueTransaction(newTx);
-    if (syncEngine.isEffectivelyOnline()) {
-      await syncEngine.flushOutbox();
-    }
-
     setPowerModalType(null);
     await loadAssetDetails(currentAsset.equipmentId);
+
+    // Drain outbox in the background
+    if (syncEngine.isEffectivelyOnline()) {
+      syncEngine.flushOutbox().catch((err) => {
+        console.warn('Background outbox flush error:', err);
+      });
+    }
   };
 
   const handleSaveEditedAsset = async (updated: Equipment) => {

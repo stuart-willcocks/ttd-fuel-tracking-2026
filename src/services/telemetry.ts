@@ -7,6 +7,16 @@ let lastSentTelemetry: DeviceTelemetry | null = null;
 let lastSentTime = 0;
 let isCollecting = false;
 
+// Cached location to avoid firing hardware GPS continuously
+let cachedLocation: { latitude: number; longitude: number; locationAccuracy: number } | null = (() => {
+  try {
+    const raw = sessionStorage.getItem('ttd_cached_location');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+})();
+let lastLocationTime = cachedLocation ? Date.now() : 0;
+
 /**
  * Reads battery level and charging state via W3C Battery Status API.
  * Supported on Chrome for Android (Zebra TC26).
@@ -40,62 +50,86 @@ export async function getBatteryStatus(): Promise<{ batteryLevel: number; isChar
 
 /**
  * Reads current GPS position via W3C Geolocation API.
- * Uses 2-minute maximumAge cache to minimize GPS chip battery drain on Zebra PDA.
+ * Fast non-blocking implementation:
+ * - Uses cached location immediately if less than 5 minutes old (0ms delay).
+ * - Fast 2000ms timeout with enableHighAccuracy: false so cellular/wifi fix is used and never blocks the PDA.
  */
 export async function getCurrentLocation(): Promise<{
   latitude: number;
   longitude: number;
   locationAccuracy: number;
 } | null> {
+  // Return cached location immediately if fresh (< 5 mins old)
+  const now = Date.now();
+  if (cachedLocation && now - lastLocationTime < 300000) {
+    return cachedLocation;
+  }
+
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
-    return null;
+    return cachedLocation;
   }
 
   return new Promise((resolve) => {
     let resolved = false;
 
+    // Strict 2000ms timeout so geolocation never stalls the app
     const timeoutId = setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        resolve(null);
+        resolve(cachedLocation);
       }
-    }, 8000);
+    }, 2000);
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeoutId);
-          resolve({
-            latitude: Number(pos.coords.latitude.toFixed(6)),
-            longitude: Number(pos.coords.longitude.toFixed(6)),
-            locationAccuracy: Math.round(pos.coords.accuracy),
-          });
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutId);
+            const fix = {
+              latitude: Number(pos.coords.latitude.toFixed(6)),
+              longitude: Number(pos.coords.longitude.toFixed(6)),
+              locationAccuracy: Math.round(pos.coords.accuracy),
+            };
+            cachedLocation = fix;
+            lastLocationTime = Date.now();
+            try {
+              sessionStorage.setItem('ttd_cached_location', JSON.stringify(fix));
+            } catch {}
+            resolve(fix);
+          }
+        },
+        () => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutId);
+            resolve(cachedLocation);
+          }
+        },
+        {
+          enableHighAccuracy: false, // Prevents battery drain and hardware GPS delays on Zebra TC26
+          timeout: 1800,
+          maximumAge: 300000, // 5 minutes cache
         }
-      },
-      () => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeoutId);
-          resolve(null);
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 7000,
-        maximumAge: 120000, // 2 minutes cache saves battery
+      );
+    } catch {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeoutId);
+        resolve(cachedLocation);
       }
-    );
+    }
   });
 }
 
 /**
  * Gathers complete device telemetry snapshot (battery + location) concurrently.
+ * Battery is prioritized and never waits on slow GPS fixes.
  */
 export async function collectDeviceTelemetry(): Promise<DeviceTelemetry> {
   const [battery, location] = await Promise.all([
     getBatteryStatus().catch(() => null),
-    getCurrentLocation().catch(() => null),
+    getCurrentLocation().catch(() => cachedLocation),
   ]);
 
   return {
