@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Plus,
   Search,
@@ -6,9 +6,8 @@ import {
   QrCode,
   Edit,
   MapPin,
-  LayoutGrid,
+  Map as MapIcon,
   Table as TableIcon,
-  ReceiptText,
   AlertTriangle,
   ArrowUpDown,
   ArrowUp,
@@ -17,7 +16,16 @@ import {
 import type { Equipment, Transaction } from '../../types';
 import { EquipmentTypeIcon } from '../../components/EquipmentTypeIcon';
 import { getGeneratorPowerState } from '../../utils/powerState';
-import { getGoogleMapsExternalUrl, handleWhat3WordsLinkClick } from '../../services/what3words';
+import {
+  getGoogleMapsExternalUrl,
+  handleWhat3WordsLinkClick,
+  getCachedWhat3WordsCoordinates,
+  convertWhat3WordsToCoordinates,
+  isValidWhat3WordsFormat,
+  normalizeWhat3Words,
+  getFleetSatelliteMapSrcDoc,
+  type FleetMapMarkerItem,
+} from '../../services/what3words';
 import { postRemoteEquipment } from '../../services/api';
 
 interface AssetsViewProps {
@@ -43,7 +51,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
-  const [viewMode, setViewMode] = useState<'TABLE' | 'GRID'>('TABLE');
+  const [viewMode, setViewMode] = useState<'TABLE' | 'MAP'>('TABLE');
+  const [coordResolveTick, setCoordResolveTick] = useState(0);
 
   // Transaction counts per asset
   const txCounts = useMemo(() => {
@@ -163,6 +172,82 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     );
   };
 
+  // Listen for actions triggered inside the Fleet Satellite Map iframe popups
+  useEffect(() => {
+    if (viewMode !== 'MAP') return;
+    const handleMessage = (e: MessageEvent) => {
+      if (!e.data || typeof e.data !== 'object') return;
+      if (e.data.type === 'TTD_MAP_SELECT_ASSET' && typeof e.data.equipmentId === 'string') {
+        onSelectAsset(e.data.equipmentId);
+      } else if (e.data.type === 'TTD_MAP_EDIT_ASSET' && typeof e.data.equipmentId === 'string') {
+        const found = assets.find((a) => a.equipmentId === e.data.equipmentId);
+        if (found) onOpenEditModal(found);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [viewMode, assets, onSelectAsset, onOpenEditModal]);
+
+  // Resolve any uncached What3Words coordinates when switching to MAP view
+  useEffect(() => {
+    if (viewMode !== 'MAP') return;
+    let cancelled = false;
+    const missingAssets = assets.filter((a) => {
+      if (typeof a.latitude === 'number' && typeof a.longitude === 'number') return false;
+      if (getCachedWhat3WordsCoordinates(a.what3words)) return false;
+      return isValidWhat3WordsFormat(a.what3words);
+    });
+
+    if (missingAssets.length === 0) return;
+
+    const uniqueW3w = Array.from(new Set(missingAssets.map((a) => normalizeWhat3Words(a.what3words))));
+    Promise.all(uniqueW3w.map((w) => convertWhat3WordsToCoordinates(w))).then(() => {
+      if (cancelled) return;
+      setCoordResolveTick((prev) => prev + 1);
+      for (const a of missingAssets) {
+        const coords = getCachedWhat3WordsCoordinates(a.what3words);
+        if (coords) {
+          postRemoteEquipment({ ...a, latitude: coords.lat, longitude: coords.lng }).catch(() => {});
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode, assets]);
+
+  // Build map markers for all filtered assets with resolved coordinates
+  const fleetMapMarkers = useMemo<FleetMapMarkerItem[]>(() => {
+    void coordResolveTick;
+    const items: FleetMapMarkerItem[] = [];
+    for (const asset of sortedAssets) {
+      const coords =
+        typeof asset.latitude === 'number' && typeof asset.longitude === 'number'
+          ? { lat: asset.latitude, lng: asset.longitude }
+          : getCachedWhat3WordsCoordinates(asset.what3words);
+      if (!coords) continue;
+
+      const isOn =
+        asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
+
+      items.push({
+        equipmentId: asset.equipmentId,
+        type: asset.type,
+        area: asset.area,
+        location: asset.location,
+        what3words: asset.what3words,
+        capacity: asset.capacity,
+        rentalSerialNumber: asset.rentalSerialNumber,
+        isOn,
+        txCount: txCounts[asset.equipmentId] || 0,
+        lat: coords.lat,
+        lng: coords.lng,
+      });
+    }
+    return items;
+  }, [sortedAssets, transactions, txCounts, coordResolveTick]);
+
   // Export to CSV
   const handleExportCsv = () => {
     const headers = [
@@ -278,13 +363,13 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             <span>Table</span>
           </button>
           <button
-            onClick={() => setViewMode('GRID')}
-            className={`admin-btn ${viewMode === 'GRID' ? 'admin-btn-secondary' : 'admin-btn-outline'} admin-btn-sm`}
+            onClick={() => setViewMode('MAP')}
+            className={`admin-btn ${viewMode === 'MAP' ? 'admin-btn-secondary' : 'admin-btn-outline'} admin-btn-sm`}
             style={{ padding: '6px 10px' }}
-            title="Card Grid View"
+            title="Satellite Map View"
           >
-            <LayoutGrid size={15} />
-            <span>Grid</span>
+            <MapIcon size={15} />
+            <span>Map</span>
           </button>
         </div>
       </div>
@@ -576,151 +661,30 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           </table>
         </div>
       ) : (
-        /* Card Grid View */
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-          {sortedAssets.map((asset) => {
-            const isRunning = asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
-            return (
-              <div
-                key={asset.equipmentId}
-                className="admin-card"
-                style={{
-                  marginBottom: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  borderTop: `2px solid ${
-                    asset.type === 'GENERATOR' ? 'var(--adm-accent-yellow)' : 'var(--adm-border-subtle)'
-                  }`,
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <span className={`admin-badge admin-badge-${asset.type.toLowerCase()}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                      <EquipmentTypeIcon type={asset.type} size={13} />
-                      <span>{asset.type}</span>
-                    </span>
-                    {asset.type === 'GENERATOR' && (
-                      <span className={`admin-badge ${isRunning ? 'admin-badge-running' : 'admin-badge-standby'}`}>
-                        <span className={`pulse-dot ${isRunning ? 'green' : 'slate'}`} />
-                        {isRunning ? 'ON' : 'OFF'}
-                      </span>
-                    )}
-                  </div>
-
-                  <h3
-                    onClick={() => onSelectAsset(asset.equipmentId)}
-                    style={{
-                      fontFamily: 'var(--adm-font-mono)',
-                      fontSize: '1.2rem',
-                      fontWeight: 700,
-                      color: 'var(--adm-text-primary)',
-                      cursor: 'pointer',
-                      marginBottom: '8px',
-                    }}
-                  >
-                    {asset.equipmentId}
-                  </h3>
-
-                  <div style={{ fontSize: '0.85rem', color: 'var(--adm-text-secondary)', marginBottom: '4px' }}>
-                    <strong>{asset.area}</strong> • {asset.location}
-                  </div>
-
-                  <div style={{ fontSize: '0.8rem', fontFamily: 'var(--adm-font-mono)', marginBottom: '12px' }}>
-                    <a
-                      href={getGoogleMapsExternalUrl(asset.what3words, asset.latitude, asset.longitude)}
-                      onClick={(e) =>
-                        handleWhat3WordsLinkClick(
-                          e,
-                          asset.what3words,
-                          asset.latitude,
-                          asset.longitude,
-                          (coords) => {
-                            postRemoteEquipment({
-                              ...asset,
-                              latitude: coords.lat,
-                              longitude: coords.lng,
-                            }).catch(() => {});
-                          }
-                        )
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Open location in Google Maps"
-                      style={{
-                        color: 'var(--adm-accent-yellow)',
-                        textDecoration: 'none',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <MapPin size={12} />
-                      <span>{asset.what3words}</span>
-                    </a>
-                  </div>
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      background: 'var(--adm-surface-1)',
-                      borderRadius: 'var(--adm-radius-sm)',
-                      fontSize: '0.8rem',
-                      marginBottom: '14px',
-                    }}
-                  >
-                    <span style={{ color: 'var(--adm-text-muted)' }}>Rating / Cap:</span>
-                    <span style={{ fontWeight: 600, color: 'var(--adm-text-primary)' }}>
-                      {asset.type === 'GENERATOR' && asset.capacity ? `${asset.capacity} kVA` : null}
-                      {asset.type === 'TANK' && asset.capacity ? `${asset.capacity.toLocaleString()} Litres` : null}
-                      {asset.type === 'PLANT' ? 'Unrated' : null}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingTop: '12px',
-                    borderTop: '1px solid var(--adm-border-subtle)',
-                  }}
-                >
-                  <button
-                    onClick={() => onOpenQRModal(asset)}
-                    className="admin-btn admin-btn-outline admin-btn-sm"
-                    title="Print QR Label Tag"
-                  >
-                    <QrCode size={14} />
-                    <span>Tag</span>
-                  </button>
-
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      onClick={() => onSelectAsset(asset.equipmentId)}
-                      className="admin-btn admin-btn-secondary admin-btn-sm"
-                      title="View Transactions for this asset"
-                      style={{ padding: '5px 8px' }}
-                    >
-                      <ReceiptText size={14} color="var(--adm-accent-yellow)" />
-                      <span>{txCounts[asset.equipmentId] || 0} Txs</span>
-                    </button>
-
-                    <button
-                      onClick={() => onOpenEditModal(asset)}
-                      className="admin-btn admin-btn-outline admin-btn-sm"
-                    >
-                      <Edit size={14} />
-                      <span>Edit</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        /* Google Satellite Fleet Map View */
+        <div
+          className="admin-card"
+          style={{
+            padding: 0,
+            margin: 0,
+            overflow: 'hidden',
+            height: 'calc(100vh - 285px)',
+            minHeight: '560px',
+            border: '1px solid var(--adm-border-subtle)',
+            position: 'relative',
+          }}
+        >
+          <iframe
+            srcDoc={getFleetSatelliteMapSrcDoc(fleetMapMarkers)}
+            title="Fleet Equipment Satellite Map"
+            style={{
+              width: '100%',
+              height: '100%',
+              border: '0',
+              display: 'block',
+            }}
+            allow="geolocation"
+          />
         </div>
       )}
     </div>

@@ -528,3 +528,320 @@ export async function handleWhat3WordsLinkClick(
 
   openCleanGoogleMapsModal(w3w, null, onResolved);
 }
+
+export interface FleetMapMarkerItem {
+  equipmentId: string;
+  type: 'GENERATOR' | 'TANK' | 'PLANT';
+  area: string;
+  location: string;
+  what3words: string;
+  capacity?: number;
+  rentalSerialNumber: string;
+  isOn?: boolean;
+  txCount?: number;
+  lat: number;
+  lng: number;
+}
+
+/**
+ * Generates a self-contained HTML document (`srcDoc`) for the Admin Console Fleet Satellite Map View.
+ * Renders pure Google Satellite imagery (`lyrs=s`, zero POI clutter) with an Equipment Type Icon
+ * at the resolved location for each equipment ID.
+ */
+export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): string {
+  // Spread markers that share identical coordinates in a small ~4.5m circle so none overlap completely
+  const coordGroups = new Map<string, FleetMapMarkerItem[]>();
+  for (const m of markers) {
+    const key = `${m.lat.toFixed(6)},${m.lng.toFixed(6)}`;
+    const list = coordGroups.get(key) || [];
+    list.push(m);
+    coordGroups.set(key, list);
+  }
+
+  const adjustedMarkers: FleetMapMarkerItem[] = [];
+  for (const group of coordGroups.values()) {
+    if (group.length === 1) {
+      adjustedMarkers.push(group[0]);
+    } else {
+      const radiusLat = 0.000042;
+      const radiusLng = 0.000068;
+      group.forEach((item, idx) => {
+        const angle = (2 * Math.PI * idx) / group.length;
+        adjustedMarkers.push({
+          ...item,
+          lat: item.lat + radiusLat * Math.sin(angle),
+          lng: item.lng + radiusLng * Math.cos(angle),
+        });
+      });
+    }
+  }
+
+  const markersJson = JSON.stringify(adjustedMarkers).replace(/</g, '\\u003c');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #0F172A;
+      overflow: hidden;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    .leaflet-control-attribution {
+      font-size: 10px !important;
+      background: rgba(15, 23, 42, 0.65) !important;
+      color: #CBD5E1 !important;
+      padding: 2px 6px !important;
+      border-top-left-radius: 4px;
+    }
+    .leaflet-control-attribution a {
+      color: #93C5FD !important;
+    }
+    .eq-map-marker {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      user-select: none;
+    }
+    .eq-map-icon-box {
+      position: relative;
+      width: 32px;
+      height: 32px;
+      border-radius: 7px;
+      background: #FFFFFF;
+      border: 2px solid #EC721E;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .eq-map-marker:hover .eq-map-icon-box {
+      transform: scale(1.14);
+      box-shadow: 0 5px 14px rgba(0, 0, 0, 0.6);
+      z-index: 10;
+    }
+    .eq-map-pwr-dot {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      border: 1.5px solid #FFFFFF;
+    }
+    .eq-map-label {
+      margin-top: 2px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: rgba(15, 23, 42, 0.86);
+      color: #FFFFFF;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    }
+    .fit-btn {
+      position: absolute;
+      bottom: 24px;
+      right: 12px;
+      z-index: 1000;
+      background: #FFFFFF;
+      color: #0F172A;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .fit-btn:hover {
+      background: #F8FAFC;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 8px !important;
+      padding: 2px !important;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35) !important;
+    }
+    .leaflet-popup-content {
+      margin: 10px 12px !important;
+      min-width: 210px;
+    }
+    .popup-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 14px;
+      color: #0F172A;
+    }
+    .popup-meta {
+      font-size: 12px;
+      color: #475569;
+      margin: 4px 0;
+    }
+    .popup-w3w {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: #2563EB;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .popup-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .popup-btn {
+      flex: 1;
+      padding: 5px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 4px;
+      border: 1px solid #CBD5E1;
+      background: #F8FAFC;
+      color: #0F172A;
+      cursor: pointer;
+      text-align: center;
+    }
+    .popup-btn-primary {
+      background: #2563EB;
+      border-color: #2563EB;
+      color: #FFFFFF;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <button type="button" class="fit-btn" id="fitBoundsBtn" title="Fit all equipment on map">
+    <span>⌖ Fit All Equipment</span>
+  </button>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    (function() {
+      var items = ${markersJson};
+      var defaultCenter = [52.0733, -1.0147];
+      var map = L.map('map', {
+        center: defaultCenter,
+        zoom: 16,
+        maxZoom: 21,
+        minZoom: 3,
+        zoomControl: true
+      });
+
+      // Pure Google Satellite layer (lyrs=s) - zero POI clutter
+      L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        maxZoom: 21,
+        maxNativeZoom: 20,
+        subdomains: ['0', '1', '2', '3'],
+        attribution: 'Map data &copy; Google Satellite'
+      }).addTo(map);
+
+      function getEquipmentSvg(type, color) {
+        if (type === 'GENERATOR') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<g transform="translate(-102)">' +
+            '<path d="m 106,6 c -1,0 -2,1 -2,2 v 9 c 0,1 1,2 2,2 h 16 c 1,0 2,-1 2,-2 V 8 c 0,-1 -1,-2 -2,-2 z M 118.69922,7.9003906 120.30078,9.099609 118.5,11.5 h 3 l -4.19922,5.599609 -1.60156,-1.199218 L 117.5,13.5 h -3 z M 106,8.5 h 7 v 2 h -7 z m 0,3 h 7 v 2 h -7 z m 0,3 h 7 v 2 h -7 z" fill="' + color + '" fill-rule="evenodd"/>' +
+            '<path d="m 107,4.5 h 3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 106,21 h 16" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="M 118,6 V 3 h 2" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
+            '</g></svg>';
+        }
+        if (type === 'TANK') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<g transform="translate(-136)">' +
+            '<rect x="139" y="5.5" width="15.5" height="8" rx="2.5" fill="' + color + '" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<circle cx="147" cy="18.5" r="2.5" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="m 143,3 h 3.5" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 151,16 h 7" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 143,16 h -3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '</g></svg>';
+        }
+        // PLANT (Forklift / Plant)
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+          '<g transform="translate(-170)">' +
+          '<circle cx="175.82" cy="20.11" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+          '<circle cx="184.72" cy="20.16" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+          '<path d="M 172.72,19.70 172.5,11.5 176,11 176.5,5.5 182,5 l 1,0.5 1.5,8.5 h 3.5" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="m 172.72,19.20 1.5,-2 h 3.5 l 1,2 h 3 l 2,-2" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="m 192,21.5 h -4 V 2" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '</g></svg>';
+      }
+
+      var boundsPoints = [];
+
+      items.forEach(function(item) {
+        var pt = [item.lat, item.lng];
+        boundsPoints.push(pt);
+
+        var borderColor = item.type === 'GENERATOR' ? '#2563EB' : item.type === 'TANK' ? '#EA580C' : '#0D9488';
+        var iconColor = '#EC721E';
+        var pwrDotHtml = item.type === 'GENERATOR'
+          ? '<span class="eq-map-pwr-dot" style="background:' + (item.isOn ? '#16A34A' : '#94A3B8') + '"></span>'
+          : '';
+
+        var html = '<div class="eq-map-marker" title="' + item.equipmentId + ' (' + item.type + ')">' +
+          '<div class="eq-map-icon-box" style="border-color:' + borderColor + '">' +
+            getEquipmentSvg(item.type, iconColor) +
+            pwrDotHtml +
+          '</div>' +
+          '<div class="eq-map-label">' + item.equipmentId + '</div>' +
+        '</div>';
+
+        var divIcon = L.divIcon({
+          html: html,
+          className: '',
+          iconSize: [0, 0],
+          iconAnchor: [0, 0]
+        });
+
+        var capStr = item.type === 'GENERATOR' && item.capacity ? (item.capacity + ' kVA')
+          : item.type === 'TANK' && item.capacity ? (item.capacity + ' L')
+          : 'Unrated';
+
+        var popupHtml = '<div>' +
+          '<div class="popup-id">' + item.equipmentId + '</div>' +
+          '<div class="popup-meta"><strong>' + item.type + '</strong> • ' + capStr + (item.type === 'GENERATOR' ? (' • ' + (item.isOn ? '<span style="color:#16A34A;font-weight:700">ON</span>' : '<span style="color:#64748B;font-weight:700">OFF</span>')) : '') + '</div>' +
+          '<div class="popup-meta">' + item.area + ' • ' + item.location + '</div>' +
+          '<div class="popup-w3w">' + item.what3words + '</div>' +
+          '<div class="popup-actions">' +
+            '<button type="button" class="popup-btn popup-btn-primary" onclick="window.parent.postMessage({type:\\'TTD_MAP_SELECT_ASSET\\',equipmentId:\\'' + item.equipmentId + '\\'}, \\'*\\')">Transactions (' + (item.txCount || 0) + ')</button>' +
+            '<button type="button" class="popup-btn" onclick="window.parent.postMessage({type:\\'TTD_MAP_EDIT_ASSET\\',equipmentId:\\'' + item.equipmentId + '\\'}, \\'*\\')">Edit</button>' +
+          '</div>' +
+        '</div>';
+
+        L.marker(pt, { icon: divIcon }).addTo(map).bindPopup(popupHtml, { offset: [0, -14] });
+      });
+
+      function fitAll() {
+        if (boundsPoints.length === 1) {
+          map.setView(boundsPoints[0], 19);
+        } else if (boundsPoints.length > 1) {
+          var bounds = L.latLngBounds(boundsPoints);
+          map.fitBounds(bounds, { padding: [45, 45], maxZoom: 19 });
+        }
+      }
+
+      fitAll();
+
+      document.getElementById('fitBoundsBtn').addEventListener('click', function() {
+        fitAll();
+      });
+    })();
+  </script>
+</body>
+</html>`;
+}
