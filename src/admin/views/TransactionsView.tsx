@@ -16,6 +16,8 @@ import {
 import type { Transaction, Equipment } from '../../types';
 import { formatAdminTimestamp } from '../../utils/dateFormat';
 import { getGeneratorPowerState } from '../../utils/powerState';
+import { getGoogleMapsExternalUrl, handleWhat3WordsLinkClick } from '../../services/what3words';
+import { postRemoteEquipment } from '../../services/api';
 
 interface TransactionsViewProps {
   transactions: Transaction[];
@@ -514,9 +516,25 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               </span>
               <p style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.82rem', margin: '3px 0 0' }}>
                 <a
-                  href={`https://what3words.com/${currentAsset.what3words.replace(/^\/\/\//, '')}`}
+                  href={getGoogleMapsExternalUrl(currentAsset.what3words, currentAsset.latitude, currentAsset.longitude)}
+                  onClick={(e) =>
+                    handleWhat3WordsLinkClick(
+                      e,
+                      currentAsset.what3words,
+                      currentAsset.latitude,
+                      currentAsset.longitude,
+                      (coords) => {
+                        postRemoteEquipment({
+                          ...currentAsset,
+                          latitude: coords.lat,
+                          longitude: coords.lng,
+                        }).catch(() => {});
+                      }
+                    )
+                  }
                   target="_blank"
                   rel="noreferrer"
+                  title="Open location in Google Maps"
                   style={{ color: 'var(--adm-accent-yellow)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
                 >
                   <MapPin size={11} />

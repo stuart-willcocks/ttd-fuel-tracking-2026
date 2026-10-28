@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Check, Power, PowerOff, Clock, AlertCircle, MapPin, X } from 'lucide-react';
 import { IconCheckIn, IconCheckOut, IconFuel, IconBack } from './icons/AppIcons';
 import type { Equipment, Transaction, ActionType } from '../types';
@@ -7,6 +7,14 @@ import { TransactionTypeIcon } from './TransactionTypeIcon';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 import { EditTransactionModal } from './EditTransactionModal';
 import { ActionConfirmModal } from './ActionConfirmModal';
+import {
+  convertWhat3WordsToCoordinates,
+  getCachedWhat3WordsCoordinates,
+  getGoogleMapsEmbedUrl,
+  type W3WCoordinates,
+} from '../services/what3words';
+import { db } from '../db/indexedDB';
+import { postRemoteEquipment } from '../services/api';
 
 export interface AssetDetailViewProps {
   asset: Equipment;
@@ -32,6 +40,52 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
   const [selectedTransactionForEdit, setSelectedTransactionForEdit] = useState<Transaction | null>(null);
   const [isMapModalOpen, setIsMapModalOpen] = useState<boolean>(false);
   const cleanW3w = (asset.what3words || '').replace(/^\/+/, '').trim();
+  const [resolvedCoords, setResolvedCoords] = useState<W3WCoordinates | null>(() => {
+    if (typeof asset.latitude === 'number' && typeof asset.longitude === 'number') {
+      return { lat: asset.latitude, lng: asset.longitude };
+    }
+    return getCachedWhat3WordsCoordinates(cleanW3w);
+  });
+  const [isResolvingCoords, setIsResolvingCoords] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof asset.latitude === 'number' && typeof asset.longitude === 'number') {
+      setResolvedCoords({ lat: asset.latitude, lng: asset.longitude });
+      return;
+    }
+    const cached = getCachedWhat3WordsCoordinates(cleanW3w);
+    if (cached) {
+      setResolvedCoords(cached);
+    } else {
+      setResolvedCoords(null);
+    }
+  }, [asset.equipmentId, asset.latitude, asset.longitude, cleanW3w]);
+
+  useEffect(() => {
+    if (!isMapModalOpen || resolvedCoords) return;
+    let cancelled = false;
+    setIsResolvingCoords(true);
+    convertWhat3WordsToCoordinates(cleanW3w)
+      .then((coords) => {
+        if (cancelled) return;
+        if (coords) {
+          setResolvedCoords(coords);
+          const updatedAsset: Equipment = {
+            ...asset,
+            latitude: coords.lat,
+            longitude: coords.lng,
+          };
+          db.equipments.put(updatedAsset).catch(() => {});
+          postRemoteEquipment(updatedAsset).catch(() => {});
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsResolvingCoords(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isMapModalOpen, resolvedCoords, cleanW3w, asset]);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -385,12 +439,28 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
             </div>
 
             <div className="w3w-map-iframe-wrap">
-              <iframe
-                src={`https://what3words.com/${encodeURIComponent(cleanW3w)}`}
-                title={`what3words map for ${cleanW3w}`}
-                className="w3w-map-iframe"
-                allow="geolocation"
-              />
+              {isResolvingCoords ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '100%',
+                    color: '#64748B',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                  }}
+                >
+                  Loading Google Map for ///{cleanW3w}...
+                </div>
+              ) : (
+                <iframe
+                  src={getGoogleMapsEmbedUrl(cleanW3w, resolvedCoords?.lat, resolvedCoords?.lng)}
+                  title={`Google Map for ${cleanW3w}`}
+                  className="w3w-map-iframe"
+                  allow="geolocation"
+                />
+              )}
             </div>
 
             <div className="w3w-map-modal-footer">

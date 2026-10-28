@@ -19,6 +19,8 @@ import { DeviceEnrollmentView } from './components/DeviceEnrollmentView';
 import { Smartphone, ExternalLink } from 'lucide-react';
 import { DesktopLaunchpad } from './components/DesktopLaunchpad';
 import { isMobileDevice, isDesktopOrSurface } from './utils/deviceDetector';
+import { resolveEquipmentCoordinates } from './services/what3words';
+import { postRemoteEquipment } from './services/api';
 
 export type AppView = 'SPLASH_SCREEN' | 'SCAN_SCREEN' | 'ASSET_DETAIL_VIEW';
 
@@ -536,10 +538,12 @@ export const App: React.FC = () => {
       setIsEnrolled(false);
       return;
     }
-    await db.equipments.put(updated);
-    setCurrentAsset(updated);
+    const resolved = await resolveEquipmentCoordinates(updated, currentAsset?.what3words);
+    await db.equipments.put(resolved);
+    setCurrentAsset(resolved);
     setIsEditingAsset(false);
     await refreshAssetsList();
+    postRemoteEquipment(resolved).catch(() => {});
     await syncEngine.syncWithRemote();
   };
 

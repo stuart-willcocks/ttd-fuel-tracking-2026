@@ -3,6 +3,12 @@ import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus, DeviceTele
 import { generateSecureDeviceToken, getDeviceId, getDeviceToken } from './device';
 import { db } from '../db/indexedDB';
 import { postRemoteTransaction } from './api';
+import {
+  normalizeWhat3Words,
+  primeWhat3WordsCache,
+  resolveEquipmentCoordinates,
+  convertWhat3WordsToCoordinates,
+} from './what3words';
 
 const STORAGE_KEY_URL = 'ttd_supabase_url';
 const STORAGE_KEY_ANON = 'ttd_supabase_anon_key';
@@ -60,22 +66,52 @@ export async function fetchEquipmentFromSupabase(): Promise<Equipment[]> {
 
   if (error) throw error;
 
-  return (data || []).map((row: any) => ({
-    equipmentId: row.equipment_id,
-    area: row.area,
-    location: row.location,
-    what3words: row.what3words,
-    type: row.type,
-    capacity: row.capacity ?? undefined,
-    rentalSerialNumber: row.rental_serial_number,
-    poweredUpTimestamp: row.powered_up_timestamp ?? undefined,
-    poweredDownTimestamp: row.powered_down_timestamp ?? undefined,
-    updatedAt: row.updated_at,
-  }));
+  return (data || []).map((row: any) => {
+    let latitude: number | undefined =
+      typeof row.latitude === 'number' && !Number.isNaN(row.latitude) ? row.latitude : undefined;
+    let longitude: number | undefined =
+      typeof row.longitude === 'number' && !Number.isNaN(row.longitude) ? row.longitude : undefined;
+
+    if ((latitude === undefined || longitude === undefined) && typeof row.device_id === 'string' && row.device_id.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(row.device_id);
+        const cleanRowW3w = normalizeWhat3Words(row.what3words);
+        if (
+          typeof parsed.lat === 'number' &&
+          typeof parsed.lng === 'number' &&
+          (!parsed.w3w || normalizeWhat3Words(parsed.w3w) === cleanRowW3w)
+        ) {
+          latitude = parsed.lat;
+          longitude = parsed.lng;
+        }
+      } catch {
+        // Ignore non-JSON device_id values
+      }
+    }
+
+    if (latitude !== undefined && longitude !== undefined) {
+      primeWhat3WordsCache(row.what3words, latitude, longitude);
+    }
+
+    return {
+      equipmentId: row.equipment_id,
+      area: row.area,
+      location: row.location,
+      what3words: row.what3words,
+      latitude,
+      longitude,
+      type: row.type,
+      capacity: row.capacity ?? undefined,
+      rentalSerialNumber: row.rental_serial_number,
+      poweredUpTimestamp: row.powered_up_timestamp ?? undefined,
+      poweredDownTimestamp: row.powered_down_timestamp ?? undefined,
+      updatedAt: row.updated_at,
+    };
+  });
 }
 
 /**
- * Save/update equipment in Supabase
+ * Save/update equipment in Supabase (converts what3words once on save or update)
  */
 export async function saveEquipmentToSupabase(equipment: Equipment): Promise<void> {
   const client = getSupabaseClient();
@@ -95,16 +131,39 @@ export async function saveEquipmentToSupabase(equipment: Equipment): Promise<voi
     }
   }
 
+  // Check existing what3words in Supabase to detect changes on update
+  let previousW3w: string | undefined;
+  try {
+    const { data: existingRow } = await client
+      .from('equipment_list')
+      .select('what3words')
+      .eq('equipment_id', equipment.equipmentId)
+      .maybeSingle();
+    if (existingRow?.what3words) {
+      previousW3w = existingRow.what3words;
+    }
+  } catch {
+    // Ignore lookup error
+  }
+
+  const resolvedEq = await resolveEquipmentCoordinates(equipment, previousW3w);
+  const cleanW3w = normalizeWhat3Words(resolvedEq.what3words);
+  const encodedCoords =
+    typeof resolvedEq.latitude === 'number' && typeof resolvedEq.longitude === 'number'
+      ? JSON.stringify({ lat: resolvedEq.latitude, lng: resolvedEq.longitude, w3w: cleanW3w })
+      : null;
+
   const payload = {
-    equipment_id: equipment.equipmentId,
-    area: equipment.area,
-    location: equipment.location,
-    what3words: equipment.what3words,
-    type: equipment.type,
-    capacity: equipment.capacity ?? null,
-    rental_serial_number: equipment.rentalSerialNumber,
-    powered_up_timestamp: equipment.poweredUpTimestamp ?? null,
-    powered_down_timestamp: equipment.poweredDownTimestamp ?? null,
+    equipment_id: resolvedEq.equipmentId,
+    area: resolvedEq.area,
+    location: resolvedEq.location,
+    what3words: resolvedEq.what3words,
+    device_id: encodedCoords,
+    type: resolvedEq.type,
+    capacity: resolvedEq.capacity ?? null,
+    rental_serial_number: resolvedEq.rentalSerialNumber,
+    powered_up_timestamp: resolvedEq.poweredUpTimestamp ?? null,
+    powered_down_timestamp: resolvedEq.poweredDownTimestamp ?? null,
     updated_at: new Date().toISOString(),
   };
 
@@ -243,18 +302,37 @@ export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]):
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
-  const rows = equipmentList.map((eq) => ({
-    equipment_id: eq.equipmentId,
-    area: eq.area,
-    location: eq.location,
-    what3words: eq.what3words,
-    type: eq.type,
-    capacity: eq.capacity ?? null,
-    rental_serial_number: eq.rentalSerialNumber,
-    powered_up_timestamp: eq.poweredUpTimestamp ?? null,
-    powered_down_timestamp: eq.poweredDownTimestamp ?? null,
-    updated_at: new Date().toISOString(),
-  }));
+  // Resolve coordinates once per unique what3words address
+  const uniqueW3w = Array.from(
+    new Set(equipmentList.map((eq) => normalizeWhat3Words(eq.what3words)).filter(Boolean))
+  );
+  await Promise.all(uniqueW3w.map((w3w) => convertWhat3WordsToCoordinates(w3w)));
+
+  const resolvedList = await Promise.all(
+    equipmentList.map((eq) => resolveEquipmentCoordinates(eq))
+  );
+
+  const rows = resolvedList.map((eq) => {
+    const cleanW3w = normalizeWhat3Words(eq.what3words);
+    const encodedCoords =
+      typeof eq.latitude === 'number' && typeof eq.longitude === 'number'
+        ? JSON.stringify({ lat: eq.latitude, lng: eq.longitude, w3w: cleanW3w })
+        : null;
+
+    return {
+      equipment_id: eq.equipmentId,
+      area: eq.area,
+      location: eq.location,
+      what3words: eq.what3words,
+      device_id: encodedCoords,
+      type: eq.type,
+      capacity: eq.capacity ?? null,
+      rental_serial_number: eq.rentalSerialNumber,
+      powered_up_timestamp: eq.poweredUpTimestamp ?? null,
+      powered_down_timestamp: eq.poweredDownTimestamp ?? null,
+      updated_at: new Date().toISOString(),
+    };
+  });
 
   const chunkSize = 50;
   for (let i = 0; i < rows.length; i += chunkSize) {
@@ -398,7 +476,12 @@ export async function uploadTransactionToCloud(
     try {
       const localEq = await db.equipments.get(tx.equipmentId);
       if (localEq) {
-        const eqPayload = {
+        const cleanW3w = normalizeWhat3Words(localEq.what3words);
+        const encodedCoords =
+          typeof localEq.latitude === 'number' && typeof localEq.longitude === 'number'
+            ? JSON.stringify({ lat: localEq.latitude, lng: localEq.longitude, w3w: cleanW3w })
+            : undefined;
+        const eqPayload: Record<string, unknown> = {
           equipment_id: localEq.equipmentId,
           area: localEq.area || 'Site Area',
           location: localEq.location || 'Field Grid',
@@ -410,6 +493,9 @@ export async function uploadTransactionToCloud(
           powered_down_timestamp: localEq.poweredDownTimestamp ?? null,
           updated_at: new Date().toISOString(),
         };
+        if (encodedCoords !== undefined) {
+          eqPayload.device_id = encodedCoords;
+        }
         await client.from('equipment_list').upsert(eqPayload, { onConflict: 'equipment_id' });
       }
     } catch (eqErr) {

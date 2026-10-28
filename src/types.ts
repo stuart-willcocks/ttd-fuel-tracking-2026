@@ -21,6 +21,8 @@ export interface Equipment {
   area: string;
   location: string;
   what3words: string;
+  latitude?: number;
+  longitude?: number;
   type: AssetType;
   capacity?: number; // kVA for generator, litres for tank, undefined for plant
   rentalSerialNumber: string;

@@ -1,6 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { X, Plus, Sparkles, MapPin, Check, Zap, Trash2, ChevronDown } from 'lucide-react';
 import type { Equipment, AssetType } from '../../types';
+import {
+  resolveEquipmentCoordinates,
+  getGoogleMapsExternalUrl,
+  handleWhat3WordsLinkClick,
+} from '../../services/what3words';
 
 interface AssetFormModalProps {
   isOpen: boolean;
@@ -399,6 +404,8 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       area: area.trim() || 'Site Area',
       location: location.trim() || 'Field Station',
       what3words: finalW3w,
+      latitude: initialAsset?.latitude,
+      longitude: initialAsset?.longitude,
       rentalSerialNumber: rentalSerialNumber.trim() || 'RSN-UNKNOWN',
       poweredUpTimestamp: initialAsset?.poweredUpTimestamp,
       poweredDownTimestamp: initialAsset?.poweredDownTimestamp,
@@ -407,7 +414,11 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      await onSave(updatedEquipment);
+      const resolvedEquipment = await resolveEquipmentCoordinates(
+        updatedEquipment,
+        initialAsset?.what3words
+      );
+      await onSave(resolvedEquipment);
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -575,7 +586,27 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               <label className="admin-label">What3Words Reference *</label>
               {what3words && (
                 <a
-                  href={`https://what3words.com/${stripW3wPrefix(what3words)}`}
+                  href={getGoogleMapsExternalUrl(
+                    what3words,
+                    initialAsset && stripW3wPrefix(initialAsset.what3words) === stripW3wPrefix(what3words)
+                      ? initialAsset.latitude
+                      : undefined,
+                    initialAsset && stripW3wPrefix(initialAsset.what3words) === stripW3wPrefix(what3words)
+                      ? initialAsset.longitude
+                      : undefined
+                  )}
+                  onClick={(e) =>
+                    handleWhat3WordsLinkClick(
+                      e,
+                      what3words,
+                      initialAsset && stripW3wPrefix(initialAsset.what3words) === stripW3wPrefix(what3words)
+                        ? initialAsset.latitude
+                        : undefined,
+                      initialAsset && stripW3wPrefix(initialAsset.what3words) === stripW3wPrefix(what3words)
+                        ? initialAsset.longitude
+                        : undefined
+                    )
+                  }
                   target="_blank"
                   rel="noreferrer"
                   style={{ fontSize: '0.72rem', color: '#2563EB', textDecoration: 'none' }}

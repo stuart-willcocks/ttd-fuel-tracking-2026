@@ -17,6 +17,8 @@ import {
 import type { Equipment, Transaction } from '../../types';
 import { EquipmentTypeIcon } from '../../components/EquipmentTypeIcon';
 import { getGeneratorPowerState } from '../../utils/powerState';
+import { getGoogleMapsExternalUrl, handleWhat3WordsLinkClick } from '../../services/what3words';
+import { postRemoteEquipment } from '../../services/api';
 
 interface AssetsViewProps {
   assets: Equipment[];
@@ -467,9 +469,25 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     {/* What3Words */}
                     <td>
                       <a
-                        href={`https://what3words.com/${asset.what3words.replace(/^\/\/\//, '')}`}
+                        href={getGoogleMapsExternalUrl(asset.what3words, asset.latitude, asset.longitude)}
+                        onClick={(e) =>
+                          handleWhat3WordsLinkClick(
+                            e,
+                            asset.what3words,
+                            asset.latitude,
+                            asset.longitude,
+                            (coords) => {
+                              postRemoteEquipment({
+                                ...asset,
+                                latitude: coords.lat,
+                                longitude: coords.lng,
+                              }).catch(() => {});
+                            }
+                          )
+                        }
                         target="_blank"
                         rel="noreferrer"
+                        title="Open location in Google Maps"
                         style={{
                           fontFamily: 'var(--adm-font-mono)',
                           fontSize: '0.8rem',
@@ -608,9 +626,38 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     <strong>{asset.area}</strong> • {asset.location}
                   </div>
 
-                  <div style={{ fontSize: '0.8rem', color: 'var(--adm-accent-yellow)', fontFamily: 'var(--adm-font-mono)', marginBottom: '12px' }}>
-                    <MapPin size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                    {asset.what3words}
+                  <div style={{ fontSize: '0.8rem', fontFamily: 'var(--adm-font-mono)', marginBottom: '12px' }}>
+                    <a
+                      href={getGoogleMapsExternalUrl(asset.what3words, asset.latitude, asset.longitude)}
+                      onClick={(e) =>
+                        handleWhat3WordsLinkClick(
+                          e,
+                          asset.what3words,
+                          asset.latitude,
+                          asset.longitude,
+                          (coords) => {
+                            postRemoteEquipment({
+                              ...asset,
+                              latitude: coords.lat,
+                              longitude: coords.lng,
+                            }).catch(() => {});
+                          }
+                        )
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Open location in Google Maps"
+                      style={{
+                        color: 'var(--adm-accent-yellow)',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <MapPin size={12} />
+                      <span>{asset.what3words}</span>
+                    </a>
                   </div>
 
                   <div
