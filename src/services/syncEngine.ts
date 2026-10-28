@@ -3,6 +3,8 @@ import { uploadTransactionToCloud, isSupabaseConfigured, subscribeToCloudChanges
 import { fetchRemoteEquipment, fetchRemoteTransactions, deleteRemoteTransaction } from './api';
 import type { Transaction } from '../types';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
+import { isDeviceEnrolled, getDeviceId, getDeviceToken, clearDeviceEnrollment } from './device';
+import { verifyRemoteDeviceToken } from './api';
 
 export interface SyncState {
   isOnline: boolean;
@@ -15,10 +17,12 @@ export interface SyncState {
 
 type SyncListener = (state: SyncState) => void;
 type RemoteDataListener = () => void;
+type DeviceRevocationListener = () => void;
 
 class SyncEngine {
   private listeners: Set<SyncListener> = new Set();
   private dataListeners: Set<RemoteDataListener> = new Set();
+  private revocationListeners: Set<DeviceRevocationListener> = new Set();
   private deletedTxIds: Set<string> = new Set();
   private isSimulatedOffline: boolean = false;
   private isSyncing: boolean = false;
@@ -84,6 +88,15 @@ class SyncEngine {
   public onRemoteDataUpdated(listener: RemoteDataListener): () => void {
     this.dataListeners.add(listener);
     return () => this.dataListeners.delete(listener);
+  }
+
+  public onDeviceRevoked(listener: DeviceRevocationListener): () => void {
+    this.revocationListeners.add(listener);
+    return () => this.revocationListeners.delete(listener);
+  }
+
+  private notifyDeviceRevoked() {
+    this.revocationListeners.forEach((listener) => listener());
   }
 
   public isEffectivelyOnline(): boolean {
@@ -301,6 +314,28 @@ class SyncEngine {
    */
   public async syncWithRemote(): Promise<void> {
     if (!this.isEffectivelyOnline() || this.isSyncing) return;
+
+    // Check device authorization status
+    if (isDeviceEnrolled()) {
+      try {
+        const currentDevId = getDeviceId();
+        const currentToken = getDeviceToken();
+        if (currentDevId && currentToken) {
+          const check = await verifyRemoteDeviceToken(currentDevId, currentToken);
+          if (!check.valid && check.status === 'revoked') {
+            console.warn(`[SyncEngine] Device ${currentDevId} has been revoked by an administrator.`);
+            clearDeviceEnrollment();
+            await db.equipments.clear();
+            await db.transactions.clear();
+            await db.outbox.clear();
+            this.notifyDeviceRevoked();
+            return;
+          }
+        }
+      } catch (e) {
+        // Silently preserve offline functionality if network error occurs
+      }
+    }
 
     this.isSyncing = true;
     await this.notify();

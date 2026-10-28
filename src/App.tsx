@@ -13,7 +13,8 @@ import { EditAssetModal } from './components/EditAssetModal';
 import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
 import { PowerEventModal } from './components/PowerEventModal';
-import { getDeviceName } from './services/device';
+import { getDeviceName, isDeviceEnrolled, clearDeviceEnrollment } from './services/device';
+import { DeviceEnrollmentView } from './components/DeviceEnrollmentView';
 import { Smartphone, ExternalLink } from 'lucide-react';
 import { DesktopLaunchpad } from './components/DesktopLaunchpad';
 import { isMobileDevice, isDesktopOrSurface } from './utils/deviceDetector';
@@ -247,6 +248,8 @@ export const App: React.FC = () => {
   const [currentAsset, setCurrentAsset] = useState<Equipment | null>(null);
   const [currentAssetTransactions, setCurrentAssetTransactions] = useState<Transaction[]>([]);
 
+  const [isEnrolled, setIsEnrolled] = useState<boolean>(() => isDeviceEnrolled());
+
   const [syncState, setSyncState] = useState<SyncState>({
     isOnline: true,
     isSimulatedOffline: false,
@@ -373,9 +376,14 @@ export const App: React.FC = () => {
       }
     });
 
+    const unsubRevoke = syncEngine.onDeviceRevoked(() => {
+      setIsEnrolled(false);
+    });
+
     return () => {
       unsubState();
       unsubData();
+      unsubRevoke();
     };
   }, [refreshAssetsList, loadAssetDetails]);
 
@@ -550,6 +558,28 @@ export const App: React.FC = () => {
     );
   }
 
+  // 0. DEVICE ENROLLMENT LOCK SCREEN (If scanner is not yet authorized)
+  if (!isEnrolled) {
+    const enrollContent = (
+      <DeviceEnrollmentView
+        onEnrolled={async () => {
+          setIsEnrolled(true);
+          await refreshAssetsList();
+          await syncEngine.syncWithRemote();
+        }}
+      />
+    );
+
+    return isDesktop ? (
+      <div className="desktop-pda-frame">
+        {renderDesktopToolbar()}
+        {enrollContent}
+      </div>
+    ) : (
+      enrollContent
+    );
+  }
+
   // 1. SPLASH SCREEN
   if (currentView === 'SPLASH_SCREEN') {
     const splashContent = (
@@ -668,6 +698,10 @@ export const App: React.FC = () => {
         onUpdate={() => {
           setIsSettingsModalOpen(false);
           setCurrentView('SPLASH_SCREEN');
+        }}
+        onDeregister={() => {
+          clearDeviceEnrollment();
+          setIsEnrolled(false);
         }}
       />
     </div>

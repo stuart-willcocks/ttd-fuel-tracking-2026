@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Equipment, Transaction } from '../types';
+import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus } from '../types';
+import { generateSecureDeviceToken } from './device';
 import { db } from '../db/indexedDB';
 import { postRemoteTransaction } from './api';
 
@@ -457,12 +458,174 @@ export async function uploadTransactionToCloud(
 }
 
 /**
+ * Fetch all authorized devices from Supabase
+ */
+export async function fetchAuthorizedDevicesFromSupabase(): Promise<AuthorizedDevice[]> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const { data, error } = await client
+    .from('authorized_devices')
+    .select('*')
+    .order('registered_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    deviceId: row.device_id,
+    deviceName: row.device_name || row.device_id,
+    authToken: row.auth_token,
+    status: row.status as DeviceStatus,
+    registeredAt: row.registered_at,
+    lastSeenAt: row.last_seen_at,
+  }));
+}
+
+/**
+ * Register or update an authorized device in Supabase
+ */
+export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const payload = {
+    device_id: device.deviceId.trim().toUpperCase(),
+    device_name: device.deviceName || device.deviceId,
+    auth_token: device.authToken.trim(),
+    status: device.status,
+    registered_at: device.registeredAt || new Date().toISOString(),
+    last_seen_at: device.lastSeenAt || new Date().toISOString(),
+  };
+
+  const { error } = await client
+    .from('authorized_devices')
+    .upsert(payload, { onConflict: 'device_id' });
+
+  if (error) throw error;
+}
+
+/**
+ * Update the status of a device (active, pending, revoked)
+ */
+export async function updateDeviceStatusInSupabase(deviceId: string, status: DeviceStatus): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const { error } = await client
+    .from('authorized_devices')
+    .update({ status, last_seen_at: new Date().toISOString() })
+    .eq('device_id', deviceId.trim().toUpperCase());
+
+  if (error) throw error;
+}
+
+/**
+ * Delete a device from the authorized devices whitelist
+ */
+export async function deleteAuthorizedDeviceFromSupabase(deviceId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const { error } = await client
+    .from('authorized_devices')
+    .delete()
+    .eq('device_id', deviceId.trim().toUpperCase());
+
+  if (error) throw error;
+}
+
+/**
+ * Verify device credentials against Supabase
+ */
+export async function verifyDeviceTokenWithSupabase(
+  deviceId: string,
+  token: string
+): Promise<{ valid: boolean; status: DeviceStatus; deviceName?: string }> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const cleanId = deviceId.trim().toUpperCase();
+  const cleanToken = token.trim();
+
+  const { data, error } = await client
+    .from('authorized_devices')
+    .select('*')
+    .eq('device_id', cleanId)
+    .single();
+
+  if (error || !data) {
+    return { valid: false, status: 'revoked' };
+  }
+
+  const isTokenMatch = data.auth_token === cleanToken;
+  const isActive = data.status === 'active' && isTokenMatch;
+
+  if (isActive) {
+    // Update heartbeat silently
+    client
+      .from('authorized_devices')
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq('device_id', cleanId)
+      .then(() => {}, () => {});
+  }
+
+  return {
+    valid: isActive,
+    status: data.status as DeviceStatus,
+    deviceName: data.device_name || data.device_id,
+  };
+}
+
+/**
+ * Submit a device registration request from a PDA
+ */
+export async function registerDeviceRequestToSupabase(
+  deviceId: string,
+  deviceName?: string,
+  authToken?: string
+): Promise<{ status: DeviceStatus; token: string }> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const cleanId = deviceId.trim().toUpperCase();
+  const token = authToken || generateSecureDeviceToken();
+  const now = new Date().toISOString();
+
+  // Check if device already exists
+  const { data: existing } = await client
+    .from('authorized_devices')
+    .select('*')
+    .eq('device_id', cleanId)
+    .single();
+
+  if (existing) {
+    if (existing.status === 'active' && (!authToken || existing.auth_token === authToken)) {
+      return { status: 'active', token: existing.auth_token };
+    }
+    return { status: existing.status as DeviceStatus, token: existing.auth_token };
+  }
+
+  // Insert new pending device
+  const { error } = await client.from('authorized_devices').insert({
+    device_id: cleanId,
+    device_name: deviceName || cleanId,
+    auth_token: token,
+    status: 'pending',
+    registered_at: now,
+    last_seen_at: now,
+  });
+
+  if (error) throw error;
+  return { status: 'pending', token };
+}
+
+/**
  * Subscribes to real-time database changes in Supabase (e.g. transactions logged by PDAs).
- * Invokes callback whenever rows in `transactions` or `equipment_list` are inserted, updated, or deleted.
+ * Invokes callback whenever rows in `transactions`, `equipment_list`, or `authorized_devices` change.
  * Returns an unsubscribe teardown function.
  */
 export function subscribeToCloudChanges(
-  onDataChange: (table: 'transactions' | 'equipment_list', eventType: string) => void
+  onDataChange: (table: 'transactions' | 'equipment_list' | 'authorized_devices', eventType: string) => void
 ): () => void {
   const client = getSupabaseClient();
   if (!client) return () => {};
@@ -483,6 +646,13 @@ export function subscribeToCloudChanges(
         onDataChange('equipment_list', payload.eventType);
       }
     )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'authorized_devices' },
+      (payload) => {
+        onDataChange('authorized_devices', payload.eventType);
+      }
+    )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         console.log('[Supabase Realtime] Connected to live transaction feed from field PDAs');
@@ -498,9 +668,27 @@ export function subscribeToCloudChanges(
   };
 }
 
-export const SUPABASE_SQL_MIGRATION = `-- TTD Fuel Tracking: Migration to enable transaction deletion, device tracking & Realtime
+export const SUPABASE_SQL_MIGRATION = `-- TTD Fuel Tracking: Migration to enable transaction deletion, device tracking, authorized devices & Realtime
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS device_id text;
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS device_id text;
+
+-- Create Authorized Devices Table (PDA Whitelist)
+CREATE TABLE IF NOT EXISTS public.authorized_devices (
+  device_id text PRIMARY KEY,
+  device_name text,
+  auth_token text NOT NULL,
+  status text NOT NULL CHECK (status IN ('active', 'pending', 'revoked')),
+  registered_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  last_seen_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.authorized_devices ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow read authorized_devices for anon" ON public.authorized_devices;
+CREATE POLICY "Allow read authorized_devices for anon" ON public.authorized_devices FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow upsert authorized_devices for anon" ON public.authorized_devices;
+CREATE POLICY "Allow upsert authorized_devices for anon" ON public.authorized_devices FOR ALL USING (true);
+DROP POLICY IF EXISTS "Allow delete authorized_devices for anon" ON public.authorized_devices;
+CREATE POLICY "Allow delete authorized_devices for anon" ON public.authorized_devices FOR DELETE USING (true);
 
 -- Enable delete and update policies so transactions deleted on PDAs are deleted from Supabase
 DROP POLICY IF EXISTS "Allow delete transactions for anon" ON public.transactions;
@@ -524,6 +712,13 @@ BEGIN
     WHERE pubname = 'supabase_realtime' AND tablename = 'equipment_list'
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.equipment_list;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'authorized_devices'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.authorized_devices;
   END IF;
 END $$;
 `;
@@ -566,15 +761,27 @@ create table if not exists public.transactions (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 3. Indexes for fast query performance across multiple PDAs
+-- 3. Create Authorized Devices Table (Zebra TC26 PDA Whitelist & Enrollment)
+create table if not exists public.authorized_devices (
+  device_id text primary key,
+  device_name text,
+  auth_token text not null,
+  status text not null check (status in ('active', 'pending', 'revoked')),
+  registered_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  last_seen_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 4. Indexes for fast query performance across multiple PDAs
 create index if not exists idx_tx_equipment_id on public.transactions(equipment_id);
 create index if not exists idx_tx_timestamp on public.transactions(transaction_timestamp desc);
+create index if not exists idx_dev_status on public.authorized_devices(status);
 
--- 4. Enable Row Level Security (RLS)
+-- 5. Enable Row Level Security (RLS)
 alter table public.equipment_list enable row level security;
 alter table public.transactions enable row level security;
+alter table public.authorized_devices enable row level security;
 
--- 5. Policies: Devices can read, write, and delete records
+-- 6. Policies: Devices can read, write, and delete records
 create policy "Allow read equipment for anon" on public.equipment_list for select using (true);
 create policy "Allow upsert equipment for anon" on public.equipment_list for all using (true);
 
@@ -583,7 +790,12 @@ create policy "Allow insert/upsert transactions for anon" on public.transactions
 create policy "Allow update transactions for anon" on public.transactions for update using (true) with check (true);
 create policy "Allow delete transactions for anon" on public.transactions for delete using (true);
 
--- 6. Enable Supabase Realtime for instant Admin console auto-refresh
+create policy "Allow read authorized_devices for anon" on public.authorized_devices for select using (true);
+create policy "Allow upsert authorized_devices for anon" on public.authorized_devices for all using (true);
+create policy "Allow delete authorized_devices for anon" on public.authorized_devices for delete using (true);
+
+-- 7. Enable Supabase Realtime for instant Admin console auto-refresh
 alter publication supabase_realtime add table public.transactions;
 alter publication supabase_realtime add table public.equipment_list;
+alter publication supabase_realtime add table public.authorized_devices;
 `;

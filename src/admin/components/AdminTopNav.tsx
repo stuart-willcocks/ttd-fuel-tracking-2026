@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { APP_VERSION, BUILD_NUMBER, getIsStaging } from '../../version';
 
-export type AdminViewType = 'ASSETS' | 'TRANSACTIONS' | 'SETTINGS';
+export type AdminViewType = 'ASSETS' | 'TRANSACTIONS' | 'SETTINGS' | 'DEVICES';
 
 interface AdminTopNavProps {
   isSupabaseOnline: boolean;

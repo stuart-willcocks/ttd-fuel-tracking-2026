@@ -55,6 +55,17 @@ export interface Transaction {
   createdAt: string;
 }
 
+export type DeviceStatus = 'active' | 'pending' | 'revoked';
+
+export interface AuthorizedDevice {
+  deviceId: string;
+  deviceName?: string;
+  authToken: string;
+  status: DeviceStatus;
+  registeredAt: string;
+  lastSeenAt: string;
+}
+
 export type ActionType = 'check-in' | 'record-fuel' | 'check-out' | 'power-up' | 'power-down';
 
 export function generateUUID(): string {

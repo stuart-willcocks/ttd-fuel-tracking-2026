@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { X, Sparkles, CheckCircle2, Smartphone, Check } from 'lucide-react';
 import { APP_VERSION } from '../version';
-import { getDeviceId, setDeviceId } from '../services/device';
+import { getDeviceId, getDeviceName } from '../services/device';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -9,6 +9,7 @@ interface SettingsModalProps {
   hasUpdate: boolean;
   availableVersion: string | null;
   onUpdate: () => void;
+  onDeregister?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -17,38 +18,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   hasUpdate,
   availableVersion,
   onUpdate,
+  onDeregister,
 }) => {
-  const [savedDeviceId, setSavedDeviceId] = useState<string>('');
-  const [deviceIdInput, setDeviceIdInput] = useState<string>('');
-  const [isSaved, setIsSaved] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      const current = getDeviceId();
-      setDeviceIdInput(current);
-      setSavedDeviceId(current);
-      setIsSaved(false);
-    }
-  }, [isOpen]);
+  const currentDeviceId = getDeviceId();
+  const currentDeviceName = getDeviceName();
 
   if (!isOpen) return null;
-
-  const isDirty = deviceIdInput.trim() !== savedDeviceId && deviceIdInput.trim().length > 0;
-
-  const handleSaveDeviceId = () => {
-    const val = deviceIdInput.trim();
-    if (val && isDirty) {
-      setDeviceId(val);
-      setSavedDeviceId(val);
-      setDeviceIdInput(val);
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 2000);
-    }
-  };
-
-  const handleDeviceIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDeviceIdInput(e.target.value);
-  };
 
   const formatVersionTag = (v: string | number) => {
     const s = String(v).trim();
@@ -61,6 +36,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const versionText = hasUpdate && availableVerStr
     ? `Current version: ${currentVerStr} (${availableVerStr} is available)`
     : `Current version: ${currentVerStr} (latest)`;
+
+  const handleDeregisterClick = () => {
+    if (window.confirm(`Deregister this PDA (${currentDeviceId})? You will need to re-scan the Admin Enrollment QR code to use this scanner again.`)) {
+      onClose();
+      onDeregister?.();
+    }
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -80,39 +62,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Device ID Display & Edit */}
+        {/* Device ID & Authorization Card */}
         <div className="settings-device-card">
           <div className="settings-card-label-row">
             <Smartphone size={16} className="settings-card-icon" />
-            <span className="settings-card-label">Device ID</span>
-            {isSaved && (
-              <span className="settings-saved-pill">
-                <Check size={12} />
-                <span>Saved</span>
-              </span>
+            <span className="settings-card-label">PDA Device ID</span>
+            <span className="settings-saved-pill" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#16A34A', borderColor: 'rgba(34, 197, 94, 0.3)' }}>
+              <Check size={12} />
+              <span>Authorized</span>
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
+            <div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'monospace', color: 'var(--text-primary)' }}>
+                {currentDeviceId || 'UNREGISTERED'}
+              </div>
+              {currentDeviceName && currentDeviceName !== currentDeviceId && (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  {currentDeviceName}
+                </div>
+              )}
+            </div>
+            {onDeregister && (
+              <button
+                type="button"
+                className="btn-pda-rect"
+                style={{ padding: '6px 10px', fontSize: '0.78rem', color: '#EF4444', borderColor: '#EF4444', background: 'transparent' }}
+                onClick={handleDeregisterClick}
+              >
+                Deregister
+              </button>
             )}
           </div>
-          <div className="settings-input-row">
-            <input
-              type="text"
-              className="settings-device-input"
-              value={deviceIdInput}
-              onChange={handleDeviceIdChange}
-              placeholder="e.g. TC26-01"
-              spellCheck={false}
-              autoComplete="off"
-            />
-            <button
-              type="button"
-              disabled={!isDirty}
-              className="btn-pda-rect btn-pda-blue settings-device-save-btn"
-              onClick={handleSaveDeviceId}
-            >
-              Save
-            </button>
-          </div>
-          <div className="settings-card-helper">
-            Identifies all transactions uploaded from this handheld unit.
+          <div className="settings-card-helper" style={{ marginTop: '8px' }}>
+            Permanently assigned at registration. Recorded with all transactions.
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import type { Equipment, Transaction } from '../types';
+import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus } from '../types';
 import { db } from '../db/indexedDB';
 import {
   isSupabaseConfigured,
@@ -11,7 +11,14 @@ import {
   bulkImportEquipmentToSupabase,
   bulkImportTransactionsToSupabase,
   uploadTransactionToCloud,
+  fetchAuthorizedDevicesFromSupabase,
+  saveAuthorizedDeviceToSupabase,
+  updateDeviceStatusInSupabase,
+  deleteAuthorizedDeviceFromSupabase,
+  verifyDeviceTokenWithSupabase,
+  registerDeviceRequestToSupabase,
 } from './supabase';
+import { generateSecureDeviceToken } from './device';
 
 export async function fetchRemoteEquipment(): Promise<Equipment[]> {
   if (isSupabaseConfigured()) {
@@ -190,3 +197,136 @@ export async function bulkUploadEquipment(equipmentList: Equipment[]): Promise<n
   }
   return equipmentList.length;
 }
+
+const MOCK_DEVICES_KEY = 'ttd_mock_authorized_devices';
+
+function getMockDevices(): AuthorizedDevice[] {
+  try {
+    const raw = localStorage.getItem(MOCK_DEVICES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+
+function saveMockDevices(devices: AuthorizedDevice[]) {
+  try {
+    localStorage.setItem(MOCK_DEVICES_KEY, JSON.stringify(devices));
+  } catch {}
+}
+
+export async function fetchRemoteAuthorizedDevices(): Promise<AuthorizedDevice[]> {
+  if (isSupabaseConfigured()) {
+    try {
+      return await fetchAuthorizedDevicesFromSupabase();
+    } catch (err) {
+      console.warn('Supabase fetch devices failed:', err);
+    }
+  }
+  return getMockDevices();
+}
+
+export async function postRemoteAuthorizedDevice(device: AuthorizedDevice): Promise<void> {
+  if (isSupabaseConfigured()) {
+    try {
+      await saveAuthorizedDeviceToSupabase(device);
+      return;
+    } catch (err) {
+      console.warn('Supabase save device failed:', err);
+    }
+  }
+  const current = getMockDevices().filter((d) => d.deviceId !== device.deviceId);
+  current.unshift(device);
+  saveMockDevices(current);
+}
+
+export async function updateRemoteDeviceStatus(deviceId: string, status: DeviceStatus): Promise<void> {
+  if (isSupabaseConfigured()) {
+    try {
+      await updateDeviceStatusInSupabase(deviceId, status);
+      return;
+    } catch (err) {
+      console.warn('Supabase update device status failed:', err);
+    }
+  }
+  const current = getMockDevices();
+  const target = current.find((d) => d.deviceId === deviceId);
+  if (target) {
+    target.status = status;
+    target.lastSeenAt = new Date().toISOString();
+    saveMockDevices(current);
+  }
+}
+
+export async function deleteRemoteAuthorizedDevice(deviceId: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    try {
+      await deleteAuthorizedDeviceFromSupabase(deviceId);
+      return;
+    } catch (err) {
+      console.warn('Supabase delete device failed:', err);
+    }
+  }
+  const current = getMockDevices().filter((d) => d.deviceId !== deviceId);
+  saveMockDevices(current);
+}
+
+export async function verifyRemoteDeviceToken(
+  deviceId: string,
+  token: string
+): Promise<{ valid: boolean; status: DeviceStatus; deviceName?: string }> {
+  if (isSupabaseConfigured()) {
+    try {
+      return await verifyDeviceTokenWithSupabase(deviceId, token);
+    } catch (err) {
+      console.warn('Supabase verify device token failed:', err);
+    }
+  }
+  const current = getMockDevices();
+  const target = current.find((d) => d.deviceId === deviceId);
+  if (!target) {
+    return { valid: false, status: 'revoked' };
+  }
+  const match = target.authToken === token;
+  if (match && target.status === 'active') {
+    target.lastSeenAt = new Date().toISOString();
+    saveMockDevices(current);
+  }
+  return {
+    valid: match && target.status === 'active',
+    status: target.status,
+    deviceName: target.deviceName || target.deviceId,
+  };
+}
+
+export async function registerRemoteDeviceRequest(
+  deviceId: string,
+  deviceName?: string,
+  token?: string
+): Promise<{ status: DeviceStatus; token: string }> {
+  if (isSupabaseConfigured()) {
+    try {
+      return await registerDeviceRequestToSupabase(deviceId, deviceName, token);
+    } catch (err) {
+      console.warn('Supabase register device request failed:', err);
+    }
+  }
+  const current = getMockDevices();
+  const cleanId = deviceId.trim().toUpperCase();
+  const existing = current.find((d) => d.deviceId === cleanId);
+  if (existing) {
+    return { status: existing.status, token: existing.authToken };
+  }
+  const finalToken = token || generateSecureDeviceToken();
+  const now = new Date().toISOString();
+  current.unshift({
+    deviceId: cleanId,
+    deviceName: deviceName || cleanId,
+    authToken: finalToken,
+    status: 'pending',
+    registeredAt: now,
+    lastSeenAt: now,
+  });
+  saveMockDevices(current);
+  return { status: 'pending', token: finalToken };
+}
+

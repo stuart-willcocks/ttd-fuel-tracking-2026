@@ -1,19 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Boxes, ReceiptText } from 'lucide-react';
+import { Boxes, ReceiptText, Smartphone } from 'lucide-react';
 import './admin.css';
 import { LaptopOnlyGuard } from './components/LaptopOnlyGuard';
 import { AdminTopNav, type AdminViewType } from './components/AdminTopNav';
 import { AssetsView } from './views/AssetsView';
 import { TransactionsView } from './views/TransactionsView';
+import { DevicesView } from './views/DevicesView';
 import { SettingsView } from './views/SettingsView';
 import { AssetFormModal } from './components/AssetFormModal';
 import { DeleteAssetModal } from './components/DeleteAssetModal';
 import { AssetQRLabelModal } from './components/AssetQRLabelModal';
 import { TransactionDetailModal } from './components/TransactionDetailModal';
 import { DangerZoneModal } from './components/DangerZoneModal';
+import { RegisterDeviceModal } from './components/RegisterDeviceModal';
 import { ToastContainer, type ToastMessage } from './components/Toast';
 
-import type { Equipment, Transaction } from '../types';
+import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus } from '../types';
 import {
   fetchRemoteEquipment,
   postRemoteEquipment,
@@ -24,6 +26,10 @@ import {
   resetRemoteData,
   deleteAllFleetData,
   bulkUploadEquipment,
+  fetchRemoteAuthorizedDevices,
+  postRemoteAuthorizedDevice,
+  updateRemoteDeviceStatus,
+  deleteRemoteAuthorizedDevice,
 } from '../services/api';
 import { isSupabaseConfigured, subscribeToCloudChanges } from '../services/supabase';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
@@ -32,6 +38,7 @@ export const AdminApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<AdminViewType>('ASSETS');
   const [assets, setAssets] = useState<Equipment[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [devices, setDevices] = useState<AuthorizedDevice[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSupabaseOnline, setIsSupabaseOnline] = useState(false);
 
@@ -43,6 +50,8 @@ export const AdminApp: React.FC = () => {
   const [qrAsset, setQrAsset] = useState<Equipment | null>(null);
   const [inspectingTransaction, setInspectingTransaction] = useState<Transaction | null>(null);
   const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
+  const [isRegisterDeviceModalOpen, setIsRegisterDeviceModalOpen] = useState(false);
+  const [registeringDevice, setRegisteringDevice] = useState<AuthorizedDevice | null>(null);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -63,15 +72,17 @@ export const AdminApp: React.FC = () => {
   const loadFleetData = useCallback(async (silent = false) => {
     if (!silent) setIsRefreshing(true);
     try {
-      const [fetchedAssets, fetchedTxs] = await Promise.all([
+      const [fetchedAssets, fetchedTxs, fetchedDevices] = await Promise.all([
         fetchRemoteEquipment(),
         fetchRemoteTransactions(),
+        fetchRemoteAuthorizedDevices(),
       ]);
 
       // Power state of any generator is determined by its most recent power transaction (OFF by default)
       const reconciledAssets = reconcileEquipmentPowerStates(fetchedAssets, fetchedTxs);
       setAssets(reconciledAssets);
       setTransactions(fetchedTxs);
+      setDevices(fetchedDevices);
       setIsSupabaseOnline(isSupabaseConfigured());
     } catch (err: unknown) {
       console.error('Failed to load fleet data:', err);
@@ -88,7 +99,7 @@ export const AdminApp: React.FC = () => {
 
     // Auto-refresh interval every 30 seconds for live operations (pauses if editing modal is open)
     const interval = setInterval(() => {
-      if (isCreateModalOpen || Boolean(editingAsset)) return;
+      if (isCreateModalOpen || Boolean(editingAsset) || isRegisterDeviceModalOpen) return;
       loadFleetData(true);
     }, 30000);
 
@@ -96,7 +107,7 @@ export const AdminApp: React.FC = () => {
       document.body.classList.remove('admin-body');
       clearInterval(interval);
     };
-  }, [loadFleetData, isCreateModalOpen, editingAsset]);
+  }, [loadFleetData, isCreateModalOpen, editingAsset, isRegisterDeviceModalOpen]);
 
   // Real-time listener for database transactions and telemetry logged by field PDAs
   useEffect(() => {
@@ -105,7 +116,7 @@ export const AdminApp: React.FC = () => {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const unsubscribe = subscribeToCloudChanges((table, eventType) => {
       // Avoid clobbering user input when an asset creation or edit modal is active
-      if (isCreateModalOpen || Boolean(editingAsset)) return;
+      if (isCreateModalOpen || Boolean(editingAsset) || isRegisterDeviceModalOpen) return;
 
       console.log(`[Realtime Sync] ${table} event (${eventType}) from field PDA - refreshing`);
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -118,7 +129,7 @@ export const AdminApp: React.FC = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       unsubscribe();
     };
-  }, [loadFleetData, isCreateModalOpen, editingAsset]);
+  }, [loadFleetData, isCreateModalOpen, editingAsset, isRegisterDeviceModalOpen]);
 
   // Create / Update Asset Handler
   const handleSaveAsset = async (savedAsset: Equipment) => {
@@ -208,6 +219,45 @@ export const AdminApp: React.FC = () => {
     }
   };
 
+  // Device Handlers
+  const handleSaveDevice = async (device: AuthorizedDevice) => {
+    try {
+      await postRemoteAuthorizedDevice(device);
+      await loadFleetData(true);
+      showToast(`Device "${device.deviceId}" authorized successfully!`, 'success');
+      setIsRegisterDeviceModalOpen(false);
+      setRegisteringDevice(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Failed to save device: ${msg}`, 'error');
+      throw err;
+    }
+  };
+
+  const handleUpdateDeviceStatus = async (deviceId: string, status: DeviceStatus) => {
+    try {
+      await updateRemoteDeviceStatus(deviceId, status);
+      await loadFleetData(true);
+      showToast(`Device "${deviceId}" status updated to ${status}.`, 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Failed to update device status: ${msg}`, 'error');
+      throw err;
+    }
+  };
+
+  const handleDeleteDevice = async (deviceId: string) => {
+    try {
+      await deleteRemoteAuthorizedDevice(deviceId);
+      await loadFleetData(true);
+      showToast(`Device "${deviceId}" deleted from authorized devices.`, 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(`Failed to delete device: ${msg}`, 'error');
+      throw err;
+    }
+  };
+
   // Reset database handler
   const handleResetDatabase = async () => {
     if (window.confirm('Reset all equipment and transactions to initial seed defaults?')) {
@@ -292,6 +342,22 @@ export const AdminApp: React.FC = () => {
             <span>Transactions</span>
             <span className="admin-nav-tab-badge">{transactions.length}</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedAssetId(null);
+              setCurrentView('DEVICES');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`admin-nav-tab ${currentView === 'DEVICES' ? 'active' : ''}`}
+          >
+            <Smartphone size={18} />
+            <span>PDAs</span>
+            <span className="admin-nav-tab-badge">
+              {devices.filter((d) => d.status === 'active').length}
+            </span>
+          </button>
         </div>
 
         {/* Main Content Viewport spanning full width */}
@@ -328,6 +394,20 @@ export const AdminApp: React.FC = () => {
                 onOpenDeleteModal={(asset) => setAssetPendingDelete(asset)}
                 onOpenQRModal={(asset) => setQrAsset(asset)}
                 onTogglePower={handleTogglePower}
+              />
+            )}
+
+            {currentView === 'DEVICES' && (
+              <DevicesView
+                devices={devices}
+                onOpenRegisterModal={(dev) => {
+                  setRegisteringDevice(dev || null);
+                  setIsRegisterDeviceModalOpen(true);
+                }}
+                onUpdateStatus={handleUpdateDeviceStatus}
+                onDeleteDevice={handleDeleteDevice}
+                onRefresh={() => loadFleetData()}
+                isRefreshing={isRefreshing}
               />
             )}
 
@@ -400,6 +480,19 @@ export const AdminApp: React.FC = () => {
               setInspectingTransaction(null);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
+          />
+        )}
+
+        {/* Device Registration & QR Code Modal */}
+        {isRegisterDeviceModalOpen && (
+          <RegisterDeviceModal
+            isOpen={isRegisterDeviceModalOpen}
+            existingDevice={registeringDevice}
+            onClose={() => {
+              setIsRegisterDeviceModalOpen(false);
+              setRegisteringDevice(null);
+            }}
+            onSaveDevice={handleSaveDevice}
           />
         )}
 
