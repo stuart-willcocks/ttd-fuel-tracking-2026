@@ -7,7 +7,6 @@ import {
   ShieldAlert,
   Clock,
   Trash2,
-  Search,
   CheckCircle2,
   RefreshCw,
   Copy,
@@ -21,7 +20,7 @@ import {
   Zap,
 } from 'lucide-react';
 import type { AuthorizedDevice, DeviceStatus } from '../../types';
-import { SUPABASE_SQL_MIGRATION, TELEMETRY_SQL_MIGRATION, checkNativeTelemetryColumns } from '../../services/supabase';
+import { TELEMETRY_SQL_MIGRATION, checkNativeTelemetryColumns } from '../../services/supabase';
 
 interface DevicesViewProps {
   devices: AuthorizedDevice[];
@@ -40,9 +39,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   onRefresh,
   isRefreshing,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | DeviceStatus>('ALL');
-  const [copiedSql, setCopiedSql] = useState(false);
   const [copiedTelemetrySql, setCopiedTelemetrySql] = useState(false);
   const [hasNativeTelemetryColumns, setHasNativeTelemetryColumns] = useState<boolean | null>(null);
   const [showSqlDetails, setShowSqlDetails] = useState(false);
@@ -60,12 +57,6 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  const handleCopyMigrationSql = () => {
-    navigator.clipboard.writeText(SUPABASE_SQL_MIGRATION);
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2500);
-  };
-
   const handleCopyTelemetrySql = () => {
     navigator.clipboard.writeText(TELEMETRY_SQL_MIGRATION);
     setCopiedTelemetrySql(true);
@@ -82,21 +73,19 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     };
   }, [devices]);
 
-  // Filtered devices
+  // Filtered and sorted devices (ascending by deviceId)
   const filteredDevices = useMemo(() => {
-    return devices.filter((dev) => {
-      if (statusFilter !== 'ALL' && dev.status !== statusFilter) {
-        return false;
-      }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const idMatch = dev.deviceId.toLowerCase().includes(q);
-        const nameMatch = (dev.deviceName || '').toLowerCase().includes(q);
-        if (!idMatch && !nameMatch) return false;
-      }
-      return true;
-    });
-  }, [devices, statusFilter, searchQuery]);
+    return devices
+      .filter((dev) => {
+        if (statusFilter !== 'ALL' && dev.status !== statusFilter) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) =>
+        a.deviceId.localeCompare(b.deviceId, undefined, { numeric: true, sensitivity: 'base' })
+      );
+  }, [devices, statusFilter]);
 
   const formatDate = (isoString?: string) => {
     if (!isoString) return '—';
@@ -302,26 +291,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               margin: 0,
             }}
           >
-            Authorized Field PDAs
+            Authorized devices
           </h1>
-          <p style={{ fontSize: '0.82rem', color: 'var(--adm-text-secondary)', margin: '2px 0 0 0' }}>
-            Manage Zebra TC26 hardware scanner authorization, whitelisting, and remote access
-          </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            type="button"
-            onClick={handleCopyMigrationSql}
-            className="admin-btn admin-btn-outline"
-            title="Copy SQL migration to create the authorized_devices table in your Supabase database"
-          >
-            {copiedSql ? <Check size={14} color="#10B981" /> : <Copy size={14} />}
-            <span style={{ color: copiedSql ? '#10B981' : undefined }}>
-              {copiedSql ? 'Copied Migration SQL!' : 'Copy SQL Migration'}
-            </span>
-          </button>
-
           <button
             type="button"
             onClick={onRefresh}
@@ -431,62 +405,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         </div>
       )}
 
-      {/* Summary KPI Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '14px',
-          marginBottom: '20px',
-        }}
-      >
-        <div className="admin-card" style={{ padding: '14px 18px', margin: 0 }}>
-          <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
-            Total Enrolled
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--adm-text-primary)', marginTop: '4px' }}>
-            {counts.total}
-          </div>
-        </div>
-
-        <div className="admin-card" style={{ padding: '14px 18px', margin: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="pulse-dot green" />
-            <span style={{ fontSize: '0.74rem', textTransform: 'uppercase', color: '#16A34A', fontWeight: 700 }}>
-              Active &amp; Authorized
-            </span>
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16A34A', marginTop: '4px' }}>
-            {counts.active}
-          </div>
-        </div>
-
-        <div className="admin-card" style={{ padding: '14px 18px', margin: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="pulse-dot amber" />
-            <span style={{ fontSize: '0.74rem', textTransform: 'uppercase', color: '#D97706', fontWeight: 700 }}>
-              Pending Approval
-            </span>
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#D97706', marginTop: '4px' }}>
-            {counts.pending}
-          </div>
-        </div>
-
-        <div className="admin-card" style={{ padding: '14px 18px', margin: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="pulse-dot slate" style={{ background: '#DC2626' }} />
-            <span style={{ fontSize: '0.74rem', textTransform: 'uppercase', color: '#DC2626', fontWeight: 700 }}>
-              Revoked / Locked
-            </span>
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#DC2626', marginTop: '4px' }}>
-            {counts.revoked}
-          </div>
-        </div>
-      </div>
-
-      {/* Controls Bar: Search & Status Filters */}
+      {/* Controls Bar: Status Filters */}
       <div
         style={{
           display: 'flex',
@@ -501,18 +420,6 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           border: '1px solid var(--adm-border-subtle)',
         }}
       >
-        <div style={{ position: 'relative', width: '280px' }}>
-          <Search size={15} style={{ position: 'absolute', left: '10px', top: '10px', color: '#94A3B8' }} />
-          <input
-            type="text"
-            className="admin-input"
-            style={{ paddingLeft: '32px', width: '100%' }}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by Device ID or Name..."
-          />
-        </div>
-
         {/* Filter Pills */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {[
@@ -565,7 +472,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             <p style={{ fontSize: '0.84rem', margin: '4px 0 16px 0' }}>
               {devices.length === 0
                 ? 'No handheld scanners have been registered yet. Click "Register New PDA" to authorize your first Zebra scanner.'
-                : 'No devices match your search or filter criteria.'}
+                : 'No devices match your filter criteria.'}
             </p>
             {devices.length === 0 && (
               <button
