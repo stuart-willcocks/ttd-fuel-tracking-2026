@@ -283,23 +283,27 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           <span>Check Out</span>
         </button>
 
-        <button
-          type="button"
-          className="btn-pda-rect btn-pda-green"
-          onClick={() => onSelectAction('power-up')}
-        >
-          <Power size={20} />
-          <span>Mark powered up</span>
-        </button>
+        {isGenerator && (
+          <button
+            type="button"
+            className="btn-pda-rect btn-pda-green"
+            onClick={() => onSelectAction('power-up')}
+          >
+            <Power size={18} />
+            <span>Mark powered up</span>
+          </button>
+        )}
 
-        <button
-          type="button"
-          className="btn-pda-rect btn-pda-slate"
-          onClick={() => onSelectAction('power-down')}
-        >
-          <PowerOff size={20} />
-          <span>Mark powered down</span>
-        </button>
+        {isGenerator && (
+          <button
+            type="button"
+            className="btn-pda-rect btn-pda-slate"
+            onClick={() => onSelectAction('power-down')}
+          >
+            <PowerOff size={18} />
+            <span>Mark powered down</span>
+          </button>
+        )}
 
         <button
           type="button"

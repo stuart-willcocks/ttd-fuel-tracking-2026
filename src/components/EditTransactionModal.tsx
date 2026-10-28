@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Trash2, Check, Minus, Plus, Power, PowerOff, Lock, Unlock, Pencil } from 'lucide-react';
+import { Trash2, Check, Power, PowerOff, Lock, Unlock, Pencil } from 'lucide-react';
 import { IconCancel } from './icons/AppIcons';
 import type { Equipment, Transaction } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
@@ -548,33 +548,9 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
               </div>
             )}
 
-            {/* Tank Check In / Check Out (Eighths Spinner) */}
+            {/* Tank Check In / Check Out (Eighths Preset Buttons) */}
             {(isCheckIn || isCheckOut) && isTank && (
               <div className="old-form-grid" style={{ gap: '8px', marginBottom: '8px', maxWidth: '310px' }}>
-                <div className="edit-tx-row">
-                  <span className="edit-tx-lbl">Fuel level</span>
-                  <div className="old-tank-spinner">
-                    <button
-                      type="button"
-                      className="old-btn-step"
-                      disabled={fuelEighths !== null && fuelEighths <= 0}
-                      onClick={() => setFuelEighths((p) => Math.max(0, (p ?? 1) - 1))}
-                    >
-                      <Minus size={18} />
-                    </button>
-                    <span className="old-tank-val">{fuelEighths !== null ? `${fuelEighths} / 8` : '— / 8'}</span>
-                    <button
-                      type="button"
-                      className="old-btn-step"
-                      disabled={fuelEighths !== null && fuelEighths >= 8}
-                      onClick={() => setFuelEighths((p) => Math.min(8, (p ?? -1) + 1))}
-                    >
-                      <Plus size={18} />
-                    </button>
-                  </div>
-                  <span className="edit-tx-unit">eighths</span>
-                </div>
-
                 <div className="old-tank-chips-row">
                   {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((v) => (
                     <button

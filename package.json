@@ -1,7 +1,7 @@
 {
   "name": "ttd-fuel-tracking",
   "private": true,
-  "version": "129",
+  "version": "130",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -5,7 +5,6 @@ import { getDeviceId, getDeviceName } from '../services/device';
 import {
   getBatteryStatus,
   getCachedTelemetryStatus,
-  requestLocationPermission,
 } from '../services/telemetry';
 
 interface SettingsModalProps {
@@ -24,11 +23,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   hasUpdate,
   availableVersion,
   onUpdate,
-  onDeregister,
   onOpenEnrollment,
 }) => {
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
   const [telemetry, setTelemetry] = useState(() => getCachedTelemetryStatus());
   const [batteryInfo, setBatteryInfo] = useState<{ batteryLevel: number; isCharging: boolean } | null>(null);
 
@@ -44,18 +41,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, [isOpen]);
 
-  const handleRefreshGps = async () => {
-    setIsLocating(true);
-    try {
-      await requestLocationPermission();
-      setTelemetry(getCachedTelemetryStatus());
-      const b = await getBatteryStatus();
-      if (b) setBatteryInfo(b);
-    } finally {
-      setIsLocating(false);
-    }
-  };
-
   if (!isOpen) return null;
 
   const formatVersionTag = (v: string | number) => {
@@ -69,13 +54,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const versionText = hasUpdate && availableVerStr
     ? `Current version: ${currentVerStr} (${availableVerStr} is available)`
     : `Current version: ${currentVerStr} (latest)`;
-
-  const handleDeregisterClick = () => {
-    if (window.confirm(`Deregister this PDA (${currentDeviceId})? You will need to re-scan the Admin Enrollment QR code to use this scanner again.`)) {
-      onClose();
-      onDeregister?.();
-    }
-  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -122,16 +100,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               )}
             </div>
-            {currentDeviceId && onDeregister ? (
-              <button
-                type="button"
-                className="btn-pda-rect"
-                style={{ padding: '6px 10px', fontSize: '0.78rem', color: '#EF4444', borderColor: '#EF4444', background: 'transparent' }}
-                onClick={handleDeregisterClick}
-              >
-                Deregister
-              </button>
-            ) : onOpenEnrollment ? (
+            {!currentDeviceId && onOpenEnrollment ? (
               <button
                 type="button"
                 className="btn-pda-rect"
@@ -144,11 +113,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 Pair Scanner
               </button>
             ) : null}
-          </div>
-          <div className="settings-card-helper" style={{ marginTop: '8px' }}>
-            {currentDeviceId
-              ? 'Permanently assigned at registration. Recorded with all transactions.'
-              : 'Pair with Admin Console QR code to permanently identify this PDA.'}
           </div>
         </div>
 
@@ -178,29 +142,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   : (telemetry.lastLocationError || 'Waiting for fix...')}
               </span>
             </div>
-
-            <button
-              type="button"
-              className="btn-pda-rect"
-              style={{
-                marginTop: '4px',
-                padding: '7px 12px',
-                fontSize: '0.78rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                background: 'rgba(59, 130, 246, 0.1)',
-                color: '#2563EB',
-                borderColor: '#2563EB',
-                fontWeight: 700,
-              }}
-              disabled={isLocating}
-              onClick={handleRefreshGps}
-            >
-              <RefreshCw size={13} className={isLocating ? 'spinning' : ''} />
-              <span>{isLocating ? 'Acquiring GPS Satellite Fix...' : 'Refresh GPS / Request Permission'}</span>
-            </button>
           </div>
         </div>
 

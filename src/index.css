@@ -326,8 +326,7 @@ html.is-desktop-browser .app-root {
 }
 
 /* ==========================================================================
-   APP_HEADER (App Title, Version, Online Indicator, Refresh / Queue Indicator)
-   Clean White Background, High-Contrast Typography
+   APP_HEADER (Brand Orange #EC721E matching Admin Console)
    ========================================================================== */
 
 .app-header {
@@ -335,65 +334,69 @@ html.is-desktop-browser .app-root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
-  background-color: var(--bg-header);
-  color: var(--text-main);
+  padding: 6px 10px;
+  background-color: #EC721E !important;
+  color: #FFFFFF;
   min-height: 48px;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: none;
   border-radius: 0px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .header-title-box {
   display: flex;
   align-items: center;
+  gap: 8px;
   min-width: 0;
   user-select: none;
 }
 
-.header-text-col {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.header-company-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-main);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
-}
-
-.header-sub-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 2px;
+.header-logo {
+  height: 32px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
 }
 
 .header-app-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--btn-blue-bg);
+  font-size: 13px;
+  font-weight: 800;
+  color: #FFFFFF;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
 .header-version-pill {
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--bg-surface-hover);
-  border: 1px solid var(--border-subtle);
-  padding: 1px 5px;
-  border-radius: 0px !important;
+  font-weight: 700;
+  color: #FFFFFF;
+  background: rgba(0, 0, 0, 0.25);
+  border: none;
+  padding: 2px 6px;
+  border-radius: 4px !important;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.header-version-alert-mark {
+  background: #EF4444;
+  color: #FFFFFF;
+  font-weight: 900;
+  font-size: 10px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .header-status-box {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex-shrink: 0;
 }
 
@@ -401,9 +404,9 @@ html.is-desktop-browser .app-root {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-surface-hover);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #FFFFFF;
   width: 30px;
   height: 30px;
   padding: 0;
@@ -412,36 +415,36 @@ html.is-desktop-browser .app-root {
 }
 
 .status-pill.online {
-  color: var(--btn-green-bg);
-  border-color: rgba(22, 163, 74, 0.3);
-  background: rgba(22, 163, 74, 0.08);
+  color: #4ADE80;
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.22);
 }
 
 .status-pill.offline {
-  color: var(--btn-red-bg);
-  border-color: rgba(220, 38, 38, 0.3);
-  background: rgba(220, 38, 38, 0.08);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.4);
+  background: #DC2626;
 }
 
 .pending-pill {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(220, 38, 38, 0.08);
-  color: var(--btn-red-bg);
-  border: 1px solid rgba(220, 38, 38, 0.3);
+  background: #DC2626;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.4);
   padding: 3px 7px;
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
   height: 30px;
-  border-radius: 0px !important;
+  border-radius: 4px !important;
 }
 
 .icon-btn {
-  background: var(--bg-surface-hover);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #FFFFFF;
   width: 30px;
   height: 30px;
   display: flex;
@@ -452,9 +455,9 @@ html.is-desktop-browser .app-root {
 }
 
 .icon-btn:hover {
-  background: #F1F5F9;
-  color: var(--text-main);
-  border-color: var(--border-medium);
+  background: rgba(255, 255, 255, 0.28);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.45);
 }
 
 .icon-btn.settings-btn.has-attention {
@@ -880,8 +883,8 @@ html.is-desktop-browser .app-root {
 }
 
 .asset-detail-w3w {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 15px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
   font-weight: 700;
   color: var(--btn-blue-bg);
   letter-spacing: 0.2px;
@@ -1085,12 +1088,26 @@ html.is-desktop-browser .app-root {
   border-radius: 0px !important;
 }
 
-.asset-detail-btn-stack .btn-pda-rect {
+.asset-detail-btn-stack .btn-pda-rect,
+.asset-detail-btn-stack .btn-pda-green,
+.asset-detail-btn-stack .btn-pda-blue,
+.asset-detail-btn-stack .btn-pda-red,
+.asset-detail-btn-stack .btn-pda-slate {
   width: 100% !important;
   height: 42px !important;
-  font-size: 13px !important;
-  padding: 0 4px !important;
+  font-size: 11.5px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  padding: 0 6px !important;
   gap: 5px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.asset-detail-btn-stack .btn-pda-rect svg {
+  flex-shrink: 0 !important;
+  display: block !important;
 }
 
 /* ==========================================================================
@@ -1529,23 +1546,25 @@ html.is-desktop-browser .app-root {
 }
 
 .old-tank-chips-row {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
   margin-top: 8px;
 }
 
 .old-tank-chip {
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 600;
+  padding: 12px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
   background-color: #FFFFFF;
   border: 1px solid var(--border-medium);
   color: var(--text-main);
   cursor: pointer;
-  border-radius: 0px !important;
+  border-radius: 4px !important;
   transition: all 0.15s ease;
+  text-align: center;
 }
 
 .old-tank-chip.active {

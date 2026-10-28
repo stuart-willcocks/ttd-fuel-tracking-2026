@@ -34,48 +34,44 @@ export const Header: React.FC<HeaderProps> = ({
   const isStaging = getIsStaging();
   return (
     <header className="app-header">
-      {/* Top Left: App Title and Version (Vnn) */}
+      {/* Top Left: TTD Logo, App Title ("TTD Fuel Tracking" in white), and Version Chip */}
       <div
         className="header-title-box"
         onClick={onShowSplash}
         style={{ cursor: onShowSplash ? 'pointer' : 'default' }}
-        title="The Technical Department Ltd"
+        title="TTD Fuel Tracking"
       >
-        <div className="header-text-col">
-          <div className="header-company-name">The Technical Department Ltd</div>
-          <div className="header-sub-row">
-            <span className="header-app-title">Fuel Tracking</span>
-            {hasUpdate ? (
-              <span
-                className="header-version-pill"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onOpenUpdate) {
-                    onOpenUpdate();
-                  } else {
-                    onOpenSettings?.();
-                  }
-                }}
-                title={`Update available: ${availableVersion ? `V${availableVersion}` : 'New version'}. Tap to update.`}
-                style={{
-                  cursor: 'pointer',
-                  background: 'rgba(236, 114, 30, 0.25)',
-                  border: '1px solid #EC721E',
-                  color: '#FFB020',
-                  fontWeight: 800,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '3px',
-                }}
-              >
-                <span>V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
-                <span style={{ fontSize: '0.66rem' }}>⚡ V{availableVersion || ''}</span>
-              </span>
-            ) : (
-              <span className="header-version-pill">V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
-            )}
-          </div>
-        </div>
+        <img
+          src="/logo-01.png"
+          alt="The Technical Department Ltd"
+          className="header-logo"
+        />
+        <span className="header-app-title">TTD Fuel Tracking</span>
+        {hasUpdate ? (
+          <span
+            className="header-version-pill"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenUpdate) {
+                onOpenUpdate();
+              } else {
+                onOpenSettings?.();
+              }
+            }}
+            title={`Update available: ${availableVersion ? `V${availableVersion}` : 'New version'}. Tap to update.`}
+            style={{
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <span>V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
+            <span className="header-version-alert-mark">!</span>
+          </span>
+        ) : (
+          <span className="header-version-pill">V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
+        )}
       </div>
 
       {/* Top Right: Upload Queue, Refresh, Connection Status, Settings */}

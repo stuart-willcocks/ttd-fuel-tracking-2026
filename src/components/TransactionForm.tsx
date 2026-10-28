@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Minus, Plus } from 'lucide-react';
 import { IconSubmit, IconCancel } from './icons/AppIcons';
 import type { Equipment, ActionType, Transaction, TransactionType } from '../types';
 import { EquipmentTypeIcon } from './EquipmentTypeIcon';
@@ -363,40 +362,10 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           )}
 
           {/* ======================================================= */}
-          {/* Tank Check In / Check Out (Eighths Spinner Control)     */}
+          {/* Tank Check In / Check Out (Eighths Preset Buttons)      */}
           {/* ======================================================= */}
           {(action === 'check-in' || action === 'check-out') && isTank && (
             <div className="old-form-grid">
-              <div className="old-form-row">
-                <span className="old-form-lbl">Fuel level</span>
-                <div className="old-tank-spinner">
-                  <button
-                    type="button"
-                    className="old-btn-step"
-                    disabled={fuelEighths !== null && fuelEighths <= 0}
-                    onClick={() => {
-                      setFuelEighths((p) => Math.max(0, (p ?? 1) - 1));
-                      setTankSpinnerInteracted(true);
-                    }}
-                  >
-                    <Minus size={18} />
-                  </button>
-                  <span className="old-tank-val">{fuelEighths !== null ? `${fuelEighths} / 8` : '— / 8'}</span>
-                  <button
-                    type="button"
-                    className="old-btn-step"
-                    disabled={fuelEighths !== null && fuelEighths >= 8}
-                    onClick={() => {
-                      setFuelEighths((p) => Math.min(8, (p ?? -1) + 1));
-                      setTankSpinnerInteracted(true);
-                    }}
-                  >
-                    <Plus size={18} />
-                  </button>
-                </div>
-                <span className="old-form-unit">eighths</span>
-              </div>
-
               <div className="old-tank-chips-row">
                 {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((v) => (
                   <button
