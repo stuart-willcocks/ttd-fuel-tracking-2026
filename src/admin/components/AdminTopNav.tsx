@@ -4,7 +4,8 @@ import {
   Smartphone,
   ExternalLink,
 } from 'lucide-react';
-import { APP_VERSION, BUILD_NUMBER, getIsStaging } from '../../version';
+import { APP_VERSION, getIsStaging } from '../../version';
+import { checkRemoteAppVersion, performAppUpdate } from '../../services/appUpdate';
 
 export type AdminViewType = 'ASSETS' | 'TRANSACTIONS' | 'SETTINGS' | 'DEVICES';
 
@@ -20,21 +21,15 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
   onRefresh,
 }) => {
   const [hasNewVersion, setHasNewVersion] = useState(false);
+  const [newVersionTag, setNewVersionTag] = useState<string | null>(null);
   const isStaging = getIsStaging();
 
   useEffect(() => {
     const checkVersion = async () => {
-      try {
-        const res = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' });
-        if (res.ok) {
-          const remoteData = await res.json();
-          const remoteBuild = Number(remoteData.build || remoteData.version);
-          if (remoteBuild && remoteBuild > BUILD_NUMBER) {
-            setHasNewVersion(true);
-          }
-        }
-      } catch {
-        // Offline or network error
+      const res = await checkRemoteAppVersion();
+      if (res.hasUpdate) {
+        setHasNewVersion(true);
+        if (res.remoteVersion) setNewVersionTag(res.remoteVersion);
       }
     };
 
@@ -61,12 +56,21 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
         <span className="admin-console-label">ADMIN CONSOLE</span>
 
         {/* Version number with optional (STAGING) and update exclamation mark */}
-        <span className="admin-version-tag">
+        <span
+          className="admin-version-tag"
+          onClick={() => {
+            if (hasNewVersion) {
+              performAppUpdate(newVersionTag || undefined);
+            }
+          }}
+          style={{ cursor: hasNewVersion ? 'pointer' : 'default' }}
+          title={hasNewVersion ? `Update to V${newVersionTag || ''} available. Click to reload with latest version.` : undefined}
+        >
           <span>V{APP_VERSION}{isStaging ? ' (STAGING)' : ''}</span>
           {hasNewVersion && (
             <span
               className="admin-version-alert-mark"
-              title="A new app version is available. Click refresh to update."
+              title="A new app version is available. Click to update now."
             >
               !
             </span>

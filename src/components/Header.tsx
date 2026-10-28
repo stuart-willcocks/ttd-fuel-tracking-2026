@@ -7,23 +7,27 @@ interface HeaderProps {
   syncState: SyncState;
   isFullscreen?: boolean;
   hasUpdate?: boolean;
+  availableVersion?: string | null;
   settingsRequiresAttention?: boolean;
   onToggleSimulatedOffline: () => void;
   onTriggerSync: () => void;
   onToggleFullscreen?: () => void;
   onOpenOutbox: () => void;
   onOpenSettings?: () => void;
+  onOpenUpdate?: () => void;
   onShowSplash?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   syncState,
   hasUpdate = false,
+  availableVersion,
   settingsRequiresAttention,
   onToggleSimulatedOffline,
   onTriggerSync,
   onOpenOutbox,
   onOpenSettings,
+  onOpenUpdate,
   onShowSplash,
 }) => {
   const requiresAttention = settingsRequiresAttention ?? hasUpdate;
@@ -40,7 +44,35 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="header-company-name">The Technical Department Ltd</div>
           <div className="header-sub-row">
             <span className="header-app-title">Fuel Tracking</span>
-            <span className="header-version-pill">V{APP_VERSION}</span>
+            {hasUpdate ? (
+              <span
+                className="header-version-pill"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onOpenUpdate) {
+                    onOpenUpdate();
+                  } else {
+                    onOpenSettings?.();
+                  }
+                }}
+                title={`Update available: ${availableVersion ? `V${availableVersion}` : 'New version'}. Tap to update.`}
+                style={{
+                  cursor: 'pointer',
+                  background: 'rgba(236, 114, 30, 0.25)',
+                  border: '1px solid #EC721E',
+                  color: '#FFB020',
+                  fontWeight: 800,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                }}
+              >
+                <span>V{APP_VERSION}</span>
+                <span style={{ fontSize: '0.66rem' }}>⚡ V{availableVersion || ''}</span>
+              </span>
+            ) : (
+              <span className="header-version-pill">V{APP_VERSION}</span>
+            )}
           </div>
         </div>
       </div>

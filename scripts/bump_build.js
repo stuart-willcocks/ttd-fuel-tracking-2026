@@ -35,6 +35,12 @@ try {
 } catch {
   // Ignore if public directory not found
 }
+const distDir = path.join(rootDir, 'dist');
+if (fs.existsSync(distDir)) {
+  try {
+    fs.writeFileSync(path.join(distDir, 'version.json'), JSON.stringify(versionData, null, 2) + '\n', 'utf-8');
+  } catch {}
+}
 
 import { execSync } from 'child_process';
 

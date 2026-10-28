@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Sparkles, CheckCircle2, Smartphone, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Sparkles, CheckCircle2, Smartphone, Check, RefreshCw } from 'lucide-react';
 import { APP_VERSION } from '../version';
 import { getDeviceId, getDeviceName } from '../services/device';
 
@@ -22,6 +22,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onDeregister,
   onOpenEnrollment,
 }) => {
+  const [isUpdating, setIsUpdating] = useState(false);
   const currentDeviceId = getDeviceId();
   const currentDeviceName = getDeviceName();
 
@@ -136,9 +137,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <button
               type="button"
               className="btn-pda-rect btn-pda-green settings-update-btn"
-              onClick={onUpdate}
+              disabled={isUpdating}
+              onClick={() => {
+                setIsUpdating(true);
+                onUpdate();
+              }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
             >
-              Update to {availableVerStr}
+              {isUpdating ? (
+                <>
+                  <RefreshCw size={14} className="spinning" />
+                  <span>Applying Update...</span>
+                </>
+              ) : (
+                <span>Update to {availableVerStr}</span>
+              )}
             </button>
           )}
         </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db, initializeDatabase } from './db/indexedDB';
 import { syncEngine, type SyncState } from './services/syncEngine';
 import { type Equipment, type Transaction, type ActionType, generateUUID } from './types';
-import { BUILD_NUMBER } from './version';
+import { checkRemoteAppVersion, performAppUpdate } from './services/appUpdate';
 import { Header } from './components/Header';
 import { ScannerView } from './components/ScannerView';
 import { AssetDetailView } from './components/AssetDetailView';
@@ -265,41 +265,11 @@ export const App: React.FC = () => {
   const [availableVersion, setAvailableVersion] = useState<string | null>(null);
 
   const checkForAppUpdate = useCallback(async () => {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
-      const res = await fetch(`/version.json?t=${Date.now()}`, {
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        const remoteData = await res.json();
-        const remoteBuild = Number(remoteData.build);
-        if (remoteBuild && remoteBuild > BUILD_NUMBER) {
-          const remoteVer = String(remoteData.version || remoteData.build);
-          setAvailableVersion(remoteVer);
-          setHasUpdate(true);
-          return;
-        }
-      }
-    } catch {
-      // Offline / network failure
-    }
-
-    // Check service worker for waiting updates
-    if ('serviceWorker' in navigator) {
-      try {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          await reg.update();
-          if (reg.waiting || reg.installing) {
-            setHasUpdate(true);
-            setAvailableVersion((prev) => prev || String(BUILD_NUMBER + 1));
-          }
-        }
-      } catch {
-        // Ignore SW check error
+    const res = await checkRemoteAppVersion();
+    if (res.hasUpdate) {
+      setHasUpdate(true);
+      if (res.remoteVersion) {
+        setAvailableVersion(res.remoteVersion);
       }
     }
   }, []);
@@ -694,11 +664,13 @@ export const App: React.FC = () => {
         syncState={syncState}
         isFullscreen={isFullscreen}
         hasUpdate={hasUpdate}
+        availableVersion={availableVersion}
         onToggleSimulatedOffline={() => syncEngine.toggleSimulatedOffline()}
         onTriggerSync={() => syncEngine.syncWithRemote()}
         onToggleFullscreen={toggleFullscreen}
         onOpenOutbox={() => setIsOutboxModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenUpdate={() => setIsSettingsModalOpen(true)}
         onShowSplash={() => setCurrentView('SPLASH_SCREEN')}
       />
 
@@ -785,8 +757,7 @@ export const App: React.FC = () => {
         hasUpdate={hasUpdate}
         availableVersion={availableVersion}
         onUpdate={() => {
-          setIsSettingsModalOpen(false);
-          setCurrentView('SPLASH_SCREEN');
+          performAppUpdate(availableVersion || undefined);
         }}
         onDeregister={() => {
           syncEngine.lockdownRevokedDevice();
