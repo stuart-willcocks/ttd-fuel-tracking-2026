@@ -8,6 +8,7 @@ import {
   getDeviceId,
   getDeviceToken,
   markDeviceRevoked,
+  saveDeviceEnrollment,
   onDeviceAuthBroadcast,
 } from './device';
 import { verifyRemoteDeviceToken } from './api';
@@ -423,6 +424,14 @@ class SyncEngine {
         this.lastAuthCheckResult = false;
         await this.lockdownRevokedDevice();
         return false;
+      }
+      if (check.authToken && check.authToken !== currentToken) {
+        saveDeviceEnrollment({
+          deviceId: currentDevId,
+          deviceName: check.deviceName || currentDevId,
+          authToken: check.authToken,
+          status: 'active',
+        });
       }
       this.lastAuthCheckResult = true;
       this.lastAuthCheckTime = now;

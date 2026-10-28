@@ -9,7 +9,7 @@ import {
   AlertTriangle,
   ShieldCheck,
 } from 'lucide-react';
-import { saveDeviceEnrollment, getDeviceStatus } from '../services/device';
+import { saveDeviceEnrollment, getDeviceStatus, getDeviceId } from '../services/device';
 import { verifyRemoteDeviceToken, registerRemoteDeviceRequest, postRemoteAuthorizedDevice } from '../services/api';
 
 interface DeviceEnrollmentViewProps {
@@ -207,8 +207,19 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
   // Manual submission handler
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanId = deviceIdInput.trim().toUpperCase();
-    const cleanToken = authTokenInput.trim();
+    let cleanId = deviceIdInput.trim().toUpperCase();
+    let cleanToken = authTokenInput.trim();
+
+    // If user pasted a full TTD-ENROLL:... string into either field, parse it automatically
+    const parsedFromToken = cleanToken ? parseEnrollmentString(cleanToken) : null;
+    const parsedFromId = cleanId ? parseEnrollmentString(cleanId) : null;
+    if (parsedFromToken) {
+      if (!cleanId) cleanId = parsedFromToken.deviceId;
+      cleanToken = parsedFromToken.token;
+    } else if (parsedFromId) {
+      cleanId = parsedFromId.deviceId;
+      if (!cleanToken) cleanToken = parsedFromId.token;
+    }
 
     if (!cleanId) {
       setErrorMsg('Please enter a valid Device ID (e.g. TC26-01).');
@@ -225,8 +236,11 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
         return;
       }
 
-      // No token provided: submit registration request to Admin
+      // No token provided: submit registration request to Admin (or match existing active device)
       const reg = await registerRemoteDeviceRequest(cleanId);
+      if (reg.token) {
+        setAuthTokenInput(reg.token);
+      }
       if (reg.status === 'active') {
         saveDeviceEnrollment({
           deviceId: cleanId,
@@ -249,6 +263,41 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
     }
   };
 
+  // Auto-recover if this browser already has a stored Device ID that is 'active' in the Admin Console
+  // (e.g. after Admin clicks Re-Activate or after manual approval)
+  useEffect(() => {
+    const storedId = getDeviceId();
+    if (!storedId || pendingApprovalDeviceId) return;
+
+    let cancelled = false;
+    const checkStoredDevice = async () => {
+      try {
+        const check = await verifyRemoteDeviceToken(storedId, '');
+        if (!cancelled && check.valid && check.status === 'active' && check.authToken) {
+          saveDeviceEnrollment({
+            deviceId: storedId,
+            deviceName: check.deviceName || storedId,
+            authToken: check.authToken,
+            status: 'active',
+          });
+          setSuccessMsg(`Device ${storedId} is active and authorized!`);
+          setTimeout(() => {
+            if (!cancelled) onEnrolled();
+          }, 500);
+        }
+      } catch {
+        // Ignore offline errors
+      }
+    };
+
+    checkStoredDevice();
+    const interval = setInterval(checkStoredDevice, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [pendingApprovalDeviceId, onEnrolled]);
+
   // Auto-poll approval status if pending manual approval
   useEffect(() => {
     if (!pendingApprovalDeviceId) return;
@@ -260,7 +309,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
           saveDeviceEnrollment({
             deviceId: pendingApprovalDeviceId,
             deviceName: check.deviceName || pendingApprovalDeviceId,
-            authToken: authTokenInput || 'approved_by_admin',
+            authToken: check.authToken || authTokenInput || 'approved_by_admin',
             status: 'active',
           });
           setSuccessMsg(`Device ${pendingApprovalDeviceId} has been approved!`);
