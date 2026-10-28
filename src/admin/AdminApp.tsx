@@ -33,6 +33,7 @@ import {
 } from '../services/api';
 import { isSupabaseConfigured, subscribeToCloudChanges } from '../services/supabase';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
+import { formatErrorMessage } from '../utils/errorMessage';
 
 export const AdminApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<AdminViewType>('ASSETS');
@@ -86,7 +87,7 @@ export const AdminApp: React.FC = () => {
       setIsSupabaseOnline(isSupabaseConfigured());
     } catch (err: unknown) {
       console.error('Failed to load fleet data:', err);
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatErrorMessage(err);
       if (!silent) showToast(`Data sync warning: ${msg}`, 'error');
     } finally {
       if (!silent) setIsRefreshing(false);
@@ -140,7 +141,7 @@ export const AdminApp: React.FC = () => {
       setEditingAsset(null);
       setIsCreateModalOpen(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatErrorMessage(err);
       showToast(`Failed to save asset: ${msg}`, 'error');
       throw err;
     }
@@ -157,7 +158,7 @@ export const AdminApp: React.FC = () => {
         setSelectedAssetId(null);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatErrorMessage(err);
       showToast(`Failed to delete asset: ${msg}`, 'error');
       throw err;
     }
@@ -170,7 +171,7 @@ export const AdminApp: React.FC = () => {
       await loadFleetData(true);
       showToast('Transaction deleted. Generator power states recalculated.', 'success');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatErrorMessage(err);
       showToast(`Failed to delete transaction: ${msg}`, 'error');
       throw err;
     }
@@ -214,7 +215,7 @@ export const AdminApp: React.FC = () => {
         'success'
       );
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatErrorMessage(err);
       showToast(`Failed to toggle power state: ${msg}`, 'error');
     }
   };
@@ -226,7 +227,7 @@ export const AdminApp: React.FC = () => {
       await loadFleetData(true);
       showToast(`Device "${device.deviceId}" authorized successfully!`, 'success');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatErrorMessage(err);
       showToast(`Failed to save device: ${msg}`, 'error');
       throw err;
     }
@@ -238,7 +239,7 @@ export const AdminApp: React.FC = () => {
       await loadFleetData(true);
       showToast(`Device "${deviceId}" status updated to ${status}.`, 'success');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatErrorMessage(err);
       showToast(`Failed to update device status: ${msg}`, 'error');
       throw err;
     }
@@ -250,7 +251,7 @@ export const AdminApp: React.FC = () => {
       await loadFleetData(true);
       showToast(`Device "${deviceId}" deleted from authorized devices.`, 'success');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatErrorMessage(err);
       showToast(`Failed to delete device: ${msg}`, 'error');
       throw err;
     }
@@ -264,7 +265,7 @@ export const AdminApp: React.FC = () => {
         await loadFleetData();
         showToast('Database reset to factory default seed data.', 'info');
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = formatErrorMessage(err);
         showToast(`Failed to reset data: ${msg}`, 'error');
       }
     }
@@ -280,7 +281,7 @@ export const AdminApp: React.FC = () => {
       await loadFleetData(true);
       showToast('All equipment IDs and transactions have been deleted.', 'success');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatErrorMessage(err);
       console.error('Failed to delete all records:', err);
       showToast(`Failed to delete records: ${msg}`, 'error');
       throw err;
@@ -294,7 +295,7 @@ export const AdminApp: React.FC = () => {
       await loadFleetData(true);
       showToast(`Successfully uploaded ${uploadedAssets.length} equipment records.`, 'success');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatErrorMessage(err);
       console.error('Failed to bulk upload equipment:', err);
       showToast(`Bulk upload failed: ${msg}`, 'error');
       throw err;

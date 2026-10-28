@@ -10,8 +10,11 @@ import {
   Search,
   CheckCircle2,
   RefreshCw,
+  Copy,
+  Check,
 } from 'lucide-react';
 import type { AuthorizedDevice, DeviceStatus } from '../../types';
+import { SUPABASE_SQL_MIGRATION } from '../../services/supabase';
 
 interface DevicesViewProps {
   devices: AuthorizedDevice[];
@@ -32,6 +35,13 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | DeviceStatus>('ALL');
+  const [copiedSql, setCopiedSql] = useState(false);
+
+  const handleCopyMigrationSql = () => {
+    navigator.clipboard.writeText(SUPABASE_SQL_MIGRATION);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2500);
+  };
 
   // Counts
   const counts = useMemo(() => {
@@ -124,6 +134,18 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={handleCopyMigrationSql}
+            className="admin-btn admin-btn-outline"
+            title="Copy SQL migration to create the authorized_devices table in your Supabase database"
+          >
+            {copiedSql ? <Check size={14} color="#10B981" /> : <Copy size={14} />}
+            <span style={{ color: copiedSql ? '#10B981' : undefined }}>
+              {copiedSql ? 'Copied Migration SQL!' : 'Copy SQL Migration'}
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={onRefresh}

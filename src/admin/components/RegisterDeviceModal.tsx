@@ -3,6 +3,8 @@ import QRCode from 'qrcode';
 import { Smartphone, QrCode, X, Check, Copy, AlertTriangle, ShieldCheck } from 'lucide-react';
 import type { AuthorizedDevice } from '../../types';
 import { generateSecureDeviceToken } from '../../services/device';
+import { formatErrorMessage } from '../../utils/errorMessage';
+import { SUPABASE_SQL_MIGRATION } from '../../services/supabase';
 
 interface RegisterDeviceModalProps {
   isOpen: boolean;
@@ -24,6 +26,7 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
   const [isGenerated, setIsGenerated] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const isMouseDownOnBackdrop = useRef<boolean>(false);
@@ -121,8 +124,8 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
       await generateQRCode(cleanId, token, deviceName.trim());
       setIsGenerated(true);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErrorMsg(`Failed to register device: ${msg}`);
+      const msg = formatErrorMessage(err);
+      setErrorMsg(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -191,20 +194,63 @@ export const RegisterDeviceModal: React.FC<RegisterDeviceModalProps> = ({
         {errorMsg && (
           <div
             style={{
-              padding: '10px 14px',
-              borderRadius: '6px',
+              padding: '12px 14px',
+              borderRadius: '8px',
               background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: '#F87171',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              color: '#FCA5A5',
               fontSize: '0.84rem',
               marginBottom: '16px',
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: 'column',
               gap: '8px',
             }}
           >
-            <AlertTriangle size={16} />
-            <span>{errorMsg}</span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <AlertTriangle size={17} style={{ flexShrink: 0, marginTop: '2px', color: '#EF4444' }} />
+              <div style={{ flex: 1, lineHeight: 1.45 }}>
+                <strong>Registration Error:</strong> {errorMsg}
+              </div>
+            </div>
+
+            {(errorMsg.includes('authorized_devices') ||
+              errorMsg.includes('does not exist') ||
+              errorMsg.includes('schema cache')) && (
+              <div
+                style={{
+                  marginTop: '6px',
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  background: 'rgba(0, 0, 0, 0.35)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                }}
+              >
+                <div style={{ fontSize: '0.78rem', color: '#E2E8F0', marginBottom: '8px', lineHeight: 1.4 }}>
+                  The <code>authorized_devices</code> table must be created in your Supabase database.
+                  Copy the SQL below, paste it into your <strong>Supabase Dashboard &rarr; SQL Editor</strong>, and click <strong>Run</strong>:
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(SUPABASE_SQL_MIGRATION);
+                    setCopiedSql(true);
+                    setTimeout(() => setCopiedSql(false), 3000);
+                  }}
+                  className="admin-btn admin-btn-sm"
+                  style={{
+                    background: copiedSql ? '#10B981' : '#EC721E',
+                    color: '#000000',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  {copiedSql ? <Check size={14} /> : <Copy size={14} />}
+                  <span>{copiedSql ? 'Copied Migration SQL!' : 'Copy Supabase SQL Migration'}</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 

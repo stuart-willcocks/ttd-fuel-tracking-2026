@@ -522,7 +522,13 @@ export async function fetchAuthorizedDevicesFromSupabase(): Promise<AuthorizedDe
     .select('*')
     .order('registered_at', { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === 'PGRST205' || (error.message && error.message.includes('authorized_devices'))) {
+      console.warn("[Supabase] Table 'public.authorized_devices' does not exist yet. Please run the SQL migration.");
+      return [];
+    }
+    throw new Error(error.message || error.details || error.hint || `Supabase error (${error.code || 'unknown'})`);
+  }
 
   return (data || []).map((row: any) => ({
     deviceId: row.device_id,
@@ -554,7 +560,14 @@ export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): 
     .from('authorized_devices')
     .upsert(payload, { onConflict: 'device_id' });
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === 'PGRST205' || (error.message && error.message.includes('authorized_devices'))) {
+      throw new Error(
+        "Table 'public.authorized_devices' does not exist in Supabase yet. Please execute the SQL migration in your Supabase SQL Editor."
+      );
+    }
+    throw new Error(error.message || error.details || error.hint || `Supabase error (${error.code || 'unknown'})`);
+  }
 }
 
 /**
@@ -569,7 +582,14 @@ export async function updateDeviceStatusInSupabase(deviceId: string, status: Dev
     .update({ status, last_seen_at: new Date().toISOString() })
     .eq('device_id', deviceId.trim().toUpperCase());
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === 'PGRST205' || (error.message && error.message.includes('authorized_devices'))) {
+      throw new Error(
+        "Table 'public.authorized_devices' does not exist in Supabase yet. Please execute the SQL migration in your Supabase SQL Editor."
+      );
+    }
+    throw new Error(error.message || error.details || error.hint || `Supabase error (${error.code || 'unknown'})`);
+  }
 }
 
 /**
@@ -586,8 +606,12 @@ export async function deleteAuthorizedDeviceFromSupabase(deviceId: string): Prom
     .eq('device_id', cleanId);
 
   if (error) {
-    console.error(`[Supabase] Failed to delete authorized device "${cleanId}":`, error);
-    throw error;
+    if (error.code === 'PGRST205' || (error.message && error.message.includes('authorized_devices'))) {
+      throw new Error(
+        "Table 'public.authorized_devices' does not exist in Supabase yet. Please execute the SQL migration in your Supabase SQL Editor."
+      );
+    }
+    throw new Error(error.message || error.details || error.hint || `Supabase error (${error.code || 'unknown'})`);
   }
 }
 
@@ -614,8 +638,12 @@ export async function verifyDeviceTokenWithSupabase(
     if (error.code === 'PGRST116') {
       return { valid: false, status: 'revoked' };
     }
+    if (error.code === 'PGRST205' || (error.message && error.message.includes('authorized_devices'))) {
+      console.warn("[Supabase] Table 'public.authorized_devices' does not exist in Supabase yet.");
+      return { valid: false, status: 'revoked' };
+    }
     console.warn('[Supabase] verifyDeviceToken query error:', error);
-    throw error;
+    throw new Error(error.message || error.details || error.hint || `Supabase error (${error.code || 'unknown'})`);
   }
 
   if (!data) {
