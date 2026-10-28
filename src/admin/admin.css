@@ -984,6 +984,8 @@ iframe[src*="vercel.live"],
 
 .admin-spin {
   animation: spin 1s linear infinite;
+  display: inline-block;
+  transform-origin: center center;
 }
 
 @keyframes spin {

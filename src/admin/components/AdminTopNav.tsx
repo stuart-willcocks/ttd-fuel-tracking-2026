@@ -107,13 +107,13 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
 
       {/* Right Action & Status Zone */}
       <div className="admin-top-menu-right">
-        {/* Simple "Online" indicator */}
+        {/* Database connection indicator */}
         <div
           className="admin-top-online-indicator"
           title={isSupabaseOnline ? 'Cloud Synced' : 'Local Server Mode'}
         >
           <span className={`pulse-dot ${isSupabaseOnline ? 'green' : 'amber'}`} />
-          <span>{isSupabaseOnline ? 'Online' : 'Offline'}</span>
+          <span>{isSupabaseOnline ? 'DATABASE CONNECTED' : 'OFFLINE'}</span>
         </div>
 
         {/* Narrow Refresh button (icon only, no word "refresh") */}
@@ -127,7 +127,7 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
           <RefreshCw size={15} className={isRefreshing ? 'admin-spin' : ''} />
         </button>
 
-        {/* Link to Zebra Handheld Field Web App relabeled as "PDA app" */}
+        {/* Link to Zebra Handheld Field Web App */}
         <a
           href="/"
           target="_blank"
@@ -136,7 +136,7 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
           title="Open PDA scanner interface in new tab"
         >
           <Smartphone size={14} />
-          <span>PDA App</span>
+          <span>LAUNCH PDA APP</span>
           <ExternalLink size={12} />
         </a>
       </div>

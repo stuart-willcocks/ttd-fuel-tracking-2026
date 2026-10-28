@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Search,
   Download,
@@ -12,11 +12,13 @@ import {
   Zap,
   Trash2,
   MapPin,
-  Boxes,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Power,
+  ChevronDown,
 } from 'lucide-react';
+import { IconCheckIn, IconCheckOut, IconFuel } from '../../components/icons/AppIcons';
 import type { Transaction, Equipment } from '../../types';
 import { formatAdminTimestamp } from '../../utils/dateFormat';
 import { getGeneratorPowerState } from '../../utils/powerState';
@@ -170,9 +172,21 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('ALL');
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState<boolean>(false);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedDevice, setSelectedDevice] = useState<string>('ALL');
   const [selectedDateFilter, setSelectedDateFilter] = useState<'ALL' | 'TODAY' | '7DAYS'>('ALL');
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node)) {
+        setIsTypeDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   React.useEffect(() => {
     setNowMs(Date.now());
@@ -649,12 +663,12 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             />
           </div>
 
-          {/* Asset Dropdown Selector */}
+          {/* Asset Dropdown Selector (100% wider: 440px, with QR Code icon) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Boxes size={15} color="#94a3b8" />
+            <QrCode size={15} color="#94a3b8" />
             <select
               className="admin-select"
-              style={{ width: '220px', padding: '9px 12px', fontSize: '0.84rem' }}
+              style={{ width: '440px', padding: '9px 12px', fontSize: '0.84rem' }}
               value={selectedAssetId || 'ALL'}
               onChange={(e) => onSelectAsset(e.target.value === 'ALL' ? null : e.target.value)}
             >
@@ -667,21 +681,101 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             </select>
           </div>
 
-          {/* Action Type Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Action Type Filter (with same SVG icons used elsewhere) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }} ref={typeDropdownRef}>
             <Filter size={14} color="#94a3b8" />
-            <select
-              className="admin-select"
-              style={{ width: '175px', padding: '9px 12px', fontSize: '0.84rem' }}
-              value={selectedTypeFilter}
-              onChange={(e) => setSelectedTypeFilter(e.target.value)}
-            >
-              <option value="ALL">All transaction types</option>
-              <option value="FUEL_TRANSFER">⛽ Fuel Transfers</option>
-              <option value="CHECK_IN">📥 Check-Ins</option>
-              <option value="CHECK_OUT">📤 Check-Outs</option>
-              <option value="POWER">⚡ Power Events</option>
-            </select>
+            <div style={{ position: 'relative', width: '205px' }}>
+              <button
+                type="button"
+                className="admin-select"
+                onClick={() => setIsTypeDropdownOpen((prev) => !prev)}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  fontSize: '0.84rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  background: '#FFFFFF',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                  {selectedTypeFilter === 'FUEL_TRANSFER' && <IconFuel size={16} color="#2563EB" />}
+                  {selectedTypeFilter === 'CHECK_IN' && <IconCheckIn size={16} color="#16A34A" />}
+                  {selectedTypeFilter === 'CHECK_OUT' && <IconCheckOut size={16} color="#16A34A" />}
+                  {selectedTypeFilter === 'POWER' && <Power size={15} color="#16A34A" />}
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {selectedTypeFilter === 'FUEL_TRANSFER'
+                      ? 'Fuel Transfers'
+                      : selectedTypeFilter === 'CHECK_IN'
+                        ? 'Check-Ins'
+                        : selectedTypeFilter === 'CHECK_OUT'
+                          ? 'Check-Outs'
+                          : selectedTypeFilter === 'POWER'
+                            ? 'Power Events'
+                            : 'All transaction types'}
+                  </span>
+                </span>
+                <ChevronDown size={14} style={{ color: '#64748B', flexShrink: 0 }} />
+              </button>
+
+              {isTypeDropdownOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    left: 0,
+                    width: '100%',
+                    background: '#FFFFFF',
+                    border: '1px solid var(--adm-border-medium)',
+                    boxShadow: 'var(--adm-shadow-md)',
+                    zIndex: 50,
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  {[
+                    { value: 'ALL', label: 'All transaction types', icon: null },
+                    { value: 'FUEL_TRANSFER', label: 'Fuel Transfers', icon: <IconFuel size={16} color="#2563EB" /> },
+                    { value: 'CHECK_IN', label: 'Check-Ins', icon: <IconCheckIn size={16} color="#16A34A" /> },
+                    { value: 'CHECK_OUT', label: 'Check-Outs', icon: <IconCheckOut size={16} color="#16A34A" /> },
+                    { value: 'POWER', label: 'Power Events', icon: <Power size={15} color="#16A34A" /> },
+                  ].map((opt) => {
+                    const isSelected = selectedTypeFilter === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTypeFilter(opt.value);
+                          setIsTypeDropdownOpen(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          width: '100%',
+                          padding: '9px 12px',
+                          border: 'none',
+                          background: isSelected ? 'var(--adm-surface-2)' : '#FFFFFF',
+                          color: 'var(--adm-text-primary)',
+                          fontSize: '0.84rem',
+                          fontWeight: isSelected ? 700 : 500,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        {opt.icon}
+                        <span>{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Device Filter */}
@@ -703,23 +797,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               </select>
             </div>
           )}
-        </div>
-
-        {/* Date Filter Pills */}
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {[
-            { key: 'ALL', label: 'All Time' },
-            { key: '7DAYS', label: 'Past 7 Days' },
-            { key: 'TODAY', label: 'Today Only' },
-          ].map((d) => (
-            <button
-              key={d.key}
-              onClick={() => setSelectedDateFilter(d.key as 'ALL' | 'TODAY' | '7DAYS')}
-              className={`admin-btn ${selectedDateFilter === d.key ? 'admin-btn-secondary' : 'admin-btn-outline'} admin-btn-sm`}
-            >
-              {d.label}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -901,9 +978,12 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
                     {/* Sync Status */}
                     <td style={{ paddingRight: '20px' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', color: '#10b981' }}>
-                        <CheckCircle2 size={12} />
-                        <span>Synced</span>
+                      <span
+                        style={{ display: 'inline-flex', alignItems: 'center', color: '#10b981' }}
+                        title="Synced"
+                        aria-label="Synced"
+                      >
+                        <CheckCircle2 size={15} />
                       </span>
                     </td>
                   </tr>

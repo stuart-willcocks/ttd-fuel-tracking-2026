@@ -69,9 +69,10 @@ export const AdminApp: React.FC = () => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Fetch initial data
+  // Fetch initial data & animate refresh icon on every database sync
   const loadFleetData = useCallback(async (silent = false) => {
-    if (!silent) setIsRefreshing(true);
+    const startTime = Date.now();
+    setIsRefreshing(true);
     try {
       const [fetchedAssets, fetchedTxs, fetchedDevices] = await Promise.all([
         fetchRemoteEquipment(),
@@ -90,7 +91,13 @@ export const AdminApp: React.FC = () => {
       const msg = formatErrorMessage(err);
       if (!silent) showToast(`Data sync warning: ${msg}`, 'error');
     } finally {
-      if (!silent) setIsRefreshing(false);
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 600 - elapsed);
+      if (remaining > 0) {
+        setTimeout(() => setIsRefreshing(false), remaining);
+      } else {
+        setIsRefreshing(false);
+      }
     }
   }, [showToast]);
 
