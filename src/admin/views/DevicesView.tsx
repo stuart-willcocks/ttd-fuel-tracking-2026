@@ -21,7 +21,7 @@ import {
   Zap,
 } from 'lucide-react';
 import type { AuthorizedDevice, DeviceStatus } from '../../types';
-import { SUPABASE_SQL_MIGRATION } from '../../services/supabase';
+import { SUPABASE_SQL_MIGRATION, TELEMETRY_SQL_MIGRATION, checkNativeTelemetryColumns } from '../../services/supabase';
 
 interface DevicesViewProps {
   devices: AuthorizedDevice[];
@@ -43,11 +43,24 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | DeviceStatus>('ALL');
   const [copiedSql, setCopiedSql] = useState(false);
+  const [copiedTelemetrySql, setCopiedTelemetrySql] = useState(false);
+  const [hasNativeTelemetryColumns, setHasNativeTelemetryColumns] = useState<boolean | null>(null);
+  const [showSqlDetails, setShowSqlDetails] = useState(false);
+
+  React.useEffect(() => {
+    checkNativeTelemetryColumns().then(setHasNativeTelemetryColumns).catch(() => {});
+  }, [devices, isRefreshing]);
 
   const handleCopyMigrationSql = () => {
     navigator.clipboard.writeText(SUPABASE_SQL_MIGRATION);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 2500);
+  };
+
+  const handleCopyTelemetrySql = () => {
+    navigator.clipboard.writeText(TELEMETRY_SQL_MIGRATION);
+    setCopiedTelemetrySql(true);
+    setTimeout(() => setCopiedTelemetrySql(false), 2500);
   };
 
   // Counts
@@ -297,6 +310,93 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Telemetry Migration Alert Banner (shown only when native columns don't exist yet) */}
+      {hasNativeTelemetryColumns === false && (
+        <div
+          style={{
+            background: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            borderRadius: '10px',
+            padding: '14px 18px',
+            marginBottom: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+                <strong style={{ color: '#B45309', fontSize: '0.94rem' }}>
+                  Supabase Schema Migration: Define Native Telemetry Columns
+                </strong>
+              </div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--adm-text-secondary)', maxWidth: '720px' }}>
+                Add dedicated columns (<code>battery_level</code>, <code>is_charging</code>, <code>latitude</code>, <code>longitude</code>, <code>location_accuracy</code>, <code>last_telemetry_at</code>) to <code>public.authorized_devices</code>. This removes all workarounds and enables full native telemetry streaming.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setShowSqlDetails(!showSqlDetails)}
+                className="admin-btn admin-btn-outline"
+                style={{ fontSize: '0.78rem', padding: '6px 10px' }}
+              >
+                {showSqlDetails ? 'Hide SQL' : 'View SQL'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyTelemetrySql}
+                className="admin-btn"
+                style={{
+                  background: '#F59E0B',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  padding: '7px 14px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                {copiedTelemetrySql ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiedTelemetrySql ? 'Copied 6-Line SQL!' : 'Copy Telemetry SQL'}</span>
+              </button>
+            </div>
+          </div>
+
+          {showSqlDetails && (
+            <div
+              style={{
+                marginTop: '4px',
+                background: '#1E293B',
+                color: '#F8FAFC',
+                padding: '12px 14px',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontFamily: 'monospace',
+                overflowX: 'auto',
+                lineHeight: 1.5,
+              }}
+            >
+              <pre style={{ margin: 0 }}>{TELEMETRY_SQL_MIGRATION}</pre>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary KPI Cards */}
       <div

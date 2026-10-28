@@ -652,8 +652,25 @@ export async function updateDeviceTelemetryInSupabase(
     .update(payload)
     .eq('device_id', cleanId);
 
-  // If telemetry columns do not exist yet on Supabase table (PGRST204), store telemetry metadata in device_name fallback
-  if (error && (error.code === 'PGRST204' || (error.message && (error.message.includes('column') || error.message.includes('battery'))))) {
+  // If native columns succeeded, clean up device_name if it previously contained the fallback string
+  if (!error) {
+    try {
+      const { data: current } = await client
+        .from('authorized_devices')
+        .select('device_name')
+        .eq('device_id', cleanId)
+        .maybeSingle();
+
+      if (current?.device_name && current.device_name.includes('__TEL__')) {
+        const cleanName = current.device_name.split('__TEL__')[0] || cleanId;
+        await client.from('authorized_devices').update({ device_name: cleanName }).eq('device_id', cleanId);
+      }
+    } catch {}
+    return;
+  }
+
+  // If telemetry columns do not exist yet on Supabase table (PGRST204 / 42703), store telemetry metadata in device_name fallback
+  if (error && (error.code === 'PGRST204' || error.code === '42703' || (error.message && (error.message.includes('column') || error.message.includes('battery'))))) {
     try {
       const { data: current } = await client
         .from('authorized_devices')
@@ -1031,3 +1048,31 @@ alter publication supabase_realtime add table public.transactions;
 alter publication supabase_realtime add table public.equipment_list;
 alter publication supabase_realtime add table public.authorized_devices;
 `;
+
+export const TELEMETRY_SQL_MIGRATION = `-- TTD Fuel Tracking: Add Native Telemetry Columns to public.authorized_devices
+-- Paste and run in Supabase Dashboard -> SQL Editor
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS battery_level smallint;
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS is_charging boolean;
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS latitude double precision;
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS longitude double precision;
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS location_accuracy real;
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS last_telemetry_at timestamp with time zone;
+`;
+
+/**
+ * Checks if the native telemetry columns (battery_level, etc.) exist on public.authorized_devices
+ */
+export async function checkNativeTelemetryColumns(): Promise<boolean> {
+  const client = getSupabaseClient();
+  if (!client) return false;
+  try {
+    const { error } = await client.from('authorized_devices').select('battery_level').limit(1);
+    if (error && (error.code === '42703' || error.message?.includes('does not exist') || error.code === 'PGRST204')) {
+      return false;
+    }
+    return !error;
+  } catch {
+    return false;
+  }
+}
+

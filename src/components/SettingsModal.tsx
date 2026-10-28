@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
-import { X, Sparkles, CheckCircle2, Smartphone, Check, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Sparkles, CheckCircle2, Smartphone, Check, RefreshCw, Navigation, Battery, BatteryCharging } from 'lucide-react';
 import { APP_VERSION } from '../version';
 import { getDeviceId, getDeviceName } from '../services/device';
+import {
+  getBatteryStatus,
+  getCachedTelemetryStatus,
+  requestLocationPermission,
+} from '../services/telemetry';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -23,8 +28,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenEnrollment,
 }) => {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [telemetry, setTelemetry] = useState(() => getCachedTelemetryStatus());
+  const [batteryInfo, setBatteryInfo] = useState<{ batteryLevel: number; isCharging: boolean } | null>(null);
+
   const currentDeviceId = getDeviceId();
   const currentDeviceName = getDeviceName();
+
+  useEffect(() => {
+    if (isOpen) {
+      setTelemetry(getCachedTelemetryStatus());
+      getBatteryStatus().then((b) => {
+        if (b) setBatteryInfo(b);
+      }).catch(() => {});
+    }
+  }, [isOpen]);
+
+  const handleRefreshGps = async () => {
+    setIsLocating(true);
+    try {
+      await requestLocationPermission();
+      setTelemetry(getCachedTelemetryStatus());
+      const b = await getBatteryStatus();
+      if (b) setBatteryInfo(b);
+    } finally {
+      setIsLocating(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -119,6 +149,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {currentDeviceId
               ? 'Permanently assigned at registration. Recorded with all transactions.'
               : 'Pair with Admin Console QR code to permanently identify this PDA.'}
+          </div>
+        </div>
+
+        {/* Hardware Telemetry Card */}
+        <div className="settings-device-card" style={{ marginTop: '12px' }}>
+          <div className="settings-card-label-row">
+            <Navigation size={16} className="settings-card-icon" style={{ color: '#3B82F6' }} />
+            <span className="settings-card-label">Hardware Telemetry</span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+            {/* Battery Row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Battery</span>
+              <span style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                {batteryInfo?.isCharging ? <BatteryCharging size={16} color="#10B981" /> : <Battery size={16} color="#10B981" />}
+                {batteryInfo ? `${batteryInfo.batteryLevel}% ${batteryInfo.isCharging ? '(Charging)' : ''}` : 'Reading...'}
+              </span>
+            </div>
+
+            {/* GPS Location Row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>GPS Location</span>
+              <span style={{ fontWeight: 700, color: telemetry.cachedLocation ? '#2563EB' : 'var(--text-secondary)', textAlign: 'right' }}>
+                {telemetry.cachedLocation
+                  ? `${telemetry.cachedLocation.latitude}, ${telemetry.cachedLocation.longitude} (±${telemetry.cachedLocation.locationAccuracy}m)`
+                  : (telemetry.lastLocationError || 'Waiting for fix...')}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="btn-pda-rect"
+              style={{
+                marginTop: '4px',
+                padding: '7px 12px',
+                fontSize: '0.78rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                background: 'rgba(59, 130, 246, 0.1)',
+                color: '#2563EB',
+                borderColor: '#2563EB',
+                fontWeight: 700,
+              }}
+              disabled={isLocating}
+              onClick={handleRefreshGps}
+            >
+              <RefreshCw size={13} className={isLocating ? 'spinning' : ''} />
+              <span>{isLocating ? 'Acquiring GPS Satellite Fix...' : 'Refresh GPS / Request Permission'}</span>
+            </button>
           </div>
         </div>
 

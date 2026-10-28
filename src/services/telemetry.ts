@@ -10,12 +10,13 @@ let isCollecting = false;
 // Cached location to avoid firing hardware GPS continuously
 let cachedLocation: { latitude: number; longitude: number; locationAccuracy: number } | null = (() => {
   try {
-    const raw = sessionStorage.getItem('ttd_cached_location');
+    const raw = sessionStorage.getItem('ttd_cached_location') || localStorage.getItem('ttd_cached_location');
     if (raw) return JSON.parse(raw);
   } catch {}
   return null;
 })();
 let lastLocationTime = cachedLocation ? Date.now() : 0;
+let lastLocationError: string | null = null;
 
 /**
  * Reads battery level and charging state via W3C Battery Status API.
@@ -49,19 +50,82 @@ export async function getBatteryStatus(): Promise<{ batteryLevel: number; isChar
 }
 
 /**
+ * Helper to fetch a single GPS position with given accuracy and timeout.
+ */
+function fetchPositionOnce(highAccuracy: boolean, timeoutMs: number): Promise<{
+  latitude: number;
+  longitude: number;
+  locationAccuracy: number;
+} | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+
+    let done = false;
+    const timer = setTimeout(() => {
+      if (!done) {
+        done = true;
+        resolve(null);
+      }
+    }, timeoutMs + 200);
+
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (!done) {
+            done = true;
+            clearTimeout(timer);
+            const fix = {
+              latitude: Number(pos.coords.latitude.toFixed(6)),
+              longitude: Number(pos.coords.longitude.toFixed(6)),
+              locationAccuracy: Math.round(pos.coords.accuracy),
+            };
+            lastLocationError = null;
+            resolve(fix);
+          }
+        },
+        (err) => {
+          if (!done) {
+            done = true;
+            clearTimeout(timer);
+            lastLocationError = `Code ${err.code}: ${err.message}`;
+            console.warn(`[Telemetry] Geolocation error (highAccuracy=${highAccuracy}):`, lastLocationError);
+            resolve(null);
+          }
+        },
+        {
+          enableHighAccuracy: highAccuracy,
+          timeout: timeoutMs,
+          maximumAge: 120000, // 2 minutes cache
+        }
+      );
+    } catch (e: any) {
+      if (!done) {
+        done = true;
+        clearTimeout(timer);
+        lastLocationError = e?.message || 'Unknown error';
+        resolve(null);
+      }
+    }
+  });
+}
+
+/**
  * Reads current GPS position via W3C Geolocation API.
- * Fast non-blocking implementation:
- * - Uses cached location immediately if less than 5 minutes old (0ms delay).
- * - Fast 2000ms timeout with enableHighAccuracy: false so cellular/wifi fix is used and never blocks the PDA.
+ * Non-blocking:
+ * - Uses cached location immediately if less than 3 minutes old (0ms delay).
+ * - Tries high-accuracy GPS (satellite fix) first with reasonable background timeout.
+ * - Falls back to low-accuracy (cellular/Wi-Fi) if high-accuracy fails or is unavailable.
  */
 export async function getCurrentLocation(): Promise<{
   latitude: number;
   longitude: number;
   locationAccuracy: number;
 } | null> {
-  // Return cached location immediately if fresh (< 5 mins old)
   const now = Date.now();
-  if (cachedLocation && now - lastLocationTime < 300000) {
+  if (cachedLocation && now - lastLocationTime < 180000) {
     return cachedLocation;
   }
 
@@ -69,57 +133,76 @@ export async function getCurrentLocation(): Promise<{
     return cachedLocation;
   }
 
-  return new Promise((resolve) => {
-    let resolved = false;
+  // 1. Try high accuracy (hardware GPS on Zebra TC26)
+  let fix = await fetchPositionOnce(true, 7000);
 
-    // Strict 2000ms timeout so geolocation never stalls the app
-    const timeoutId = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        resolve(cachedLocation);
-      }
-    }, 2000);
+  // 2. If high accuracy timed out or unavailable, try low accuracy (cell/Wi-Fi)
+  if (!fix) {
+    fix = await fetchPositionOnce(false, 3000);
+  }
 
+  if (fix) {
+    cachedLocation = fix;
+    lastLocationTime = Date.now();
     try {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(timeoutId);
-            const fix = {
-              latitude: Number(pos.coords.latitude.toFixed(6)),
-              longitude: Number(pos.coords.longitude.toFixed(6)),
-              locationAccuracy: Math.round(pos.coords.accuracy),
-            };
-            cachedLocation = fix;
-            lastLocationTime = Date.now();
-            try {
-              sessionStorage.setItem('ttd_cached_location', JSON.stringify(fix));
-            } catch {}
-            resolve(fix);
-          }
-        },
-        () => {
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(timeoutId);
-            resolve(cachedLocation);
-          }
-        },
-        {
-          enableHighAccuracy: false, // Prevents battery drain and hardware GPS delays on Zebra TC26
-          timeout: 1800,
-          maximumAge: 300000, // 5 minutes cache
-        }
-      );
-    } catch {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeoutId);
-        resolve(cachedLocation);
-      }
-    }
-  });
+      sessionStorage.setItem('ttd_cached_location', JSON.stringify(fix));
+      localStorage.setItem('ttd_cached_location', JSON.stringify(fix));
+    } catch {}
+    return fix;
+  }
+
+  return cachedLocation;
+}
+
+/**
+ * Manually requests or re-requests location permission and acquires an immediate GPS fix.
+ * Can be called from the Settings modal.
+ */
+export async function requestLocationPermission(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) return false;
+
+  const fix = await fetchPositionOnce(true, 10000);
+  if (fix) {
+    cachedLocation = fix;
+    lastLocationTime = Date.now();
+    try {
+      sessionStorage.setItem('ttd_cached_location', JSON.stringify(fix));
+      localStorage.setItem('ttd_cached_location', JSON.stringify(fix));
+    } catch {}
+    await pushDeviceTelemetry(true);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Checks current location permission state via Permissions API if available.
+ */
+export async function checkLocationPermissionState(): Promise<'granted' | 'prompt' | 'denied' | 'unsupported'> {
+  if (typeof navigator === 'undefined' || !navigator.permissions) return 'unsupported';
+  try {
+    const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+    return status.state as 'granted' | 'prompt' | 'denied';
+  } catch {
+    return 'unsupported';
+  }
+}
+
+/**
+ * Returns current cached telemetry status for diagnostics (Settings UI).
+ */
+export function getCachedTelemetryStatus(): {
+  cachedLocation: { latitude: number; longitude: number; locationAccuracy: number } | null;
+  lastLocationTime: number;
+  lastLocationError: string | null;
+  lastSentTelemetry: DeviceTelemetry | null;
+} {
+  return {
+    cachedLocation,
+    lastLocationTime,
+    lastLocationError,
+    lastSentTelemetry,
+  };
 }
 
 /**
@@ -164,6 +247,16 @@ function shouldSendTelemetry(newTel: DeviceTelemetry, force: boolean): boolean {
     return true;
   }
 
+  // Send immediately if we previously had no battery reading and now we do
+  if (typeof newTel.batteryLevel === 'number' && (lastSentTelemetry.batteryLevel === null || typeof lastSentTelemetry.batteryLevel !== 'number')) {
+    return true;
+  }
+
+  // CRITICAL: Send immediately if we previously had no GPS coordinates and now we do!
+  if (typeof newTel.latitude === 'number' && (lastSentTelemetry.latitude === null || typeof lastSentTelemetry.latitude !== 'number')) {
+    return true;
+  }
+
   // Send if location shifted significantly (> 0.0005 degrees ≈ 55 meters)
   if (
     typeof newTel.latitude === 'number' &&
@@ -197,6 +290,7 @@ export async function pushDeviceTelemetry(force: boolean = false): Promise<void>
       await updateRemoteDeviceTelemetry(deviceId, telemetry);
       lastSentTelemetry = telemetry;
       lastSentTime = Date.now();
+      console.log('[Telemetry] Transmitted PDA telemetry update:', telemetry);
     }
   } catch (err) {
     // Fail silently in background
@@ -208,18 +302,60 @@ export async function pushDeviceTelemetry(force: boolean = false): Promise<void>
 
 /**
  * Starts continuous, low-power telemetry monitoring on the PDA.
- * Subscribes to battery events and periodic 5-minute heartbeat.
+ * Subscribes to battery events, geolocation watchPosition updates, and periodic 5-minute heartbeat.
  */
 export function startTelemetryMonitoring(): () => void {
   if (typeof window === 'undefined') return () => {};
 
-  // Initial immediate collection on boot
+  // Initial immediate collection on boot (sends battery immediately)
   pushDeviceTelemetry(true);
 
   // Periodic heartbeat every 5 minutes (low-frequency to protect free tier quotas)
   const intervalId = setInterval(() => {
     pushDeviceTelemetry(false);
   }, 300000);
+
+  // Continuous background GPS watch
+  let watchId: number | null = null;
+  if (typeof navigator !== 'undefined' && navigator.geolocation) {
+    try {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const fix = {
+            latitude: Number(pos.coords.latitude.toFixed(6)),
+            longitude: Number(pos.coords.longitude.toFixed(6)),
+            locationAccuracy: Math.round(pos.coords.accuracy),
+          };
+          console.log('[Telemetry] Live GPS watch fix:', fix);
+          cachedLocation = fix;
+          lastLocationTime = Date.now();
+          lastLocationError = null;
+          try {
+            sessionStorage.setItem('ttd_cached_location', JSON.stringify(fix));
+            localStorage.setItem('ttd_cached_location', JSON.stringify(fix));
+          } catch {}
+
+          // If we had no location sent yet, push immediately!
+          if (!lastSentTelemetry || lastSentTelemetry.latitude === null) {
+            pushDeviceTelemetry(true);
+          } else {
+            pushDeviceTelemetry(false);
+          }
+        },
+        (err) => {
+          lastLocationError = `Code ${err.code}: ${err.message}`;
+          console.warn('[Telemetry] Geolocation watch warning:', lastLocationError);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 60000,
+        }
+      );
+    } catch (err) {
+      console.warn('[Telemetry] Failed to start geolocation watcher:', err);
+    }
+  }
 
   // Battery status change listener
   const nav = navigator as unknown as {
@@ -250,6 +386,11 @@ export function startTelemetryMonitoring(): () => void {
 
   return () => {
     clearInterval(intervalId);
+    if (watchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      try {
+        navigator.geolocation.clearWatch(watchId);
+      } catch {}
+    }
     cleanBatteryEvents();
   };
 }
