@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Check, Power, PowerOff, Clock, AlertCircle } from 'lucide-react';
+import { Check, Power, PowerOff, Clock, AlertCircle, MapPin, X } from 'lucide-react';
 import { IconCheckIn, IconCheckOut, IconFuel, IconBack } from './icons/AppIcons';
 import type { Equipment, Transaction, ActionType } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
@@ -30,6 +30,8 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
   // Edit / Delete transaction modal state & long-press detection
   const [pendingTxToModify, setPendingTxToModify] = useState<Transaction | null>(null);
   const [selectedTransactionForEdit, setSelectedTransactionForEdit] = useState<Transaction | null>(null);
+  const [isMapModalOpen, setIsMapModalOpen] = useState<boolean>(false);
+  const cleanW3w = (asset.what3words || '').replace(/^\/+/, '').trim();
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -185,10 +187,16 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
       {/* 2. METADATA SECTION: Non-monospace what3words, light grey asset data, no equipment type text */}
       <div className="asset-detail-meta-box">
-        {/* what3words: Clean sans-serif light grey */}
-        <div className="asset-detail-w3w">
-          {asset.what3words.replace('///', '')}
-        </div>
+        {/* what3words: Clickable to launch in-app map */}
+        <button
+          type="button"
+          className="asset-detail-w3w asset-detail-w3w-btn"
+          onClick={() => setIsMapModalOpen(true)}
+          title="Open location map"
+        >
+          <MapPin size={14} style={{ flexShrink: 0 }} />
+          <span>{cleanW3w}</span>
+        </button>
 
         {/* Asset Capacity & Serial Number */}
         {(asset.capacity !== undefined || asset.rentalSerialNumber) && (
@@ -349,6 +357,53 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           onSave={handleSaveTransaction}
           onDelete={handleDeleteTransaction}
         />
+      )}
+
+      {/* In-App What3Words Location Map Modal */}
+      {isMapModalOpen && (
+        <div
+          className="modal-backdrop w3w-map-modal-backdrop"
+          onClick={() => setIsMapModalOpen(false)}
+        >
+          <div
+            className="modal-box w3w-map-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header-simple w3w-map-modal-header">
+              <div className="w3w-map-modal-title-group">
+                <MapPin size={16} style={{ color: '#2563EB', flexShrink: 0 }} />
+                <span className="w3w-map-modal-title">///{cleanW3w}</span>
+              </div>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setIsMapModalOpen(false)}
+                aria-label="Close map"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="w3w-map-iframe-wrap">
+              <iframe
+                src={`https://what3words.com/${encodeURIComponent(cleanW3w)}`}
+                title={`what3words map for ${cleanW3w}`}
+                className="w3w-map-iframe"
+                allow="geolocation"
+              />
+            </div>
+
+            <div className="w3w-map-modal-footer">
+              <button
+                type="button"
+                className="btn-pda-rect btn-pda-blue"
+                onClick={() => setIsMapModalOpen(false)}
+              >
+                <span>Close Map</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

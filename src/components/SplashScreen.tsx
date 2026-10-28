@@ -17,6 +17,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
   const checkForUpdates = useCallback(async (isInitial: boolean = false) => {
     if (isCheckingRef.current) return;
     isCheckingRef.current = true;
+    const stagingSuffix = isStaging ? ' (STAGING)' : '';
 
     // 1. Check if we just completed an update reload
     if (isInitial) {
@@ -32,7 +33,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
         const justUpdatedVersion = sessionStorage.getItem('ttd_just_updated_to');
         if (justUpdatedVersion) {
           sessionStorage.removeItem('ttd_just_updated_to');
-          setVersionText(`Updated to version ${justUpdatedVersion}`);
+          setVersionText(`Updated to version ${justUpdatedVersion}${stagingSuffix}`);
           setIsContinueEnabled(true);
           isCheckingRef.current = false;
           return;
@@ -58,16 +59,16 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
       if (isInitial) {
         await new Promise((r) => setTimeout(r, 400));
       }
-      setVersionText((prev) => (prev.startsWith('Updated to version') ? prev : `Version ${APP_VERSION}`));
+      setVersionText((prev) => (prev.startsWith('Updated to version') ? prev : `Version ${APP_VERSION}${stagingSuffix}`));
       setIsContinueEnabled(true);
     } catch {
       // Offline fallback
-      setVersionText((prev) => (prev.startsWith('Updated to version') ? prev : `Version ${APP_VERSION}`));
+      setVersionText((prev) => (prev.startsWith('Updated to version') ? prev : `Version ${APP_VERSION}${stagingSuffix}`));
       setIsContinueEnabled(true);
     } finally {
       isCheckingRef.current = false;
     }
-  }, []);
+  }, [isStaging]);
 
   useEffect(() => {
     // Initial check on load
@@ -102,7 +103,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
 
           <div className="splash-title-block">
             <h1 className="splash-main-title">The Technical Department Ltd</h1>
-            <h2 className="splash-sub-title">Fuel Tracking App{isStaging ? ' (STAGING)' : ''}</h2>
+            <h2 className="splash-sub-title">Fuel Tracking App</h2>
           </div>
         </div>
 
