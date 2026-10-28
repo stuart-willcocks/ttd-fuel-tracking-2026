@@ -226,33 +226,31 @@ export async function fetchRemoteAuthorizedDevices(): Promise<AuthorizedDevice[]
 }
 
 export async function postRemoteAuthorizedDevice(device: AuthorizedDevice): Promise<void> {
+  const cleanDevice: AuthorizedDevice = {
+    ...device,
+    deviceId: device.deviceId.trim().toUpperCase(),
+    authToken: device.authToken.trim(),
+    deviceName: device.deviceName ? device.deviceName.trim() : device.deviceId.trim().toUpperCase(),
+  };
+
   if (isSupabaseConfigured()) {
-    try {
-      await saveAuthorizedDeviceToSupabase(device);
-      return;
-    } catch (err) {
-      console.warn('Supabase save device failed:', err);
-    }
+    await saveAuthorizedDeviceToSupabase(cleanDevice);
   }
-  const current = getMockDevices().filter((d) => d.deviceId !== device.deviceId);
-  current.unshift(device);
+  const current = getMockDevices().filter((d) => d.deviceId.toUpperCase() !== cleanDevice.deviceId);
+  current.unshift(cleanDevice);
   saveMockDevices(current);
 }
 
 export async function updateRemoteDeviceStatus(deviceId: string, status: DeviceStatus): Promise<void> {
+  const cleanId = deviceId.trim().toUpperCase();
   // Broadcast immediately to any active tabs/listeners
-  broadcastDeviceAuthEvent({ type: 'STATUS_CHANGED', deviceId, status });
+  broadcastDeviceAuthEvent({ type: 'STATUS_CHANGED', deviceId: cleanId, status });
 
   if (isSupabaseConfigured()) {
-    try {
-      await updateDeviceStatusInSupabase(deviceId, status);
-      return;
-    } catch (err) {
-      console.warn('Supabase update device status failed:', err);
-    }
+    await updateDeviceStatusInSupabase(cleanId, status);
   }
   const current = getMockDevices();
-  const target = current.find((d) => d.deviceId === deviceId);
+  const target = current.find((d) => d.deviceId.toUpperCase() === cleanId);
   if (target) {
     target.status = status;
     target.lastSeenAt = new Date().toISOString();
@@ -261,18 +259,14 @@ export async function updateRemoteDeviceStatus(deviceId: string, status: DeviceS
 }
 
 export async function deleteRemoteAuthorizedDevice(deviceId: string): Promise<void> {
+  const cleanId = deviceId.trim().toUpperCase();
   // Broadcast revocation immediately
-  broadcastDeviceAuthEvent({ type: 'REVOKED', deviceId, status: 'revoked' });
+  broadcastDeviceAuthEvent({ type: 'REVOKED', deviceId: cleanId, status: 'revoked' });
 
   if (isSupabaseConfigured()) {
-    try {
-      await deleteAuthorizedDeviceFromSupabase(deviceId);
-      return;
-    } catch (err) {
-      console.warn('Supabase delete device failed:', err);
-    }
+    await deleteAuthorizedDeviceFromSupabase(cleanId);
   }
-  const current = getMockDevices().filter((d) => d.deviceId !== deviceId);
+  const current = getMockDevices().filter((d) => d.deviceId.toUpperCase() !== cleanId);
   saveMockDevices(current);
 }
 
@@ -280,26 +274,28 @@ export async function verifyRemoteDeviceToken(
   deviceId: string,
   token: string
 ): Promise<{ valid: boolean; status: DeviceStatus; deviceName?: string }> {
+  const cleanId = deviceId.trim().toUpperCase();
+  const cleanToken = token.trim();
+
   if (isSupabaseConfigured()) {
-    try {
-      return await verifyDeviceTokenWithSupabase(deviceId, token);
-    } catch (err) {
-      console.warn('Supabase verify device token failed:', err);
-    }
+    // When Supabase is configured, Supabase is the authoritative source!
+    // Do NOT fall back to local mock devices, which would mask revocations.
+    return await verifyDeviceTokenWithSupabase(cleanId, cleanToken);
   }
+
   const current = getMockDevices();
-  const target = current.find((d) => d.deviceId === deviceId);
+  const target = current.find((d) => d.deviceId.toUpperCase() === cleanId);
   if (!target) {
     return { valid: false, status: 'revoked' };
   }
-  const match = target.authToken === token;
+  const match = target.authToken === cleanToken;
   if (match && target.status === 'active') {
     target.lastSeenAt = new Date().toISOString();
     saveMockDevices(current);
   }
   return {
     valid: match && target.status === 'active',
-    status: target.status,
+    status: match ? target.status : 'revoked',
     deviceName: target.deviceName || target.deviceId,
   };
 }

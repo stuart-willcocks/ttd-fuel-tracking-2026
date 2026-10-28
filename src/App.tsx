@@ -433,7 +433,8 @@ export const App: React.FC = () => {
   }, [refreshAssetsList, loadAssetDetails]);
 
   const handleAssetScannedOrSelected = async (equipmentId: string) => {
-    if (!isDeviceEnrolled()) {
+    const isAuth = await syncEngine.verifyDeviceAuthorization();
+    if (!isAuth) {
       setIsEnrolled(false);
       return;
     }
@@ -451,8 +452,9 @@ export const App: React.FC = () => {
     setCurrentView('SCAN_SCREEN');
   };
 
-  const handleFormSubmitValues = (data: Partial<Transaction>) => {
-    if (!isDeviceEnrolled()) {
+  const handleFormSubmitValues = async (data: Partial<Transaction>) => {
+    const isAuth = await syncEngine.verifyDeviceAuthorization();
+    if (!isAuth) {
       setIsEnrolled(false);
       return;
     }
@@ -461,7 +463,8 @@ export const App: React.FC = () => {
   };
 
   const handleConfirmTransaction = async () => {
-    if (!isDeviceEnrolled()) {
+    const isAuth = await syncEngine.verifyDeviceAuthorization();
+    if (!isAuth) {
       setIsEnrolled(false);
       return;
     }
@@ -512,6 +515,11 @@ export const App: React.FC = () => {
   };
 
   const handleConfirmPowerEvent = async (timestamp: string) => {
+    const isAuth = await syncEngine.verifyDeviceAuthorization();
+    if (!isAuth) {
+      setIsEnrolled(false);
+      return;
+    }
     if (!currentAsset || !powerModalType) return;
 
     const nowIso = new Date().toISOString();
@@ -536,6 +544,11 @@ export const App: React.FC = () => {
   };
 
   const handleSaveEditedAsset = async (updated: Equipment) => {
+    const isAuth = await syncEngine.verifyDeviceAuthorization();
+    if (!isAuth) {
+      setIsEnrolled(false);
+      return;
+    }
     await db.equipments.put(updated);
     setCurrentAsset(updated);
     setIsEditingAsset(false);
@@ -544,6 +557,11 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateTransaction = async (updatedTx: Transaction) => {
+    const isAuth = await syncEngine.verifyDeviceAuthorization();
+    if (!isAuth) {
+      setIsEnrolled(false);
+      return;
+    }
     try {
       await syncEngine.updateTransaction(updatedTx);
       if (currentAsset) {
@@ -555,6 +573,11 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteTransaction = async (transactionId: string) => {
+    const isAuth = await syncEngine.verifyDeviceAuthorization();
+    if (!isAuth) {
+      setIsEnrolled(false);
+      return;
+    }
     try {
       await syncEngine.deleteTransaction(transactionId);
       if (currentAsset) {

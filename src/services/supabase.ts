@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus } from '../types';
-import { generateSecureDeviceToken } from './device';
+import { generateSecureDeviceToken, getDeviceId, getDeviceToken } from './device';
 import { db } from '../db/indexedDB';
 import { postRemoteTransaction } from './api';
 
@@ -81,6 +81,20 @@ export async function saveEquipmentToSupabase(equipment: Equipment): Promise<voi
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
+  // Verify device authorization for field handheld client modifications
+  const isAdminPortal = typeof window !== 'undefined' && window.location.pathname.includes('admin');
+  if (!isAdminPortal) {
+    const currentDevId = getDeviceId();
+    const currentToken = getDeviceToken();
+    if (!currentDevId || !currentToken) {
+      throw new Error('DEVICE_UNAUTHORIZED: Device has no active enrollment token');
+    }
+    const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
+    if (!authCheck.valid || authCheck.status !== 'active') {
+      throw new Error('DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator');
+    }
+  }
+
   const payload = {
     equipment_id: equipment.equipmentId,
     area: equipment.area,
@@ -105,6 +119,19 @@ export async function deleteEquipmentFromSupabase(equipmentId: string): Promise<
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
+  const isAdminPortal = typeof window !== 'undefined' && window.location.pathname.includes('admin');
+  if (!isAdminPortal) {
+    const currentDevId = getDeviceId();
+    const currentToken = getDeviceToken();
+    if (!currentDevId || !currentToken) {
+      throw new Error('DEVICE_UNAUTHORIZED: Device has no active enrollment token');
+    }
+    const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
+    if (!authCheck.valid || authCheck.status !== 'active') {
+      throw new Error('DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator');
+    }
+  }
+
   const { error } = await client.from('equipment_list').delete().eq('equipment_id', equipmentId);
   if (error) throw error;
 }
@@ -115,6 +142,19 @@ export async function deleteEquipmentFromSupabase(equipmentId: string): Promise<
 export async function deleteTransactionFromSupabase(transactionId: string): Promise<void> {
   const client = getSupabaseClient();
   if (!client) return;
+
+  const isAdminPortal = typeof window !== 'undefined' && window.location.pathname.includes('admin');
+  if (!isAdminPortal) {
+    const currentDevId = getDeviceId();
+    const currentToken = getDeviceToken();
+    if (!currentDevId || !currentToken) {
+      throw new Error('DEVICE_UNAUTHORIZED: Device has no active enrollment token');
+    }
+    const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
+    if (!authCheck.valid || authCheck.status !== 'active') {
+      throw new Error('DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator');
+    }
+  }
 
   // 1. Fetch transaction record prior to deletion to check if it impacts generator power state
   const { data: targetTx } = await client
@@ -305,6 +345,7 @@ export async function fetchTransactionsFromSupabase(): Promise<Transaction[]> {
 export async function uploadTransactionToCloud(
   tx: Transaction
 ): Promise<{ success: boolean; uploadTimestamp: string; error?: string }> {
+  const uploadTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
   const client = getSupabaseClient();
 
   if (!client) {
@@ -317,14 +358,41 @@ export async function uploadTransactionToCloud(
       console.warn('Central API upload failed (offline):', errorMsg);
       return {
         success: false,
-        uploadTimestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        uploadTimestamp,
         error: errorMsg,
       };
     }
   }
 
+  // 1. FAIL-CLOSED DEVICE AUTHORIZATION GUARD
+  const isAdminPortal = typeof window !== 'undefined' && (
+    window.location.pathname.includes('admin') ||
+    tx.deviceId === 'Admin-Workstation'
+  );
+
+  if (!isAdminPortal) {
+    const currentDevId = getDeviceId();
+    const currentToken = getDeviceToken();
+    if (!currentDevId || !currentToken) {
+      return {
+        success: false,
+        uploadTimestamp,
+        error: 'DEVICE_UNAUTHORIZED: Device has no active enrollment token',
+      };
+    }
+
+    const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
+    if (!authCheck.valid || authCheck.status !== 'active') {
+      console.warn(`[Supabase Upload Blocked] Device ${currentDevId} is not active (status: ${authCheck.status}).`);
+      return {
+        success: false,
+        uploadTimestamp,
+        error: 'DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator',
+      };
+    }
+  }
+
   // Supabase cloud path
-  const uploadTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
   try {
     // Step 1: Ensure parent equipment exists in Supabase equipment_list to satisfy Foreign Key constraint
     try {
@@ -368,8 +436,7 @@ export async function uploadTransactionToCloud(
       device_id: tx.deviceId ?? null,
     };
 
-    // Step 2: Save the transaction to Supabase.
-    // Try standard insert first (for new transactions).
+    // Save the transaction to Supabase
     let { error: txError } = await client.from('transactions').insert(payload);
 
     // If device_id column does not exist yet on remote Supabase table, retry without device_id
@@ -381,9 +448,7 @@ export async function uploadTransactionToCloud(
     }
 
     // If duplicate key (code 23505) or RLS policy violation on existing row (code 42501):
-    // This is an edit/update to an existing transaction.
-    // Because Supabase anonymous RLS allows DELETE and INSERT but restricts UPDATE,
-    // delete the existing row and insert the updated payload to preserve the exact transaction ID.
+    // Delete the existing row and insert the updated payload to preserve the exact transaction ID.
     if (
       txError &&
       (txError.code === '23505' ||
@@ -441,18 +506,6 @@ export async function uploadTransactionToCloud(
       errorMsg = String(err);
     }
     console.error('Supabase upload error:', errorMsg);
-
-    // If Supabase upload fails, attempt fallback to local server API
-    try {
-      const fallbackRes = await postRemoteTransaction(tx);
-      if (fallbackRes.success) {
-        console.log('Successfully saved to local API as fallback for tx:', tx.id);
-        return { success: true, uploadTimestamp: fallbackRes.uploadTimestamp };
-      }
-    } catch {
-      // Ignore fallback error and report original Supabase error
-    }
-
     return { success: false, uploadTimestamp, error: errorMsg };
   }
 }
@@ -526,12 +579,16 @@ export async function deleteAuthorizedDeviceFromSupabase(deviceId: string): Prom
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
+  const cleanId = deviceId.trim().toUpperCase();
   const { error } = await client
     .from('authorized_devices')
     .delete()
-    .eq('device_id', deviceId.trim().toUpperCase());
+    .eq('device_id', cleanId);
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[Supabase] Failed to delete authorized device "${cleanId}":`, error);
+    throw error;
+  }
 }
 
 /**
@@ -551,14 +608,13 @@ export async function verifyDeviceTokenWithSupabase(
     .from('authorized_devices')
     .select('*')
     .eq('device_id', cleanId)
-    .single();
+    .maybeSingle();
 
   if (error) {
-    // PGRST116: query returned 0 rows (device not registered in table)
     if (error.code === 'PGRST116') {
       return { valid: false, status: 'revoked' };
     }
-    // Table missing or network failure: throw so caller can fall back gracefully
+    console.warn('[Supabase] verifyDeviceToken query error:', error);
     throw error;
   }
 
@@ -580,7 +636,7 @@ export async function verifyDeviceTokenWithSupabase(
 
   return {
     valid: isActive,
-    status: data.status as DeviceStatus,
+    status: isActive ? 'active' : ((data.status as DeviceStatus) || 'revoked'),
     deviceName: data.device_name || data.device_id,
   };
 }
@@ -696,6 +752,7 @@ CREATE TABLE IF NOT EXISTS public.authorized_devices (
 );
 
 ALTER TABLE public.authorized_devices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.authorized_devices REPLICA IDENTITY FULL;
 DROP POLICY IF EXISTS "Allow read authorized_devices for anon" ON public.authorized_devices;
 CREATE POLICY "Allow read authorized_devices for anon" ON public.authorized_devices FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow upsert authorized_devices for anon" ON public.authorized_devices;
@@ -793,6 +850,7 @@ create index if not exists idx_dev_status on public.authorized_devices(status);
 alter table public.equipment_list enable row level security;
 alter table public.transactions enable row level security;
 alter table public.authorized_devices enable row level security;
+alter table public.authorized_devices replica identity full;
 
 -- 6. Policies: Devices can read, write, and delete records
 create policy "Allow read equipment for anon" on public.equipment_list for select using (true);

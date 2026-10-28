@@ -36,6 +36,7 @@ class SyncEngine {
   private lastSyncTime: string | null = null;
   private lastError: string | null = null;
   private syncTimer: ReturnType<typeof setInterval> | null = null;
+  private authTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -63,6 +64,13 @@ class SyncEngine {
           this.syncWithRemote();
         }
       }, 3000);
+
+      // Fast check every 2 seconds to instantly detect revocations / deletions from Admin Console
+      this.authTimer = setInterval(() => {
+        if (this.isEffectivelyOnline() && isDeviceEnrolled()) {
+          this.verifyDeviceAuthorization();
+        }
+      }, 2000);
 
       // Listen to cross-tab / cross-window instant authorization events
       onDeviceAuthBroadcast((event) => {
@@ -92,6 +100,9 @@ class SyncEngine {
                   return;
                 }
               }
+
+              // On ANY change to authorized_devices (including DELETE where affectedId might be empty),
+              // immediately verify authorization against Supabase
               this.verifyDeviceAuthorization();
               return;
             }
@@ -111,6 +122,10 @@ class SyncEngine {
     if (this.syncTimer) {
       clearInterval(this.syncTimer);
       this.syncTimer = null;
+    }
+    if (this.authTimer) {
+      clearInterval(this.authTimer);
+      this.authTimer = null;
     }
   }
 
@@ -200,6 +215,11 @@ class SyncEngine {
    * If the transaction affected equipment power status, recomputes the equipment's power state.
    */
   public async deleteTransaction(transactionId: string): Promise<void> {
+    const isAuth = await this.verifyDeviceAuthorization();
+    if (!isAuth) {
+      throw new Error('DEVICE_UNAUTHORIZED: This device has been deleted or revoked');
+    }
+
     const tx = await db.transactions.get(transactionId);
 
     // 1. Delete from local database and outbox
@@ -251,6 +271,11 @@ class SyncEngine {
    * Immediately attempts upload to the shared server.
    */
   public async queueTransaction(tx: Transaction): Promise<void> {
+    const isAuth = await this.verifyDeviceAuthorization();
+    if (!isAuth) {
+      throw new Error('DEVICE_UNAUTHORIZED: This device has been deleted or revoked');
+    }
+
     // 1. Write to local IndexedDB
     await db.transactions.put(tx);
 
@@ -292,6 +317,11 @@ class SyncEngine {
    * If online, immediately triggers an outbox flush to update the record in Supabase.
    */
   public async updateTransaction(tx: Transaction): Promise<void> {
+    const isAuth = await this.verifyDeviceAuthorization();
+    if (!isAuth) {
+      throw new Error('DEVICE_UNAUTHORIZED: This device has been deleted or revoked');
+    }
+
     const updatedTx: Transaction = {
       ...tx,
       syncStatus: 'pending',
@@ -384,8 +414,11 @@ class SyncEngine {
       }
       return true;
     } catch (e) {
-      // If network fails offline, preserve offline functionality ONLY if token is active locally
-      return isDeviceEnrolled();
+      if (!this.isEffectivelyOnline()) {
+        return isDeviceEnrolled();
+      }
+      console.warn('[SyncEngine] Error during device verification while online:', e);
+      return false;
     }
   }
 
@@ -521,6 +554,12 @@ class SyncEngine {
     let processed = 0;
     let errors = 0;
 
+    const isAuth = await this.verifyDeviceAuthorization();
+    if (!isAuth) {
+      await this.lockdownRevokedDevice();
+      return { processed: 0, errors: 1 };
+    }
+
     const items = await db.outbox.orderBy('createdAt').toArray();
 
     for (const item of items) {
@@ -543,6 +582,12 @@ class SyncEngine {
         await db.outbox.delete(item.id);
         processed++;
       } else {
+        if (result.error && result.error.includes('DEVICE_UNAUTHORIZED')) {
+          console.warn('[SyncEngine] Outbox flush blocked: Device unauthorized. Locking down.');
+          await this.lockdownRevokedDevice();
+          return { processed, errors: errors + 1 };
+        }
+
         errors++;
         this.lastError = result.error || 'Failed to upload transaction';
         await db.outbox.update(item.id, {
