@@ -13,7 +13,7 @@ import { EditAssetModal } from './components/EditAssetModal';
 import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
 import { PowerEventModal } from './components/PowerEventModal';
-import { getDeviceName, isDeviceEnrolled, clearDeviceEnrollment } from './services/device';
+import { getDeviceName, isDeviceEnrolled, getDeviceId, onDeviceAuthBroadcast } from './services/device';
 import { DeviceEnrollmentView } from './components/DeviceEnrollmentView';
 import { Smartphone, ExternalLink } from 'lucide-react';
 import { DesktopLaunchpad } from './components/DesktopLaunchpad';
@@ -249,20 +249,6 @@ export const App: React.FC = () => {
   const [currentAssetTransactions, setCurrentAssetTransactions] = useState<Transaction[]>([]);
 
   const [isEnrolled, setIsEnrolled] = useState<boolean>(() => isDeviceEnrolled());
-  const [isEnrollmentSkipped, setIsEnrollmentSkipped] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('ttd_enrollment_skipped') === '1';
-    } catch {
-      return false;
-    }
-  });
-
-  const handleSkipEnrollment = () => {
-    try {
-      sessionStorage.setItem('ttd_enrollment_skipped', '1');
-    } catch {}
-    setIsEnrollmentSkipped(true);
-  };
 
   const [syncState, setSyncState] = useState<SyncState>({
     isOnline: true,
@@ -392,16 +378,65 @@ export const App: React.FC = () => {
 
     const unsubRevoke = syncEngine.onDeviceRevoked(() => {
       setIsEnrolled(false);
+      setActiveAssetId(null);
+      setCurrentAsset(null);
+      setCurrentAssetTransactions([]);
+      setCurrentView('SPLASH_SCREEN');
     });
+
+    // Instant cross-tab/window event listener
+    const unsubBroadcast = onDeviceAuthBroadcast((event) => {
+      const myId = getDeviceId();
+      if (event.deviceId && myId && event.deviceId.toUpperCase() === myId.toUpperCase()) {
+        if (event.status !== 'active') {
+          syncEngine.lockdownRevokedDevice();
+        }
+      }
+    });
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (
+        e.key === 'ttd_pda_device_status' ||
+        e.key === 'ttd_pda_device_token' ||
+        e.key === 'ttd_mock_authorized_devices'
+      ) {
+        if (!isDeviceEnrolled()) {
+          setIsEnrolled(false);
+        } else {
+          syncEngine.verifyDeviceAuthorization();
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        if (!isDeviceEnrolled()) {
+          setIsEnrolled(false);
+        } else {
+          syncEngine.verifyDeviceAuthorization();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
 
     return () => {
       unsubState();
       unsubData();
       unsubRevoke();
+      unsubBroadcast();
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
     };
   }, [refreshAssetsList, loadAssetDetails]);
 
   const handleAssetScannedOrSelected = async (equipmentId: string) => {
+    if (!isDeviceEnrolled()) {
+      setIsEnrolled(false);
+      return;
+    }
     setActiveAssetId(equipmentId);
     setActiveAction(null);
     await loadAssetDetails(equipmentId);
@@ -417,11 +452,19 @@ export const App: React.FC = () => {
   };
 
   const handleFormSubmitValues = (data: Partial<Transaction>) => {
+    if (!isDeviceEnrolled()) {
+      setIsEnrolled(false);
+      return;
+    }
     setPendingTxData(data);
     setIsConfirmModalOpen(true);
   };
 
   const handleConfirmTransaction = async () => {
+    if (!isDeviceEnrolled()) {
+      setIsEnrolled(false);
+      return;
+    }
     if (!currentAsset || !pendingTxData) return;
 
     const nowIso = new Date().toISOString();
@@ -572,19 +615,15 @@ export const App: React.FC = () => {
     );
   }
 
-  // 0. DEVICE ENROLLMENT LOCK SCREEN (If scanner is not yet authorized and not skipped)
-  if (!isEnrolled && !isEnrollmentSkipped) {
+  // 0. DEVICE ENROLLMENT LOCK SCREEN (If scanner has no active token)
+  if (!isEnrolled) {
     const enrollContent = (
       <DeviceEnrollmentView
         onEnrolled={async () => {
           setIsEnrolled(true);
-          try {
-            sessionStorage.removeItem('ttd_enrollment_skipped');
-          } catch {}
           await refreshAssetsList();
           await syncEngine.syncWithRemote();
         }}
-        onSkip={handleSkipEnrollment}
       />
     );
 
@@ -718,19 +757,11 @@ export const App: React.FC = () => {
           setCurrentView('SPLASH_SCREEN');
         }}
         onDeregister={() => {
-          clearDeviceEnrollment();
-          setIsEnrolled(false);
-          setIsEnrollmentSkipped(false);
-          try {
-            sessionStorage.removeItem('ttd_enrollment_skipped');
-          } catch {}
+          syncEngine.lockdownRevokedDevice();
         }}
         onOpenEnrollment={() => {
           setIsSettingsModalOpen(false);
-          setIsEnrollmentSkipped(false);
-          try {
-            sessionStorage.removeItem('ttd_enrollment_skipped');
-          } catch {}
+          setIsEnrolled(false);
         }}
       />
     </div>

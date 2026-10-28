@@ -18,7 +18,7 @@ import {
   verifyDeviceTokenWithSupabase,
   registerDeviceRequestToSupabase,
 } from './supabase';
-import { generateSecureDeviceToken } from './device';
+import { generateSecureDeviceToken, broadcastDeviceAuthEvent } from './device';
 
 export async function fetchRemoteEquipment(): Promise<Equipment[]> {
   if (isSupabaseConfigured()) {
@@ -240,6 +240,9 @@ export async function postRemoteAuthorizedDevice(device: AuthorizedDevice): Prom
 }
 
 export async function updateRemoteDeviceStatus(deviceId: string, status: DeviceStatus): Promise<void> {
+  // Broadcast immediately to any active tabs/listeners
+  broadcastDeviceAuthEvent({ type: 'STATUS_CHANGED', deviceId, status });
+
   if (isSupabaseConfigured()) {
     try {
       await updateDeviceStatusInSupabase(deviceId, status);
@@ -258,6 +261,9 @@ export async function updateRemoteDeviceStatus(deviceId: string, status: DeviceS
 }
 
 export async function deleteRemoteAuthorizedDevice(deviceId: string): Promise<void> {
+  // Broadcast revocation immediately
+  broadcastDeviceAuthEvent({ type: 'REVOKED', deviceId, status: 'revoked' });
+
   if (isSupabaseConfigured()) {
     try {
       await deleteAuthorizedDeviceFromSupabase(deviceId);

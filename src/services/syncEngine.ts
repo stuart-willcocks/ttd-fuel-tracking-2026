@@ -3,7 +3,13 @@ import { uploadTransactionToCloud, isSupabaseConfigured, subscribeToCloudChanges
 import { fetchRemoteEquipment, fetchRemoteTransactions, deleteRemoteTransaction } from './api';
 import type { Transaction } from '../types';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
-import { isDeviceEnrolled, getDeviceId, getDeviceToken, clearDeviceEnrollment } from './device';
+import {
+  isDeviceEnrolled,
+  getDeviceId,
+  getDeviceToken,
+  markDeviceRevoked,
+  onDeviceAuthBroadcast,
+} from './device';
 import { verifyRemoteDeviceToken } from './api';
 
 export interface SyncState {
@@ -46,6 +52,7 @@ class SyncEngine {
       window.addEventListener('offline', () => this.handleNetworkChange());
       window.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && this.isEffectivelyOnline()) {
+          this.verifyDeviceAuthorization();
           this.syncWithRemote();
         }
       });
@@ -57,10 +64,38 @@ class SyncEngine {
         }
       }, 3000);
 
+      // Listen to cross-tab / cross-window instant authorization events
+      onDeviceAuthBroadcast((event) => {
+        const myId = getDeviceId();
+        if (event.deviceId && myId && event.deviceId.toUpperCase() === myId.toUpperCase()) {
+          if (event.status !== 'active') {
+            console.warn(`[SyncEngine Broadcast] Device ${myId} revoked via local event.`);
+            this.lockdownRevokedDevice();
+          }
+        }
+      });
+
       // Subscribe to real-time cloud changes so PDAs update immediately
       if (isSupabaseConfigured()) {
         try {
-          subscribeToCloudChanges(() => {
+          subscribeToCloudChanges((table, eventType, payload) => {
+            if (table === 'authorized_devices') {
+              const myId = getDeviceId();
+              const newRow = payload?.new as { device_id?: string; status?: string } | undefined;
+              const oldRow = payload?.old as { device_id?: string; status?: string } | undefined;
+              const affectedId = (newRow?.device_id || oldRow?.device_id || '').toUpperCase();
+
+              if (affectedId && myId && affectedId === myId.toUpperCase()) {
+                if (newRow?.status !== 'active' || eventType === 'DELETE') {
+                  console.warn(`[SyncEngine Realtime] PDA ${myId} status changed to ${newRow?.status || 'deleted'}. Locking down.`);
+                  this.lockdownRevokedDevice();
+                  return;
+                }
+              }
+              this.verifyDeviceAuthorization();
+              return;
+            }
+
             if (this.isEffectivelyOnline() && !this.isSyncing) {
               this.syncWithRemote();
             }
@@ -308,6 +343,53 @@ class SyncEngine {
   }
 
   /**
+   * Immediately clears local cached fleet data, marks device status as revoked,
+   * and notifies all listeners to lock down the UI.
+   */
+  public async lockdownRevokedDevice(): Promise<void> {
+    const currentDevId = getDeviceId();
+    console.warn(`[SyncEngine] Locking down device "${currentDevId}". Active token revoked.`);
+    markDeviceRevoked();
+    try {
+      await db.equipments.clear();
+      await db.transactions.clear();
+      await db.outbox.clear();
+    } catch (e) {
+      console.warn('Error clearing local db on revocation:', e);
+    }
+    this.notifyDeviceRevoked();
+  }
+
+  /**
+   * Verifies that this physical device has a valid active token on the central server.
+   * If token is revoked or missing, triggers lockdown immediately.
+   */
+  public async verifyDeviceAuthorization(): Promise<boolean> {
+    if (!isDeviceEnrolled()) {
+      return false;
+    }
+    const currentDevId = getDeviceId();
+    const currentToken = getDeviceToken();
+    if (!currentDevId || !currentToken) {
+      await this.lockdownRevokedDevice();
+      return false;
+    }
+
+    try {
+      const check = await verifyRemoteDeviceToken(currentDevId, currentToken);
+      if (!check.valid || check.status !== 'active') {
+        console.warn(`[SyncEngine] Device ${currentDevId} validation failed (valid=${check.valid}, status=${check.status}). Locking down.`);
+        await this.lockdownRevokedDevice();
+        return false;
+      }
+      return true;
+    } catch (e) {
+      // If network fails offline, preserve offline functionality ONLY if token is active locally
+      return isDeviceEnrolled();
+    }
+  }
+
+  /**
    * Full two-way sync:
    * 1. Flush any pending outbox items from this device to the central server.
    * 2. Pull remote transactions & equipment from the central server and update local IndexedDB.
@@ -315,26 +397,14 @@ class SyncEngine {
   public async syncWithRemote(): Promise<void> {
     if (!this.isEffectivelyOnline() || this.isSyncing) return;
 
-    // Check device authorization status
+    // Strict Device Authorization: If device has no active token, lock down immediately
     if (isDeviceEnrolled()) {
-      try {
-        const currentDevId = getDeviceId();
-        const currentToken = getDeviceToken();
-        if (currentDevId && currentToken) {
-          const check = await verifyRemoteDeviceToken(currentDevId, currentToken);
-          if (!check.valid && check.status === 'revoked') {
-            console.warn(`[SyncEngine] Device ${currentDevId} has been revoked by an administrator.`);
-            clearDeviceEnrollment();
-            await db.equipments.clear();
-            await db.transactions.clear();
-            await db.outbox.clear();
-            this.notifyDeviceRevoked();
-            return;
-          }
-        }
-      } catch (e) {
-        // Silently preserve offline functionality if network error occurs
+      const isAuthorized = await this.verifyDeviceAuthorization();
+      if (!isAuthorized) {
+        return;
       }
+    } else {
+      return;
     }
 
     this.isSyncing = true;

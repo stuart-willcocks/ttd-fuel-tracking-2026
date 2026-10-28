@@ -7,7 +7,6 @@ import {
   KeyRound,
   Smartphone,
   AlertTriangle,
-  X,
   ShieldCheck,
 } from 'lucide-react';
 import { saveDeviceEnrollment, getDeviceStatus } from '../services/device';
@@ -15,7 +14,6 @@ import { verifyRemoteDeviceToken, registerRemoteDeviceRequest, postRemoteAuthori
 
 interface DeviceEnrollmentViewProps {
   onEnrolled: () => void;
-  onSkip?: () => void;
 }
 
 /**
@@ -74,7 +72,6 @@ export function parseEnrollmentString(
 
 export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
   onEnrolled,
-  onSkip,
 }) => {
   const [activeTab, setActiveTab] = useState<'scan' | 'manual'>('scan');
   const [barcodeInput, setBarcodeInput] = useState('');
@@ -318,42 +315,19 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px',
-              background: 'rgba(0,0,0,0.25)',
-              color: '#FFFFFF',
-              padding: '3px 7px',
+              gap: '5px',
+              background: isRevoked ? 'rgba(239, 68, 68, 0.25)' : 'rgba(0,0,0,0.25)',
+              color: isRevoked ? '#EF4444' : '#FFFFFF',
+              border: isRevoked ? '1px solid #EF4444' : 'none',
+              padding: '4px 8px',
               borderRadius: '4px',
               fontSize: '0.72rem',
-              fontWeight: 700,
+              fontWeight: 800,
             }}
           >
-            <Smartphone size={12} />
-            <span>PDA Setup</span>
+            {isRevoked ? <ShieldAlert size={13} color="#EF4444" /> : <Smartphone size={13} />}
+            <span>{isRevoked ? 'LOCKED (REVOKED)' : 'LOCKED (UNREGISTERED)'}</span>
           </div>
-
-          {onSkip && (
-            <button
-              type="button"
-              onClick={onSkip}
-              title="Exit registration screen"
-              style={{
-                background: 'rgba(0,0,0,0.2)',
-                border: '1px solid rgba(0,0,0,0.3)',
-                color: '#000000',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '0.74rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-              }}
-            >
-              <X size={13} />
-              <span>Exit</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -394,8 +368,8 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
             </h1>
             <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
               {isRevoked
-                ? 'Authorization for this scanner was revoked by an administrator.'
-                : 'Point the laser scanner at the Admin Console QR code to enroll.'}
+                ? 'Authorization for this scanner has been revoked by an administrator. The UI is locked down until an authorized QR code is scanned.'
+                : 'This handheld is locked down. Point the laser scanner at an authorized Admin QR code to activate.'}
             </p>
           </div>
 
@@ -783,27 +757,6 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
                 </button>
               )}
             </form>
-          )}
-
-          {/* Skip / Exit Option */}
-          {onSkip && (
-            <div style={{ textAlign: 'center', marginTop: '16px' }}>
-              <button
-                type="button"
-                onClick={onSkip}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#94A3B8',
-                  fontSize: '0.82rem',
-                  textDecoration: 'underline',
-                  cursor: 'pointer',
-                  padding: '6px',
-                }}
-              >
-                Skip registration and continue to app &rarr;
-              </button>
-            </div>
           )}
         </div>
 

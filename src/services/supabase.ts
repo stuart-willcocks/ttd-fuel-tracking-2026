@@ -634,7 +634,11 @@ export async function registerDeviceRequestToSupabase(
  * Returns an unsubscribe teardown function.
  */
 export function subscribeToCloudChanges(
-  onDataChange: (table: 'transactions' | 'equipment_list' | 'authorized_devices', eventType: string) => void
+  onDataChange: (
+    table: 'transactions' | 'equipment_list' | 'authorized_devices',
+    eventType: string,
+    payload?: { new?: Record<string, unknown>; old?: Record<string, unknown> }
+  ) => void
 ): () => void {
   const client = getSupabaseClient();
   if (!client) return () => {};
@@ -645,21 +649,21 @@ export function subscribeToCloudChanges(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'transactions' },
       (payload) => {
-        onDataChange('transactions', payload.eventType);
+        onDataChange('transactions', payload.eventType, payload as { new?: Record<string, unknown>; old?: Record<string, unknown> });
       }
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'equipment_list' },
       (payload) => {
-        onDataChange('equipment_list', payload.eventType);
+        onDataChange('equipment_list', payload.eventType, payload as { new?: Record<string, unknown>; old?: Record<string, unknown> });
       }
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'authorized_devices' },
       (payload) => {
-        onDataChange('authorized_devices', payload.eventType);
+        onDataChange('authorized_devices', payload.eventType, payload as { new?: Record<string, unknown>; old?: Record<string, unknown> });
       }
     )
     .subscribe((status) => {

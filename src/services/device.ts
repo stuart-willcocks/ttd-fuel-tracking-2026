@@ -5,6 +5,35 @@ const STORAGE_KEY_DEVICE_NAME = 'ttd_pda_device_name';
 const STORAGE_KEY_DEVICE_TOKEN = 'ttd_pda_device_token';
 const STORAGE_KEY_DEVICE_STATUS = 'ttd_pda_device_status';
 
+// BroadcastChannel for cross-tab / cross-window instant authorization synchronization
+const deviceAuthChannel =
+  typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined'
+    ? new BroadcastChannel('ttd_device_auth_events')
+    : null;
+
+export interface DeviceAuthBroadcastEvent {
+  type: 'REVOKED' | 'ENROLLED' | 'STATUS_CHANGED';
+  deviceId: string;
+  status?: DeviceStatus;
+}
+
+export function broadcastDeviceAuthEvent(event: DeviceAuthBroadcastEvent): void {
+  try {
+    deviceAuthChannel?.postMessage(event);
+  } catch {}
+}
+
+export function onDeviceAuthBroadcast(callback: (event: DeviceAuthBroadcastEvent) => void): () => void {
+  if (!deviceAuthChannel) return () => {};
+  const handler = (e: MessageEvent<DeviceAuthBroadcastEvent>) => {
+    if (e.data && e.data.type) {
+      callback(e.data);
+    }
+  };
+  deviceAuthChannel.addEventListener('message', handler);
+  return () => deviceAuthChannel.removeEventListener('message', handler);
+}
+
 /**
  * Generates a high-entropy secure device authentication token
  */
@@ -21,7 +50,8 @@ export function generateSecureDeviceToken(): string {
 }
 
 /**
- * Checks whether this physical PDA device has been enrolled and authorized.
+ * Checks whether this physical PDA device has an active, valid enrollment token.
+ * If there is no active token (revoked, pending, or missing), returns false.
  */
 export function isDeviceEnrolled(): boolean {
   if (typeof window === 'undefined') return true;
@@ -30,7 +60,13 @@ export function isDeviceEnrolled(): boolean {
   const token = localStorage.getItem(STORAGE_KEY_DEVICE_TOKEN);
   const status = localStorage.getItem(STORAGE_KEY_DEVICE_STATUS);
 
-  return Boolean(id && id.trim().length > 0 && token && status === 'active');
+  return Boolean(
+    id &&
+    id.trim().length > 0 &&
+    token &&
+    token.trim().length > 0 &&
+    status === 'active'
+  );
 }
 
 /**
@@ -74,7 +110,7 @@ export function saveDeviceEnrollment(info: {
   const cleanId = info.deviceId.trim().toUpperCase();
   const cleanToken = info.authToken.trim();
   const status = info.status || 'active';
-  const cleanName = (info.deviceName && info.deviceName.trim().length > 0)
+  const cleanName = info.deviceName && info.deviceName.trim().length > 0
     ? info.deviceName.trim()
     : cleanId;
 
@@ -82,6 +118,29 @@ export function saveDeviceEnrollment(info: {
   localStorage.setItem(STORAGE_KEY_DEVICE_TOKEN, cleanToken);
   localStorage.setItem(STORAGE_KEY_DEVICE_STATUS, status);
   localStorage.setItem(STORAGE_KEY_DEVICE_NAME, cleanName);
+
+  broadcastDeviceAuthEvent({
+    type: 'ENROLLED',
+    deviceId: cleanId,
+    status,
+  });
+}
+
+/**
+ * Marks this physical device as revoked, removes the active authentication token,
+ * and sets status to 'revoked' so the lockdown screen displays the decommissioned state.
+ */
+export function markDeviceRevoked(): void {
+  if (typeof window === 'undefined') return;
+  const currentDevId = getDeviceId();
+  localStorage.removeItem(STORAGE_KEY_DEVICE_TOKEN);
+  localStorage.setItem(STORAGE_KEY_DEVICE_STATUS, 'revoked');
+
+  broadcastDeviceAuthEvent({
+    type: 'REVOKED',
+    deviceId: currentDevId,
+    status: 'revoked',
+  });
 }
 
 /**
@@ -89,10 +148,17 @@ export function saveDeviceEnrollment(info: {
  */
 export function clearDeviceEnrollment(): void {
   if (typeof window === 'undefined') return;
+  const currentDevId = getDeviceId();
   localStorage.removeItem(STORAGE_KEY_DEVICE_ID);
   localStorage.removeItem(STORAGE_KEY_DEVICE_NAME);
   localStorage.removeItem(STORAGE_KEY_DEVICE_TOKEN);
   localStorage.removeItem(STORAGE_KEY_DEVICE_STATUS);
+
+  broadcastDeviceAuthEvent({
+    type: 'REVOKED',
+    deviceId: currentDevId,
+    status: 'revoked',
+  });
 }
 
 /**
