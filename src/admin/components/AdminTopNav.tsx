@@ -25,16 +25,43 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
   const isStaging = getIsStaging();
 
   useEffect(() => {
-    const checkVersion = async () => {
+    // Clean up any cache-busting ?v= query param from the address bar after an update reload
+    if (typeof window !== 'undefined' && window.location.search.includes('v=')) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('v');
+        const cleanSearch = url.searchParams.toString();
+        window.history.replaceState({}, '', url.pathname + (cleanSearch ? `?${cleanSearch}` : '') + url.hash);
+      } catch {}
+    }
+
+    const checkVersion = async (isInitialLoad = false) => {
       const res = await checkRemoteAppVersion();
       if (res.hasUpdate) {
         setHasNewVersion(true);
         if (res.remoteVersion) setNewVersionTag(res.remoteVersion);
+
+        // If the browser served a stale cached bundle on initial open/refresh,
+        // automatically bust cache and reload into the new version immediately.
+        if (isInitialLoad && res.remoteVersion) {
+          try {
+            const lastAutoAttempt = sessionStorage.getItem('ttd_admin_auto_update_target');
+            if (lastAutoAttempt !== res.remoteVersion) {
+              sessionStorage.setItem('ttd_admin_auto_update_target', res.remoteVersion);
+              performAppUpdate(res.remoteVersion);
+              return;
+            }
+          } catch {}
+        }
+      } else {
+        try {
+          sessionStorage.removeItem('ttd_admin_auto_update_target');
+        } catch {}
       }
     };
 
-    checkVersion();
-    const interval = setInterval(checkVersion, 30000);
+    checkVersion(true);
+    const interval = setInterval(() => checkVersion(false), 30000);
     return () => clearInterval(interval);
   }, []);
 

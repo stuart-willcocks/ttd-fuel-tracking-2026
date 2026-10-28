@@ -89,8 +89,9 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        navigateFallbackDenylist: [/^\/api/, /^\/version\.json$/],
+        navigateFallbackDenylist: [/^\/api/, /^\/version\.json$/, /^\/admin/],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        globIgnores: ['**/admin.html', '**/assets/admin-*'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

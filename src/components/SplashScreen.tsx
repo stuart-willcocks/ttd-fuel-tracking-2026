@@ -20,6 +20,14 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
 
     // 1. Check if we just completed an update reload
     if (isInitial) {
+      if (typeof window !== 'undefined' && window.location.search.includes('v=')) {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('v');
+          const cleanSearch = url.searchParams.toString();
+          window.history.replaceState({}, '', url.pathname + (cleanSearch ? `?${cleanSearch}` : '') + url.hash);
+        } catch {}
+      }
       try {
         const justUpdatedVersion = sessionStorage.getItem('ttd_just_updated_to');
         if (justUpdatedVersion) {

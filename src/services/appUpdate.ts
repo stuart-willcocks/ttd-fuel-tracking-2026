@@ -122,7 +122,7 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
       }
     }
 
-    // 4. Prime the HTTP cache with fresh index.html from the network, then navigate to clean path
+    // 4. Prime the HTTP cache with fresh HTML from the network, then navigate with cache-busting query param
     const cleanUrl = window.location.origin + window.location.pathname;
     try {
       await fetch(cleanUrl, {
@@ -136,7 +136,9 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
       // Ignore network pre-fetch error and proceed to reload
     }
 
-    window.location.replace(cleanUrl);
+    const bustUrl = new URL(cleanUrl);
+    bustUrl.searchParams.set('v', String(Date.now()));
+    window.location.replace(bustUrl.toString());
   } catch (err) {
     console.error('[AppUpdate] Update execution failed, falling back to reload:', err);
     window.location.reload();
