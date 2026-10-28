@@ -73,10 +73,12 @@ export async function checkRemoteAppVersion(): Promise<VersionCheckResult> {
 
 /**
  * Executes a complete, guaranteed app update:
- * 1. Prompts waiting service workers to skip waiting.
- * 2. Purges all browser CacheStorage caches to remove stale chunks.
- * 3. Cleans transient storage flags.
- * 4. Force-reloads the page with a cache-busting timestamp query parameter.
+ * 1. Stores target version in sessionStorage.
+ * 2. Unregisters active service workers BEFORE purging CacheStorage so Workbox's
+ *    NavigationRoute (createHandlerBoundToURL('index.html')) never hits an emptied precache
+ *    (which otherwise causes Chrome Android to fail with ERR_FAILED / "This site can't be reached").
+ * 3. Purges all browser CacheStorage caches to remove stale chunks.
+ * 4. Revalidates index.html over the network and reloads cleanly.
  */
 export async function performAppUpdate(targetVersion?: string): Promise<void> {
   if (isCurrentlyUpdating) return;
@@ -85,25 +87,31 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
   console.log(`[AppUpdate] Applying update${targetVersion ? ` to version ${targetVersion}` : ''}...`);
 
   try {
-    // 1. Tell all registered service workers to activate immediately
+    // 1. Mark update completed in sessionStorage first before any navigation/reload event
+    try {
+      sessionStorage.removeItem('ttd_initial_view');
+      if (targetVersion) {
+        sessionStorage.setItem('ttd_just_updated_to', String(targetVersion));
+      }
+    } catch {}
+
+    // 2. Unregister all service workers BEFORE deleting CacheStorage caches
     if ('serviceWorker' in navigator) {
       try {
         const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const reg of registrations) {
-          if (reg.waiting) {
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-          }
-          if (reg.active) {
-            reg.active.postMessage({ type: 'SKIP_WAITING' });
-          }
-          reg.update().catch(() => {});
-        }
+        await Promise.all(
+          registrations.map(async (reg) => {
+            try {
+              await reg.unregister();
+            } catch {}
+          }),
+        );
       } catch (swErr) {
-        console.warn('[AppUpdate] SW skipWaiting error:', swErr);
+        console.warn('[AppUpdate] SW unregister error:', swErr);
       }
     }
 
-    // 2. Clear all browser CacheStorage caches so stale HTML/JS bundles are purged
+    // 3. Clear all browser CacheStorage caches so stale HTML/JS bundles are purged
     if (typeof window !== 'undefined' && 'caches' in window) {
       try {
         const cacheKeys = await caches.keys();
@@ -114,18 +122,21 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
       }
     }
 
-    // 3. Mark update completed in sessionStorage
+    // 4. Prime the HTTP cache with fresh index.html from the network, then navigate to clean path
+    const cleanUrl = window.location.origin + window.location.pathname;
     try {
-      sessionStorage.removeItem('ttd_initial_view');
-      if (targetVersion) {
-        sessionStorage.setItem('ttd_just_updated_to', String(targetVersion));
-      }
-    } catch {}
+      await fetch(cleanUrl, {
+        cache: 'reload',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      });
+    } catch {
+      // Ignore network pre-fetch error and proceed to reload
+    }
 
-    // 4. Force reload by navigating to fresh timestamp URL
-    const url = new URL(window.location.href);
-    url.searchParams.set('v', String(Date.now()));
-    window.location.replace(url.toString());
+    window.location.replace(cleanUrl);
   } catch (err) {
     console.error('[AppUpdate] Update execution failed, falling back to reload:', err);
     window.location.reload();
@@ -134,14 +145,17 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
 
 /**
  * Registers a listener on navigator.serviceWorker 'controllerchange'
- * so that when a new service worker claims the page, it reloads to pick up new bundles.
+ * so that when a new service worker claims an already-controlled page, it reloads to pick up new bundles.
  */
 export function setupServiceWorkerAutoReload(): void {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
+  const hadControllerOnBoot = Boolean(navigator.serviceWorker.controller);
   let isReloading = false;
+
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (isReloading) return;
+    if (isCurrentlyUpdating || isReloading || !hadControllerOnBoot) return;
+    if (!navigator.serviceWorker.controller) return;
     isReloading = true;
     console.log('[AppUpdate] Service worker controller changed. Reloading page...');
     window.location.reload();

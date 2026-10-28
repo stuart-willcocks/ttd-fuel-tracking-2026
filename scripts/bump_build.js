@@ -39,7 +39,7 @@ const distDir = path.join(rootDir, 'dist');
 if (fs.existsSync(distDir)) {
   try {
     fs.writeFileSync(path.join(distDir, 'version.json'), JSON.stringify(versionData, null, 2) + '\n', 'utf-8');
-  } catch {}
+  } catch { }
 }
 
 import { execSync } from 'child_process';
