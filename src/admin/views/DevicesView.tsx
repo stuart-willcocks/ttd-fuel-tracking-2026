@@ -46,10 +46,19 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const [copiedTelemetrySql, setCopiedTelemetrySql] = useState(false);
   const [hasNativeTelemetryColumns, setHasNativeTelemetryColumns] = useState<boolean | null>(null);
   const [showSqlDetails, setShowSqlDetails] = useState(false);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
 
   React.useEffect(() => {
+    setNowMs(Date.now());
     checkNativeTelemetryColumns().then(setHasNativeTelemetryColumns).catch(() => {});
   }, [devices, isRefreshing]);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleCopyMigrationSql = () => {
     navigator.clipboard.writeText(SUPABASE_SQL_MIGRATION);
@@ -103,6 +112,30 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     } catch {
       return isoString;
     }
+  };
+
+  const formatTimeSinceSync = (isoString?: string) => {
+    if (!isoString) return '—';
+    const syncedMs = new Date(isoString).getTime();
+    if (Number.isNaN(syncedMs)) return '—';
+
+    const diffMs = Math.max(0, nowMs - syncedMs);
+    const totalMinutes = Math.floor(diffMs / 60000);
+
+    if (totalMinutes < 60) {
+      return `${totalMinutes} ${totalMinutes === 1 ? 'min' : 'mins'}`;
+    }
+
+    if (totalMinutes < 1440) {
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      return `${hours}h ${mins}m`;
+    }
+
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const mins = totalMinutes % 60;
+    return `${days}d ${hours}h ${mins}m`;
   };
 
   const renderBattery = (dev: AuthorizedDevice) => {
@@ -552,10 +585,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 <th>Device ID</th>
                 <th>Device Label / Description</th>
                 <th>Status</th>
+                <th>Last Active / Synced</th>
+                <th>Time Since Last Sync</th>
                 <th>Battery</th>
                 <th>GPS Location</th>
                 <th>Enrolled Date</th>
-                <th>Last Active / Synced</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
@@ -619,6 +653,25 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                       )}
                     </td>
 
+                    <td style={{ fontSize: '0.82rem', color: 'var(--adm-text-secondary)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Clock size={13} style={{ opacity: 0.6 }} />
+                        <span>{formatDate(dev.lastSeenAt)}</span>
+                      </div>
+                    </td>
+
+                    <td
+                      style={{
+                        fontSize: '0.82rem',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontWeight: 600,
+                        color: 'var(--adm-text-primary)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {formatTimeSinceSync(dev.lastSeenAt)}
+                    </td>
+
                     <td>
                       {renderBattery(dev)}
                     </td>
@@ -629,13 +682,6 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
                     <td style={{ fontSize: '0.82rem', color: 'var(--adm-text-secondary)' }}>
                       {formatDate(dev.registeredAt)}
-                    </td>
-
-                    <td style={{ fontSize: '0.82rem', color: 'var(--adm-text-secondary)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <Clock size={13} style={{ opacity: 0.6 }} />
-                        <span>{formatDate(dev.lastSeenAt)}</span>
-                      </div>
                     </td>
 
                     <td style={{ textAlign: 'right' }}>
