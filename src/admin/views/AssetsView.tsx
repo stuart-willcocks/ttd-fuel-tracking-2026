@@ -16,6 +16,7 @@ import {
 import type { Equipment, Transaction } from '../../types';
 import { EquipmentTypeIcon } from '../../components/EquipmentTypeIcon';
 import { getGeneratorPowerState } from '../../utils/powerState';
+import { formatPdaTimestamp } from '../../utils/dateFormat';
 import {
   getGoogleMapsExternalUrl,
   handleWhat3WordsLinkClick,
@@ -25,6 +26,7 @@ import {
   normalizeWhat3Words,
   getFleetSatelliteMapSrcDoc,
   type FleetMapMarkerItem,
+  type FleetMapTransactionItem,
 } from '../../services/what3words';
 import { postRemoteEquipment } from '../../services/api';
 
@@ -220,6 +222,50 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   // Build map markers for all filtered assets with resolved coordinates
   const fleetMapMarkers = useMemo<FleetMapMarkerItem[]>(() => {
     void coordResolveTick;
+
+    // Group and sort transactions newest-first per equipmentId
+    const txByAsset = new Map<string, Transaction[]>();
+    for (const tx of transactions) {
+      const list = txByAsset.get(tx.equipmentId) || [];
+      list.push(tx);
+      txByAsset.set(tx.equipmentId, list);
+    }
+
+    const formatCompactTxSummary = (tx: Transaction): string => {
+      const t = (tx.transactionType || '').toString();
+      if (t.includes('FuelTransfer')) {
+        const parts: string[] = [];
+        parts.push(`Fuel: ${tx.fuelTransferLitres !== undefined ? tx.fuelTransferLitres : 0}L`);
+        if (tx.defTransferLitres !== undefined) {
+          parts.push(`DEF: ${tx.defTransferLitres}L`);
+        }
+        return parts.join(' • ');
+      }
+      if (t === 'PoweredUp') return 'Powered Up';
+      if (t === 'PoweredDown') return 'Powered Down';
+
+      const isCheckOut = t.includes('CheckOut');
+      const fuelPct = isCheckOut ? tx.checkOutFuelPercentage : tx.checkInFuelPercentage;
+      const fuelEighths = isCheckOut ? tx.checkOutFuelEighths : tx.checkInFuelEighths;
+      const defPct = isCheckOut ? tx.checkOutDefPercentage : tx.checkInDefPercentage;
+      const kwh = isCheckOut ? tx.checkOutKWH : tx.checkInKWH;
+
+      const parts: string[] = [];
+      if (fuelPct !== undefined) {
+        parts.push(`Fuel: ${fuelPct}%`);
+      } else if (fuelEighths !== undefined) {
+        parts.push(`Fuel: ${fuelEighths}/8`);
+      }
+      if (defPct !== undefined) {
+        parts.push(`DEF: ${defPct}%`);
+      }
+      if (kwh !== undefined) {
+        parts.push(`kWh: ${kwh}`);
+      }
+      if (parts.length > 0) return parts.join(' • ');
+      return isCheckOut ? 'Check Out' : 'Check In';
+    };
+
     const items: FleetMapMarkerItem[] = [];
     for (const asset of sortedAssets) {
       const coords =
@@ -231,6 +277,17 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       const isOn =
         asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
 
+      const assetTxs = (txByAsset.get(asset.equipmentId) || [])
+        .slice()
+        .sort((a, b) => new Date(b.transactionTimestamp).getTime() - new Date(a.transactionTimestamp).getTime());
+
+      const recentTransactions: FleetMapTransactionItem[] = assetTxs.slice(0, 8).map((tx) => ({
+        id: tx.id,
+        timestamp: formatPdaTimestamp(tx.transactionTimestamp),
+        type: tx.transactionType,
+        summary: formatCompactTxSummary(tx),
+      }));
+
       items.push({
         equipmentId: asset.equipmentId,
         type: asset.type,
@@ -241,6 +298,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         rentalSerialNumber: asset.rentalSerialNumber,
         isOn,
         txCount: txCounts[asset.equipmentId] || 0,
+        recentTransactions,
         lat: coords.lat,
         lng: coords.lng,
       });

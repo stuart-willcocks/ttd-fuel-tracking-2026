@@ -529,6 +529,13 @@ export async function handleWhat3WordsLinkClick(
   openCleanGoogleMapsModal(w3w, null, onResolved);
 }
 
+export interface FleetMapTransactionItem {
+  id: string;
+  timestamp: string;
+  type: string;
+  summary: string;
+}
+
 export interface FleetMapMarkerItem {
   equipmentId: string;
   type: 'GENERATOR' | 'TANK' | 'PLANT';
@@ -539,6 +546,7 @@ export interface FleetMapMarkerItem {
   rentalSerialNumber: string;
   isOn?: boolean;
   txCount?: number;
+  recentTransactions?: FleetMapTransactionItem[];
   lat: number;
   lng: number;
 }
@@ -722,6 +730,108 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       border-color: #2563EB;
       color: #FFFFFF;
     }
+    .leaflet-tooltip.eq-tx-balloon {
+      background: #FFFFFF !important;
+      color: #0F172A !important;
+      border: 1px solid #CBD5E1 !important;
+      border-radius: 8px !important;
+      padding: 8px 10px !important;
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38) !important;
+      min-width: 245px;
+      max-width: 320px;
+      white-space: normal !important;
+      pointer-events: none;
+    }
+    .leaflet-tooltip-top.eq-tx-balloon::before {
+      border-top-color: #FFFFFF !important;
+    }
+    .leaflet-tooltip-bottom.eq-tx-balloon::before {
+      border-bottom-color: #FFFFFF !important;
+    }
+    .tx-balloon-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-bottom: 5px;
+      margin-bottom: 5px;
+      border-bottom: 1px solid #E2E8F0;
+    }
+    .tx-balloon-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 800;
+      color: #0F172A;
+    }
+    .tx-balloon-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: #EFF6FF;
+      color: #1D4ED8;
+      border: 1px solid #BFDBFE;
+    }
+    .tx-balloon-sub {
+      font-size: 11px;
+      color: #64748B;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+    .tx-balloon-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .tx-balloon-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 5px;
+      border-radius: 4px;
+      background: #F8FAFC;
+      border: 1px solid #F1F5F9;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+    .tx-balloon-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      width: 15px;
+      height: 15px;
+    }
+    .tx-balloon-ts {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      color: #475569;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .tx-balloon-val {
+      font-size: 11px;
+      font-weight: 600;
+      color: #0F172A;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .tx-balloon-empty {
+      font-size: 11px;
+      color: #94A3B8;
+      font-style: italic;
+      padding: 4px 2px;
+    }
+    .tx-balloon-more {
+      font-size: 10px;
+      font-weight: 600;
+      color: #64748B;
+      text-align: right;
+      margin-top: 3px;
+    }
   </style>
 </head>
 <body>
@@ -781,6 +891,34 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
           '</g></svg>';
       }
 
+      function getTxTypeSvg(type) {
+        var t = (type || '').toString();
+        if (t.indexOf('CheckIn') !== -1 || t === 'check-in') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<g transform="translate(-204)"><path d="M 216,5 V 3 h 9 v 18 h -9 v -1 -1" /><path d="m 218,12 h -10 -1" /><path d="m 214,9 4,3 -4,3" /></g></svg>';
+        }
+        if (t.indexOf('CheckOut') !== -1 || t === 'check-out') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<g transform="translate(-34)"><path d="M 46,5 V 3 h 9 v 18 h -9 v -1 -1" /><path d="m 37,12 h 10 1" /><path d="m 41,9 -4,3 4,3" /></g></svg>';
+        }
+        if (t === 'PoweredUp' || t === 'power-up') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#16A34A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg>';
+        }
+        if (t === 'PoweredDown' || t === 'power-down') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#DC2626" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M18.36 6.64A9 9 0 0 1 20.77 15"/><path d="M6.16 6.16a9 9 0 1 0 12.68 12.68"/><path d="M12 2v4"/><path d="m2 2 20 20"/></svg>';
+        }
+        // FuelTransfer
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none">' +
+          '<g transform="translate(-68)"><g transform="translate(2)"><circle cx="86.75" cy="12.25" r="1.75" fill="#2563EB" /><path d="M 85.5,12 86.715,9.5 88,12" stroke="#2563EB" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" /></g>' +
+          '<path d="m 72.5,20.5 c 0,0 -0.437,-1.493 -0.5,-2 -0.062,-0.506 -0.081,-0.656 0,-1 0.081,-0.343 0.253,-0.657 0.5,-1 0.246,-0.342 1,-1 1,-1" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />' +
+          '<path d="M 72.5,13.5 76,17 77.5,17.5 78.5,17 83,12.5 82.5,9 80,6.5 78.5,7.5 77,7 l -2,2 0.5,1.5 z" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />' +
+          '<path d="m 81.5,7.5 3.5,-3 h 3.5" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />' +
+          '<path d="M 75,15 78.5,11.5 82,13" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />' +
+          '<path d="M 78,12.5 V 15" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></g></svg>';
+      }
+
       var boundsPoints = [];
 
       items.forEach(function(item) {
@@ -793,7 +931,7 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
           ? '<span class="eq-map-pwr-dot" style="background:' + (item.isOn ? '#16A34A' : '#94A3B8') + '"></span>'
           : '';
 
-        var html = '<div class="eq-map-marker" title="' + item.equipmentId + ' (' + item.type + ')">' +
+        var html = '<div class="eq-map-marker">' +
           '<div class="eq-map-icon-box" style="border-color:' + borderColor + '">' +
             getEquipmentSvg(item.type, iconColor) +
             pwrDotHtml +
@@ -812,6 +950,38 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
           : item.type === 'TANK' && item.capacity ? (item.capacity + ' L')
           : 'Unrated';
 
+        var txList = Array.isArray(item.recentTransactions) ? item.recentTransactions : [];
+        var maxBalloonTx = 6;
+        var visibleTx = txList.slice(0, maxBalloonTx);
+        var txRowsHtml = '';
+
+        if (visibleTx.length === 0) {
+          txRowsHtml = '<div class="tx-balloon-empty">No transactions recorded</div>';
+        } else {
+          txRowsHtml = '<div class="tx-balloon-list">';
+          visibleTx.forEach(function(tx) {
+            txRowsHtml += '<div class="tx-balloon-row">' +
+              '<span class="tx-balloon-icon">' + getTxTypeSvg(tx.type) + '</span>' +
+              '<span class="tx-balloon-ts">' + tx.timestamp + '</span>' +
+              '<span class="tx-balloon-val">' + tx.summary + '</span>' +
+            '</div>';
+          });
+          txRowsHtml += '</div>';
+          if ((item.txCount || txList.length) > visibleTx.length) {
+            var remaining = (item.txCount || txList.length) - visibleTx.length;
+            txRowsHtml += '<div class="tx-balloon-more">+' + remaining + ' earlier transaction' + (remaining === 1 ? '' : 's') + '</div>';
+          }
+        }
+
+        var balloonHtml = '<div>' +
+          '<div class="tx-balloon-hdr">' +
+            '<span class="tx-balloon-id">' + item.equipmentId + '</span>' +
+            '<span class="tx-balloon-badge">' + (item.txCount || 0) + ' tx</span>' +
+          '</div>' +
+          '<div class="tx-balloon-sub">' + item.area + ' • ' + item.location + '</div>' +
+          txRowsHtml +
+        '</div>';
+
         var popupHtml = '<div>' +
           '<div class="popup-id">' + item.equipmentId + '</div>' +
           '<div class="popup-meta"><strong>' + item.type + '</strong> • ' + capStr + (item.type === 'GENERATOR' ? (' • ' + (item.isOn ? '<span style="color:#16A34A;font-weight:700">ON</span>' : '<span style="color:#64748B;font-weight:700">OFF</span>')) : '') + '</div>' +
@@ -823,7 +993,17 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
           '</div>' +
         '</div>';
 
-        L.marker(pt, { icon: divIcon }).addTo(map).bindPopup(popupHtml, { offset: [0, -14] });
+        var marker = L.marker(pt, { icon: divIcon }).addTo(map);
+        marker.bindTooltip(balloonHtml, {
+          direction: 'top',
+          offset: [0, -24],
+          opacity: 1,
+          className: 'eq-tx-balloon'
+        });
+        marker.bindPopup(popupHtml, { offset: [0, -14] });
+        marker.on('popupopen', function() {
+          marker.closeTooltip();
+        });
       });
 
       function fitAll() {
