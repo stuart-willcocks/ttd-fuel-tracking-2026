@@ -1,7 +1,7 @@
 import React from 'react';
 import { Wifi, WifiOff, RefreshCw, UploadCloud, Settings } from 'lucide-react';
 import type { SyncState } from '../services/syncEngine';
-import { APP_VERSION } from '../version';
+import { APP_VERSION, getIsStaging } from '../version';
 
 interface HeaderProps {
   syncState: SyncState;
@@ -31,6 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
   onShowSplash,
 }) => {
   const requiresAttention = settingsRequiresAttention ?? hasUpdate;
+  const isStaging = getIsStaging();
   return (
     <header className="app-header">
       {/* Top Left: App Title and Version (Vnn) */}
@@ -67,11 +68,11 @@ export const Header: React.FC<HeaderProps> = ({
                   gap: '3px',
                 }}
               >
-                <span>V{APP_VERSION}</span>
+                <span>V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
                 <span style={{ fontSize: '0.66rem' }}>⚡ V{availableVersion || ''}</span>
               </span>
             ) : (
-              <span className="header-version-pill">V{APP_VERSION}</span>
+              <span className="header-version-pill">V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
             )}
           </div>
         </div>
