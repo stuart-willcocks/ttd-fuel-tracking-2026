@@ -1,4 +1,4 @@
-import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus } from '../types';
+import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus, DeviceTelemetry } from '../types';
 import { db } from '../db/indexedDB';
 import {
   isSupabaseConfigured,
@@ -14,6 +14,7 @@ import {
   fetchAuthorizedDevicesFromSupabase,
   saveAuthorizedDeviceToSupabase,
   updateDeviceStatusInSupabase,
+  updateDeviceTelemetryInSupabase,
   deleteAuthorizedDeviceFromSupabase,
   verifyDeviceTokenWithSupabase,
   registerDeviceRequestToSupabase,
@@ -330,5 +331,33 @@ export async function registerRemoteDeviceRequest(
   });
   saveMockDevices(current);
   return { status: 'pending', token: finalToken };
+}
+
+export async function updateRemoteDeviceTelemetry(
+  deviceId: string,
+  telemetry: DeviceTelemetry
+): Promise<void> {
+  if (isSupabaseConfigured()) {
+    try {
+      await updateDeviceTelemetryInSupabase(deviceId, telemetry);
+      return;
+    } catch (err) {
+      console.warn('Supabase update telemetry failed, saving locally:', err);
+    }
+  }
+
+  const current = getMockDevices();
+  const cleanId = deviceId.trim().toUpperCase();
+  const target = current.find((d) => d.deviceId.toUpperCase() === cleanId);
+  if (target) {
+    if (typeof telemetry.batteryLevel === 'number') target.batteryLevel = telemetry.batteryLevel;
+    if (typeof telemetry.isCharging === 'boolean') target.isCharging = telemetry.isCharging;
+    if (typeof telemetry.latitude === 'number') target.latitude = telemetry.latitude;
+    if (typeof telemetry.longitude === 'number') target.longitude = telemetry.longitude;
+    if (typeof telemetry.locationAccuracy === 'number') target.locationAccuracy = telemetry.locationAccuracy;
+    target.lastTelemetryAt = telemetry.lastTelemetryAt || new Date().toISOString();
+    target.lastSeenAt = new Date().toISOString();
+    saveMockDevices(current);
+  }
 }
 

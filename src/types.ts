@@ -57,7 +57,16 @@ export interface Transaction {
 
 export type DeviceStatus = 'active' | 'pending' | 'revoked';
 
-export interface AuthorizedDevice {
+export interface DeviceTelemetry {
+  batteryLevel?: number | null; // 0 - 100 (%)
+  isCharging?: boolean | null; // true / false
+  latitude?: number | null;
+  longitude?: number | null;
+  locationAccuracy?: number | null; // in meters
+  lastTelemetryAt?: string | null; // ISO timestamp
+}
+
+export interface AuthorizedDevice extends DeviceTelemetry {
   deviceId: string;
   deviceName?: string;
   authToken: string;

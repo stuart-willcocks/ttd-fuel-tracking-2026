@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus } from '../types';
+import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus, DeviceTelemetry } from '../types';
 import { generateSecureDeviceToken, getDeviceId, getDeviceToken } from './device';
 import { db } from '../db/indexedDB';
 import { postRemoteTransaction } from './api';
@@ -537,6 +537,12 @@ export async function fetchAuthorizedDevicesFromSupabase(): Promise<AuthorizedDe
     status: row.status as DeviceStatus,
     registeredAt: row.registered_at,
     lastSeenAt: row.last_seen_at,
+    batteryLevel: typeof row.battery_level === 'number' ? row.battery_level : null,
+    isCharging: typeof row.is_charging === 'boolean' ? row.is_charging : null,
+    latitude: typeof row.latitude === 'number' ? row.latitude : null,
+    longitude: typeof row.longitude === 'number' ? row.longitude : null,
+    locationAccuracy: typeof row.location_accuracy === 'number' ? row.location_accuracy : null,
+    lastTelemetryAt: row.last_telemetry_at || null,
   }));
 }
 
@@ -547,7 +553,7 @@ export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): 
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     device_id: device.deviceId.trim().toUpperCase(),
     device_name: device.deviceName || device.deviceId,
     auth_token: device.authToken.trim(),
@@ -556,9 +562,30 @@ export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): 
     last_seen_at: device.lastSeenAt || new Date().toISOString(),
   };
 
-  const { error } = await client
+  if (typeof device.batteryLevel === 'number') payload.battery_level = device.batteryLevel;
+  if (typeof device.isCharging === 'boolean') payload.is_charging = device.isCharging;
+  if (typeof device.latitude === 'number') payload.latitude = device.latitude;
+  if (typeof device.longitude === 'number') payload.longitude = device.longitude;
+  if (typeof device.locationAccuracy === 'number') payload.location_accuracy = device.locationAccuracy;
+  if (device.lastTelemetryAt) payload.last_telemetry_at = device.lastTelemetryAt;
+
+  let { error } = await client
     .from('authorized_devices')
     .upsert(payload, { onConflict: 'device_id' });
+
+  // If telemetry columns do not exist yet on remote table, retry with standard core columns
+  if (error && (error.code === 'PGRST204' || (error.message && (error.message.includes('column') || error.message.includes('battery'))))) {
+    const basicPayload = {
+      device_id: payload.device_id,
+      device_name: payload.device_name,
+      auth_token: payload.auth_token,
+      status: payload.status,
+      registered_at: payload.registered_at,
+      last_seen_at: payload.last_seen_at,
+    };
+    const retryRes = await client.from('authorized_devices').upsert(basicPayload, { onConflict: 'device_id' });
+    error = retryRes.error;
+  }
 
   if (error) {
     if (error.code === 'PGRST205' || (error.message && error.message.includes('authorized_devices'))) {
@@ -567,6 +594,48 @@ export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): 
       );
     }
     throw new Error(error.message || error.details || error.hint || `Supabase error (${error.code || 'unknown'})`);
+  }
+}
+
+/**
+ * Updates live telemetry (battery percentage, charging state, GPS coordinates) for a PDA
+ */
+export async function updateDeviceTelemetryInSupabase(
+  deviceId: string,
+  telemetry: DeviceTelemetry
+): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const cleanId = deviceId.trim().toUpperCase();
+  const payload: Record<string, unknown> = {
+    last_seen_at: new Date().toISOString(),
+    last_telemetry_at: telemetry.lastTelemetryAt || new Date().toISOString(),
+  };
+
+  if (typeof telemetry.batteryLevel === 'number') payload.battery_level = telemetry.batteryLevel;
+  if (typeof telemetry.isCharging === 'boolean') payload.is_charging = telemetry.isCharging;
+  if (typeof telemetry.latitude === 'number') payload.latitude = telemetry.latitude;
+  if (typeof telemetry.longitude === 'number') payload.longitude = telemetry.longitude;
+  if (typeof telemetry.locationAccuracy === 'number') payload.location_accuracy = telemetry.locationAccuracy;
+
+  let { error } = await client
+    .from('authorized_devices')
+    .update(payload)
+    .eq('device_id', cleanId);
+
+  // If telemetry columns do not exist yet on Supabase table, update only last_seen_at
+  if (error && (error.code === 'PGRST204' || (error.message && (error.message.includes('column') || error.message.includes('battery'))))) {
+    const fallbackRes = await client
+      .from('authorized_devices')
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq('device_id', cleanId);
+    error = fallbackRes.error;
+  }
+
+  if (error) {
+    if (error.code === 'PGRST205') return; // Table not created yet, skip silently
+    console.debug('[Supabase] Telemetry update warning:', error);
   }
 }
 
@@ -775,9 +844,23 @@ CREATE TABLE IF NOT EXISTS public.authorized_devices (
   device_name text,
   auth_token text NOT NULL,
   status text NOT NULL CHECK (status IN ('active', 'pending', 'revoked')),
+  battery_level smallint,
+  is_charging boolean,
+  latitude double precision,
+  longitude double precision,
+  location_accuracy real,
+  last_telemetry_at timestamp with time zone,
   registered_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
   last_seen_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Add telemetry columns to existing table if already created
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS battery_level smallint;
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS is_charging boolean;
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS latitude double precision;
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS longitude double precision;
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS location_accuracy real;
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS last_telemetry_at timestamp with time zone;
 
 ALTER TABLE public.authorized_devices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.authorized_devices REPLICA IDENTITY FULL;
@@ -865,6 +948,12 @@ create table if not exists public.authorized_devices (
   device_name text,
   auth_token text not null,
   status text not null check (status in ('active', 'pending', 'revoked')),
+  battery_level smallint,
+  is_charging boolean,
+  latitude double precision,
+  longitude double precision,
+  location_accuracy real,
+  last_telemetry_at timestamp with time zone,
   registered_at timestamp with time zone default timezone('utc'::text, now()) not null,
   last_seen_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

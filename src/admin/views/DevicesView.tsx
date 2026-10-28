@@ -12,6 +12,13 @@ import {
   RefreshCw,
   Copy,
   Check,
+  Battery,
+  BatteryCharging,
+  BatteryMedium,
+  BatteryWarning,
+  MapPin,
+  ExternalLink,
+  Zap,
 } from 'lucide-react';
 import type { AuthorizedDevice, DeviceStatus } from '../../types';
 import { SUPABASE_SQL_MIGRATION } from '../../services/supabase';
@@ -83,6 +90,129 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     } catch {
       return isoString;
     }
+  };
+
+  const renderBattery = (dev: AuthorizedDevice) => {
+    if (typeof dev.batteryLevel !== 'number' || dev.batteryLevel === null) {
+      return <span style={{ color: 'var(--adm-text-muted)', fontSize: '0.82rem' }}>—</span>;
+    }
+
+    const level = Math.max(0, Math.min(100, Math.round(dev.batteryLevel)));
+    const isCharging = Boolean(dev.isCharging);
+
+    let color = '#10B981'; // Green
+    let BatteryIcon = Battery;
+
+    if (isCharging) {
+      color = '#10B981';
+      BatteryIcon = BatteryCharging;
+    } else if (level <= 20) {
+      color = '#EF4444'; // Red
+      BatteryIcon = BatteryWarning;
+    } else if (level <= 50) {
+      color = '#F59E0B'; // Amber
+      BatteryIcon = BatteryMedium;
+    }
+
+    const tooltip = [
+      `Battery: ${level}%`,
+      isCharging ? 'Status: Charging' : 'Status: On Battery',
+      dev.lastTelemetryAt ? `Telemetry update: ${formatDate(dev.lastTelemetryAt)}` : null,
+    ].filter(Boolean).join('\n');
+
+    return (
+      <div
+        title={tooltip}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '2px 8px',
+          borderRadius: '6px',
+          background: isCharging ? 'rgba(16, 185, 129, 0.08)' : 'var(--adm-surface-2, #F8FAFC)',
+          border: `1px solid ${color}33`,
+        }}
+      >
+        <BatteryIcon size={15} color={color} style={{ flexShrink: 0 }} />
+        <span style={{ fontWeight: 700, fontSize: '0.84rem', color }}>
+          {level}%
+        </span>
+        {isCharging && (
+          <span
+            style={{
+              fontSize: '0.64rem',
+              fontWeight: 800,
+              padding: '1px 4px',
+              borderRadius: '3px',
+              background: '#10B981',
+              color: '#FFFFFF',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2px',
+              letterSpacing: '0.2px',
+            }}
+          >
+            <Zap size={8} fill="#FFFFFF" />
+            <span>CHG</span>
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const renderLocation = (dev: AuthorizedDevice) => {
+    if (
+      typeof dev.latitude !== 'number' ||
+      typeof dev.longitude !== 'number' ||
+      dev.latitude === null ||
+      dev.longitude === null
+    ) {
+      return <span style={{ color: 'var(--adm-text-muted)', fontSize: '0.82rem' }}>—</span>;
+    }
+
+    const lat = dev.latitude.toFixed(5);
+    const lon = dev.longitude.toFixed(5);
+    const mapsUrl = `https://www.google.com/maps?q=${dev.latitude},${dev.longitude}`;
+
+    const tooltip = [
+      `Latitude: ${dev.latitude}`,
+      `Longitude: ${dev.longitude}`,
+      dev.locationAccuracy ? `Accuracy: ±${dev.locationAccuracy}m` : null,
+      dev.lastTelemetryAt ? `Telemetry update: ${formatDate(dev.lastTelemetryAt)}` : null,
+      'Click to open in Google Maps',
+    ].filter(Boolean).join('\n');
+
+    return (
+      <a
+        href={mapsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={tooltip}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '5px',
+          textDecoration: 'none',
+          padding: '2px 8px',
+          borderRadius: '6px',
+          background: 'rgba(59, 130, 246, 0.08)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          color: '#2563EB',
+          fontSize: '0.8rem',
+          fontWeight: 600,
+          transition: 'all 0.15s ease',
+        }}
+      >
+        <MapPin size={13} style={{ flexShrink: 0, color: '#2563EB' }} />
+        <span>{lat}, {lon}</span>
+        {typeof dev.locationAccuracy === 'number' && (
+          <span style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 500 }}>
+            ±{dev.locationAccuracy}m
+          </span>
+        )}
+        <ExternalLink size={10} style={{ opacity: 0.65, flexShrink: 0 }} />
+      </a>
+    );
   };
 
   const handleToggleRevoke = async (dev: AuthorizedDevice) => {
@@ -322,6 +452,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 <th>Device ID</th>
                 <th>Device Label / Description</th>
                 <th>Status</th>
+                <th>Battery</th>
+                <th>GPS Location</th>
                 <th>Enrolled Date</th>
                 <th>Last Active / Synced</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
@@ -385,6 +517,14 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                           <span>Revoked</span>
                         </span>
                       )}
+                    </td>
+
+                    <td>
+                      {renderBattery(dev)}
+                    </td>
+
+                    <td>
+                      {renderLocation(dev)}
                     </td>
 
                     <td style={{ fontSize: '0.82rem', color: 'var(--adm-text-secondary)' }}>

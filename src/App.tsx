@@ -14,6 +14,7 @@ import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
 import { PowerEventModal } from './components/PowerEventModal';
 import { getDeviceName, isDeviceEnrolled, getDeviceId, onDeviceAuthBroadcast } from './services/device';
+import { startTelemetryMonitoring } from './services/telemetry';
 import { DeviceEnrollmentView } from './components/DeviceEnrollmentView';
 import { Smartphone, ExternalLink } from 'lucide-react';
 import { DesktopLaunchpad } from './components/DesktopLaunchpad';
@@ -355,6 +356,14 @@ export const App: React.FC = () => {
     setCurrentAssetTransactions(txs);
     return asset;
   }, [refreshAssetsList]);
+
+  // Automatic low-power battery & location telemetry tracking for enrolled PDAs
+  useEffect(() => {
+    if (isEnrolled) {
+      const stop = startTelemetryMonitoring();
+      return () => stop();
+    }
+  }, [isEnrolled]);
 
   // Boot & synchronization listeners
   useEffect(() => {

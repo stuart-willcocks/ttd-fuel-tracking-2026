@@ -11,6 +11,7 @@ import {
   onDeviceAuthBroadcast,
 } from './device';
 import { verifyRemoteDeviceToken } from './api';
+import { pushDeviceTelemetry } from './telemetry';
 
 export interface SyncState {
   isOnline: boolean;
@@ -309,6 +310,7 @@ class SyncEngine {
       this.flushOutbox().catch((err) => {
         console.error('Immediate flush error after queueing transaction:', err);
       });
+      pushDeviceTelemetry(false).catch(() => {});
     }
   }
 
@@ -605,6 +607,7 @@ class SyncEngine {
     if (processed > 0) {
       this.lastSyncTime = new Date().toLocaleTimeString();
       this.lastError = null;
+      pushDeviceTelemetry(false).catch(() => {});
     }
 
     return { processed, errors };
