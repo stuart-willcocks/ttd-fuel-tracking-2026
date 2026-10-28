@@ -183,38 +183,223 @@ export async function resolveEquipmentCoordinates(
 }
 
 /**
- * Returns a Google Maps URL for external browser tabs
+ * Returns a Google Maps URL with Satellite layer enabled (`t=k` / `data=!3m1!1e3`)
  */
 export function getGoogleMapsExternalUrl(w3w?: string | null, lat?: number | null, lng?: number | null): string {
   if (typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)) {
-    return `https://www.google.com/maps?q=${lat},${lng}`;
+    return `https://maps.google.com/maps?q=${lat},${lng}&t=k&z=19&output=embed`;
   }
   const cached = getCachedWhat3WordsCoordinates(w3w);
   if (cached) {
-    return `https://www.google.com/maps?q=${cached.lat},${cached.lng}`;
+    return `https://maps.google.com/maps?q=${cached.lat},${cached.lng}&t=k&z=19&output=embed`;
   }
   const clean = normalizeWhat3Words(w3w);
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clean)}`;
+  return `https://maps.google.com/maps?q=${encodeURIComponent(clean)}&t=k&z=18&output=embed`;
 }
 
 /**
- * Returns an embeddable Google Maps iframe URL for the in-app PDA map modal
+ * Returns a clutter-free embeddable Google Maps iframe URL with the Satellite layer (`t=k`) visible.
+ * Using `output=embed` with `t=k` removes the left-hand Places/Directions/Save/Nearby drawer and
+ * top Restaurants/Hotels category buttons while keeping the satellite layer and location pin active.
  */
 export function getGoogleMapsEmbedUrl(w3w?: string | null, lat?: number | null, lng?: number | null): string {
   if (typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)) {
-    return `https://maps.google.com/maps?q=${lat},${lng}&z=18&output=embed`;
+    return `https://maps.google.com/maps?q=${lat},${lng}&t=k&z=19&ie=UTF8&iwloc=near&output=embed`;
   }
   const cached = getCachedWhat3WordsCoordinates(w3w);
   if (cached) {
-    return `https://maps.google.com/maps?q=${cached.lat},${cached.lng}&z=18&output=embed`;
+    return `https://maps.google.com/maps?q=${cached.lat},${cached.lng}&t=k&z=19&ie=UTF8&iwloc=near&output=embed`;
   }
   const clean = normalizeWhat3Words(w3w);
-  return `https://maps.google.com/maps?q=${encodeURIComponent(clean)}&z=16&output=embed`;
+  return `https://maps.google.com/maps?q=${encodeURIComponent(clean)}&t=k&z=18&ie=UTF8&iwloc=near&output=embed`;
 }
 
 /**
- * Click handler for What3Words links in the Admin Console:
- * Uses pre-converted coordinates if present, or resolves them once on demand and opens Google Maps.
+ * Opens a clutter-free Google Maps Satellite modal overlay in the Admin Console.
+ * Eliminates the Google Maps left-hand info drawer (Directions, Save, Nearby) and top category chips
+ * (Restaurants, Hotels, etc.) and always displays the Satellite layer (`t=k`).
+ */
+function openCleanGoogleMapsModal(
+  rawW3w: string,
+  initialCoords?: W3WCoordinates | null,
+  onResolved?: (coords: W3WCoordinates) => void
+) {
+  if (typeof document === 'undefined') return;
+
+  const clean = normalizeWhat3Words(rawW3w);
+  const existingModal = document.getElementById('ttd-w3w-satellite-modal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  const backdrop = document.createElement('div');
+  backdrop.id = 'ttd-w3w-satellite-modal';
+  Object.assign(backdrop.style, {
+    position: 'fixed',
+    inset: '0',
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    backdropFilter: 'blur(3px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: '10000',
+    padding: '24px',
+  });
+
+  const panel = document.createElement('div');
+  Object.assign(panel.style, {
+    width: 'min(960px, 92vw)',
+    height: 'min(680px, 86vh)',
+    backgroundColor: '#FFFFFF',
+    borderRadius: '12px',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    border: '1px solid #E2E8F0',
+  });
+
+  const header = document.createElement('div');
+  Object.assign(header.style, {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px 18px',
+    backgroundColor: '#F8FAFC',
+    borderBottom: '1px solid #E2E8F0',
+    fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+  });
+
+  const titleWrap = document.createElement('div');
+  Object.assign(titleWrap.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  });
+
+  const titleText = document.createElement('span');
+  titleText.textContent = `///${clean}`;
+  Object.assign(titleText.style, {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontWeight: '800',
+    fontSize: '1rem',
+    color: '#0F172A',
+  });
+
+  const coordsBadge = document.createElement('span');
+  Object.assign(coordsBadge.style, {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: '0.78rem',
+    fontWeight: '600',
+    color: '#475569',
+    backgroundColor: '#E2E8F0',
+    padding: '2px 8px',
+    borderRadius: '6px',
+  });
+  coordsBadge.textContent = initialCoords
+    ? `${initialCoords.lat.toFixed(5)}, ${initialCoords.lng.toFixed(5)}`
+    : 'Resolving coordinates...';
+
+  titleWrap.appendChild(titleText);
+  titleWrap.appendChild(coordsBadge);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.innerHTML = '&#10005;';
+  closeBtn.title = 'Close Map (Esc)';
+  Object.assign(closeBtn.style, {
+    width: '32px',
+    height: '32px',
+    borderRadius: '6px',
+    border: '1px solid #CBD5E1',
+    backgroundColor: '#FFFFFF',
+    color: '#334155',
+    fontSize: '14px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  });
+
+  const bodyWrap = document.createElement('div');
+  Object.assign(bodyWrap.style, {
+    flex: '1',
+    position: 'relative',
+    backgroundColor: '#0F172A',
+  });
+
+  const cleanup = () => {
+    document.removeEventListener('keydown', onKeyDown);
+    backdrop.remove();
+  };
+
+  const onKeyDown = (ev: KeyboardEvent) => {
+    if (ev.key === 'Escape') cleanup();
+  };
+  document.addEventListener('keydown', onKeyDown);
+
+  closeBtn.onclick = cleanup;
+  backdrop.onclick = (ev) => {
+    if (ev.target === backdrop) cleanup();
+  };
+
+  header.appendChild(titleWrap);
+  header.appendChild(closeBtn);
+  panel.appendChild(header);
+  panel.appendChild(bodyWrap);
+  backdrop.appendChild(panel);
+  document.body.appendChild(backdrop);
+
+  const renderIframe = (coords: W3WCoordinates | null) => {
+    bodyWrap.innerHTML = '';
+    const iframe = document.createElement('iframe');
+    iframe.src = getGoogleMapsEmbedUrl(clean, coords?.lat, coords?.lng);
+    iframe.title = `Satellite Map for ///${clean}`;
+    iframe.setAttribute('allow', 'geolocation');
+    Object.assign(iframe.style, {
+      width: '100%',
+      height: '100%',
+      border: '0',
+      display: 'block',
+    });
+    bodyWrap.appendChild(iframe);
+  };
+
+  if (initialCoords) {
+    renderIframe(initialCoords);
+  } else {
+    const loadingEl = document.createElement('div');
+    loadingEl.textContent = `Loading satellite map for ///${clean}...`;
+    Object.assign(loadingEl.style, {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100%',
+      color: '#F8FAFC',
+      fontFamily: "'Inter', system-ui, sans-serif",
+      fontSize: '0.92rem',
+      fontWeight: '600',
+    });
+    bodyWrap.appendChild(loadingEl);
+
+    convertWhat3WordsToCoordinates(clean).then((resolved) => {
+      if (!document.body.contains(backdrop)) return;
+      if (resolved) {
+        coordsBadge.textContent = `${resolved.lat.toFixed(5)}, ${resolved.lng.toFixed(5)}`;
+        onResolved?.(resolved);
+        renderIframe(resolved);
+      } else {
+        coordsBadge.textContent = 'Location lookup failed';
+        renderIframe(null);
+      }
+    });
+  }
+}
+
+/**
+ * Click handler for What3Words links:
+ * Opens a clutter-free Google Maps Satellite view with no left-hand drawer and no category pills.
  */
 export async function handleWhat3WordsLinkClick(
   e: React.MouseEvent<HTMLElement>,
@@ -227,31 +412,16 @@ export async function handleWhat3WordsLinkClick(
   e.stopPropagation();
 
   if (typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)) {
-    window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank', 'noopener,noreferrer');
+    openCleanGoogleMapsModal(w3w, { lat, lng }, onResolved);
     return;
   }
 
   const cached = getCachedWhat3WordsCoordinates(w3w);
   if (cached) {
     onResolved?.(cached);
-    window.open(`https://www.google.com/maps?q=${cached.lat},${cached.lng}`, '_blank', 'noopener,noreferrer');
+    openCleanGoogleMapsModal(w3w, cached, onResolved);
     return;
   }
 
-  // Open blank tab synchronously on user gesture to avoid popup blockers while converting
-  const newWin = window.open('about:blank', '_blank');
-  const coords = await convertWhat3WordsToCoordinates(w3w);
-  const targetUrl = coords
-    ? `https://www.google.com/maps?q=${coords.lat},${coords.lng}`
-    : getGoogleMapsExternalUrl(w3w);
-
-  if (coords) {
-    onResolved?.(coords);
-  }
-
-  if (newWin) {
-    newWin.location.href = targetUrl;
-  } else {
-    window.open(targetUrl, '_blank', 'noopener,noreferrer');
-  }
+  openCleanGoogleMapsModal(w3w, null, onResolved);
 }
