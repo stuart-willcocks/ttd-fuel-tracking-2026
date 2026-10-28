@@ -225,8 +225,6 @@ export const AdminApp: React.FC = () => {
       await postRemoteAuthorizedDevice(device);
       await loadFleetData(true);
       showToast(`Device "${device.deviceId}" authorized successfully!`, 'success');
-      setIsRegisterDeviceModalOpen(false);
-      setRegisteringDevice(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       showToast(`Failed to save device: ${msg}`, 'error');

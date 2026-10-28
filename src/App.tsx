@@ -249,6 +249,20 @@ export const App: React.FC = () => {
   const [currentAssetTransactions, setCurrentAssetTransactions] = useState<Transaction[]>([]);
 
   const [isEnrolled, setIsEnrolled] = useState<boolean>(() => isDeviceEnrolled());
+  const [isEnrollmentSkipped, setIsEnrollmentSkipped] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('ttd_enrollment_skipped') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleSkipEnrollment = () => {
+    try {
+      sessionStorage.setItem('ttd_enrollment_skipped', '1');
+    } catch {}
+    setIsEnrollmentSkipped(true);
+  };
 
   const [syncState, setSyncState] = useState<SyncState>({
     isOnline: true,
@@ -558,15 +572,19 @@ export const App: React.FC = () => {
     );
   }
 
-  // 0. DEVICE ENROLLMENT LOCK SCREEN (If scanner is not yet authorized)
-  if (!isEnrolled) {
+  // 0. DEVICE ENROLLMENT LOCK SCREEN (If scanner is not yet authorized and not skipped)
+  if (!isEnrolled && !isEnrollmentSkipped) {
     const enrollContent = (
       <DeviceEnrollmentView
         onEnrolled={async () => {
           setIsEnrolled(true);
+          try {
+            sessionStorage.removeItem('ttd_enrollment_skipped');
+          } catch {}
           await refreshAssetsList();
           await syncEngine.syncWithRemote();
         }}
+        onSkip={handleSkipEnrollment}
       />
     );
 
@@ -702,6 +720,17 @@ export const App: React.FC = () => {
         onDeregister={() => {
           clearDeviceEnrollment();
           setIsEnrolled(false);
+          setIsEnrollmentSkipped(false);
+          try {
+            sessionStorage.removeItem('ttd_enrollment_skipped');
+          } catch {}
+        }}
+        onOpenEnrollment={() => {
+          setIsSettingsModalOpen(false);
+          setIsEnrollmentSkipped(false);
+          try {
+            sessionStorage.removeItem('ttd_enrollment_skipped');
+          } catch {}
         }}
       />
     </div>

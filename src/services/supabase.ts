@@ -553,7 +553,16 @@ export async function verifyDeviceTokenWithSupabase(
     .eq('device_id', cleanId)
     .single();
 
-  if (error || !data) {
+  if (error) {
+    // PGRST116: query returned 0 rows (device not registered in table)
+    if (error.code === 'PGRST116') {
+      return { valid: false, status: 'revoked' };
+    }
+    // Table missing or network failure: throw so caller can fall back gracefully
+    throw error;
+  }
+
+  if (!data) {
     return { valid: false, status: 'revoked' };
   }
 

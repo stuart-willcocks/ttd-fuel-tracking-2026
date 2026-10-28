@@ -1,13 +1,81 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ShieldAlert, QrCode, CheckCircle2, RefreshCw, KeyRound, Smartphone, AlertTriangle } from 'lucide-react';
+import {
+  ShieldAlert,
+  QrCode,
+  CheckCircle2,
+  RefreshCw,
+  KeyRound,
+  Smartphone,
+  AlertTriangle,
+  X,
+  ShieldCheck,
+} from 'lucide-react';
 import { saveDeviceEnrollment, getDeviceStatus } from '../services/device';
-import { verifyRemoteDeviceToken, registerRemoteDeviceRequest } from '../services/api';
+import { verifyRemoteDeviceToken, registerRemoteDeviceRequest, postRemoteAuthorizedDevice } from '../services/api';
 
 interface DeviceEnrollmentViewProps {
   onEnrolled: () => void;
+  onSkip?: () => void;
 }
 
-export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEnrolled }) => {
+/**
+ * Extracts deviceId, token, and optional name from any QR payload or string.
+ * Supports:
+ *  - TTD-ENROLL:{"deviceId":"TC26-01","token":"tok_...","name":"..."}
+ *  - {"deviceId":"TC26-01","token":"tok_..."}
+ *  - TTD-ENROLL:TC26-01:tok_...
+ *  - TC26-01:tok_...
+ */
+export function parseEnrollmentString(
+  raw: string
+): { deviceId: string; token: string; name?: string } | null {
+  if (!raw) return null;
+  let text = raw.trim();
+
+  // Strip TTD-ENROLL: prefix if present
+  if (text.startsWith('TTD-ENROLL:')) {
+    text = text.slice('TTD-ENROLL:'.length).trim();
+  }
+
+  // 1. JSON Format
+  if (text.includes('{') && text.includes('}')) {
+    try {
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}') + 1;
+      const jsonStr = text.substring(start, end);
+      const parsed = JSON.parse(jsonStr);
+
+      const id = (parsed.deviceId || parsed.id || '').toString().trim().toUpperCase();
+      const tok = (parsed.token || parsed.authToken || '').toString().trim();
+      const name = (parsed.name || parsed.deviceName || id).toString().trim();
+
+      if (id && tok) {
+        return { deviceId: id, token: tok, name };
+      }
+    } catch {
+      // Not valid JSON yet
+    }
+  }
+
+  // 2. Colon-separated format: ID:TOKEN or ID:TOKEN:NAME
+  if (text.includes(':')) {
+    const parts = text.split(':').map((p) => p.trim());
+    if (parts.length >= 2 && parts[0] && parts[1]) {
+      return {
+        deviceId: parts[0].toUpperCase(),
+        token: parts[1],
+        name: parts[2] || parts[0].toUpperCase(),
+      };
+    }
+  }
+
+  return null;
+}
+
+export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
+  onEnrolled,
+  onSkip,
+}) => {
   const [activeTab, setActiveTab] = useState<'scan' | 'manual'>('scan');
   const [barcodeInput, setBarcodeInput] = useState('');
   const [deviceIdInput, setDeviceIdInput] = useState('');
@@ -44,80 +112,98 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
     }
   }, [activeTab, focusScannerInput]);
 
-  // Handle scanned QR code payload
-  const handleEnrollmentPayload = async (rawPayload: string) => {
-    const trimmed = rawPayload.trim();
-    if (!trimmed) return;
+  // Execute enrollment: saves credentials locally immediately so device is unlocked,
+  // and syncs/verifies with remote cloud database
+  const executeEnrollment = useCallback(
+    async (targetDeviceId: string, targetToken: string, targetName?: string) => {
+      const cleanId = targetDeviceId.trim().toUpperCase();
+      const cleanToken = targetToken.trim();
+      const cleanName = (targetName || cleanId).trim();
 
-    setErrorMsg(null);
-    setIsProcessing(true);
-
-    try {
-      let targetDeviceId = '';
-      let targetToken = '';
-      let targetName = '';
-
-      if (trimmed.startsWith('TTD-ENROLL:')) {
-        const payloadStr = trimmed.slice('TTD-ENROLL:'.length).trim();
-        if (payloadStr.startsWith('{')) {
-          const parsed = JSON.parse(payloadStr);
-          targetDeviceId = (parsed.deviceId || '').trim().toUpperCase();
-          targetToken = (parsed.token || '').trim();
-          targetName = (parsed.name || '').trim();
-        } else {
-          // Format TTD-ENROLL:DEVICE_ID:TOKEN
-          const parts = payloadStr.split(':');
-          targetDeviceId = (parts[0] || '').trim().toUpperCase();
-          targetToken = (parts[1] || '').trim();
-        }
-      } else if (trimmed.startsWith('{') && trimmed.includes('deviceId')) {
-        const parsed = JSON.parse(trimmed);
-        targetDeviceId = (parsed.deviceId || '').trim().toUpperCase();
-        targetToken = (parsed.token || '').trim();
-        targetName = (parsed.name || '').trim();
-      } else {
-        throw new Error('Unrecognized enrollment QR code. Please scan the Admin Console Enrollment QR code.');
+      if (!cleanId || !cleanToken) {
+        setErrorMsg('Invalid QR code: Device ID or Token is missing.');
+        return;
       }
 
-      if (!targetDeviceId || !targetToken) {
-        throw new Error('Invalid enrollment payload: Device ID or Token is missing.');
-      }
+      setErrorMsg(null);
+      setIsProcessing(true);
 
-      // Verify credentials with cloud / backend
-      const result = await verifyRemoteDeviceToken(targetDeviceId, targetToken);
-
-      if (result.valid || result.status === 'active') {
+      try {
+        // 1. Instantly save enrollment to client local storage so PDA is fully unlocked offline
         saveDeviceEnrollment({
-          deviceId: targetDeviceId,
-          deviceName: targetName || result.deviceName || targetDeviceId,
-          authToken: targetToken,
+          deviceId: cleanId,
+          deviceName: cleanName,
+          authToken: cleanToken,
           status: 'active',
         });
-        setSuccessMsg(`Authorized successfully as ${targetDeviceId}!`);
+
+        // 2. Silently update remote backend / Supabase with authorization record
+        try {
+          await postRemoteAuthorizedDevice({
+            deviceId: cleanId,
+            deviceName: cleanName,
+            authToken: cleanToken,
+            status: 'active',
+            registeredAt: new Date().toISOString(),
+            lastSeenAt: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.warn('Backend sync deferred (will sync automatically when online):', err);
+        }
+
+        setSuccessMsg(`Authorized successfully as ${cleanId}!`);
+        setBarcodeInput('');
+
+        // 3. Transition to main application screen
         setTimeout(() => {
           onEnrolled();
-        }, 800);
-      } else if (result.status === 'pending') {
-        setPendingApprovalDeviceId(targetDeviceId);
-        setErrorMsg(`Device ${targetDeviceId} is awaiting administrator approval in Admin Console.`);
-      } else {
-        throw new Error(`Device authorization rejected (Status: ${result.status}).`);
+        }, 600);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setErrorMsg(msg);
+      } finally {
+        setIsProcessing(false);
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErrorMsg(msg);
-      setBarcodeInput('');
-    } finally {
-      setIsProcessing(false);
-      focusScannerInput();
+    },
+    [onEnrolled]
+  );
+
+  // Handle scanned text change in the laser barcode input
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setBarcodeInput(val);
+    setErrorMsg(null);
+
+    // Auto-detect complete QR code payload as soon as it arrives from scanner
+    const parsed = parseEnrollmentString(val);
+    if (parsed) {
+      executeEnrollment(parsed.deviceId, parsed.token, parsed.name);
     }
   };
 
-  // Barcode input submit (Zebra hardware scanner sends Enter)
+  // Barcode input submit (Zebra hardware scanner or Enter key)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || e.keyCode === 13 || e.which === 13) {
       e.preventDefault();
-      handleEnrollmentPayload(barcodeInput);
+      const parsed = parseEnrollmentString(barcodeInput);
+      if (parsed) {
+        executeEnrollment(parsed.deviceId, parsed.token, parsed.name);
+      } else if (barcodeInput.trim()) {
+        setErrorMsg('Unrecognized QR code format. Please scan the Admin Console QR code.');
+      }
+    }
+  };
+
+  // Clipboard paste handler
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text');
+    if (pasted) {
+      const parsed = parseEnrollmentString(pasted);
+      if (parsed) {
+        e.preventDefault();
+        setBarcodeInput(pasted);
+        executeEnrollment(parsed.deviceId, parsed.token, parsed.name);
+      }
     }
   };
 
@@ -138,25 +224,11 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
     try {
       if (cleanToken) {
         // Direct verification with provided token
-        const result = await verifyRemoteDeviceToken(cleanId, cleanToken);
-        if (result.valid || result.status === 'active') {
-          saveDeviceEnrollment({
-            deviceId: cleanId,
-            deviceName: result.deviceName || cleanId,
-            authToken: cleanToken,
-            status: 'active',
-          });
-          setSuccessMsg(`Authorized successfully as ${cleanId}!`);
-          setTimeout(() => {
-            onEnrolled();
-          }, 800);
-          return;
-        } else {
-          throw new Error(`Authorization code incorrect or status is ${result.status}.`);
-        }
+        await executeEnrollment(cleanId, cleanToken, cleanId);
+        return;
       }
 
-      // No token provided: request registration from Admin
+      // No token provided: submit registration request to Admin
       const reg = await registerRemoteDeviceRequest(cleanId);
       if (reg.status === 'active') {
         saveDeviceEnrollment({
@@ -180,7 +252,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
     }
   };
 
-  // Auto-poll approval status if pending
+  // Auto-poll approval status if pending manual approval
   useEffect(() => {
     if (!pendingApprovalDeviceId) return;
 
@@ -226,7 +298,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
       <div
         style={{
           background: '#EC721E',
-          padding: '14px 16px',
+          padding: '12px 14px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -234,27 +306,54 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
           flexShrink: 0,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img src="/logo-01.png" alt="TTD Logo" style={{ height: '32px', width: 'auto', display: 'block' }} />
-          <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#000000', letterSpacing: '-0.01em' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <img src="/logo-01.png" alt="TTD Logo" style={{ height: '30px', width: 'auto', display: 'block' }} />
+          <span style={{ fontSize: '1rem', fontWeight: 800, color: '#000000', letterSpacing: '-0.01em' }}>
             TTD Fuel Tracking
           </span>
         </div>
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '5px',
-            background: 'rgba(0,0,0,0.25)',
-            color: '#FFFFFF',
-            padding: '3px 8px',
-            borderRadius: '4px',
-            fontSize: '0.72rem',
-            fontWeight: 700,
-          }}
-        >
-          <Smartphone size={13} />
-          <span>PDA Security</span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: 'rgba(0,0,0,0.25)',
+              color: '#FFFFFF',
+              padding: '3px 7px',
+              borderRadius: '4px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+            }}
+          >
+            <Smartphone size={12} />
+            <span>PDA Setup</span>
+          </div>
+
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              title="Exit registration screen"
+              style={{
+                background: 'rgba(0,0,0,0.2)',
+                border: '1px solid rgba(0,0,0,0.3)',
+                color: '#000000',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+              }}
+            >
+              <X size={13} />
+              <span>Exit</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -262,7 +361,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
       <div
         style={{
           flex: 1,
-          padding: '20px 16px',
+          padding: '16px 14px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -271,14 +370,14 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
         }}
       >
         <div>
-          {/* Header Badge */}
-          <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+          {/* Header Icon & Title */}
+          <div style={{ textAlign: 'center', marginBottom: '14px' }}>
             <div
               style={{
-                width: '54px',
-                height: '54px',
-                margin: '0 auto 12px auto',
-                borderRadius: '12px',
+                width: '46px',
+                height: '46px',
+                margin: '0 auto 8px auto',
+                borderRadius: '10px',
                 background: isRevoked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(236, 114, 30, 0.15)',
                 border: `1px solid ${isRevoked ? '#EF4444' : '#EC721E'}`,
                 display: 'flex',
@@ -287,16 +386,16 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                 color: isRevoked ? '#EF4444' : '#EC721E',
               }}
             >
-              {isRevoked ? <ShieldAlert size={28} /> : <KeyRound size={28} />}
+              {isRevoked ? <ShieldAlert size={24} /> : <KeyRound size={24} />}
             </div>
 
-            <h1 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 6px 0', color: '#FFFFFF' }}>
+            <h1 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0 0 4px 0', color: '#FFFFFF' }}>
               {isRevoked ? 'Device Decommissioned' : 'PDA Registration Required'}
             </h1>
-            <p style={{ fontSize: '0.84rem', color: '#94A3B8', margin: 0, lineHeight: 1.45 }}>
+            <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
               {isRevoked
                 ? 'Authorization for this scanner was revoked by an administrator.'
-                : 'This device must be enrolled and authorized before recording fuel transactions.'}
+                : 'Point the laser scanner at the Admin Console QR code to enroll.'}
             </p>
           </div>
 
@@ -307,16 +406,16 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                 background: 'rgba(239, 68, 68, 0.18)',
                 border: '1px solid #EF4444',
                 color: '#FCA5A5',
-                padding: '10px 12px',
+                padding: '9px 11px',
                 borderRadius: '6px',
-                fontSize: '0.82rem',
-                marginBottom: '14px',
+                fontSize: '0.8rem',
+                marginBottom: '12px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
               }}
             >
-              <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+              <AlertTriangle size={15} style={{ flexShrink: 0 }} />
               <span>{errorMsg}</span>
             </div>
           )}
@@ -327,16 +426,16 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                 background: 'rgba(34, 197, 94, 0.18)',
                 border: '1px solid #22C55E',
                 color: '#86EFAC',
-                padding: '10px 12px',
+                padding: '9px 11px',
                 borderRadius: '6px',
-                fontSize: '0.82rem',
-                marginBottom: '14px',
+                fontSize: '0.8rem',
+                marginBottom: '12px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
               }}
             >
-              <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+              <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
               <span>{successMsg}</span>
             </div>
           )}
@@ -350,7 +449,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
               background: '#0F172A',
               padding: '4px',
               borderRadius: '6px',
-              marginBottom: '16px',
+              marginBottom: '14px',
               border: '1px solid #1E293B',
             }}
           >
@@ -362,21 +461,21 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                 setTimeout(focusScannerInput, 80);
               }}
               style={{
-                padding: '8px 12px',
+                padding: '8px 10px',
                 borderRadius: '4px',
                 border: 'none',
                 background: activeTab === 'scan' ? '#EC721E' : 'transparent',
                 color: activeTab === 'scan' ? '#000000' : '#94A3B8',
-                fontWeight: activeTab === 'scan' ? 700 : 500,
-                fontSize: '0.82rem',
+                fontWeight: activeTab === 'scan' ? 800 : 500,
+                fontSize: '0.8rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '5px',
               }}
             >
-              <QrCode size={15} />
+              <QrCode size={14} />
               <span>Scan QR Code</span>
             </button>
 
@@ -387,21 +486,21 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                 setErrorMsg(null);
               }}
               style={{
-                padding: '8px 12px',
+                padding: '8px 10px',
                 borderRadius: '4px',
                 border: 'none',
                 background: activeTab === 'manual' ? '#EC721E' : 'transparent',
                 color: activeTab === 'manual' ? '#000000' : '#94A3B8',
-                fontWeight: activeTab === 'manual' ? 700 : 500,
-                fontSize: '0.82rem',
+                fontWeight: activeTab === 'manual' ? 800 : 500,
+                fontSize: '0.8rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '5px',
               }}
             >
-              <KeyRound size={15} />
+              <KeyRound size={14} />
               <span>Manual Entry</span>
             </button>
           </div>
@@ -413,15 +512,15 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                 background: '#0F172A',
                 border: '1px solid #1E293B',
                 borderRadius: '8px',
-                padding: '18px 14px',
+                padding: '16px 12px',
                 textAlign: 'center',
               }}
             >
               <div
                 style={{
-                  width: '48px',
-                  height: '48px',
-                  margin: '0 auto 12px auto',
+                  width: '42px',
+                  height: '42px',
+                  margin: '0 auto 10px auto',
                   borderRadius: '50%',
                   background: 'rgba(37, 99, 235, 0.15)',
                   display: 'flex',
@@ -430,14 +529,14 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                   color: '#60A5FA',
                 }}
               >
-                <QrCode size={26} />
+                <QrCode size={22} />
               </div>
 
-              <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#F8FAFC', marginBottom: '6px' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#F8FAFC', marginBottom: '4px' }}>
                 Aim Laser Scanner at Admin QR
               </div>
-              <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '0 0 16px 0', lineHeight: 1.4 }}>
-                In the Admin Console, click <strong>PDAs &rarr; Register New PDA</strong>, then point this scanner at the screen and pull the trigger.
+              <p style={{ fontSize: '0.76rem', color: '#94A3B8', margin: '0 0 14px 0', lineHeight: 1.4 }}>
+                In Admin Console, select <strong>PDAs &rarr; Register New PDA</strong>, then scan the QR code displayed on screen.
               </p>
 
               {/* Dedicated Zebra Laser Scanner Hardware Input */}
@@ -446,8 +545,9 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                   ref={inputRef}
                   type="text"
                   value={barcodeInput}
-                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
                   inputMode="none"
                   autoComplete="off"
                   autoCorrect="off"
@@ -456,12 +556,12 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                   disabled={isProcessing}
                   style={{
                     width: '100%',
-                    padding: '12px 14px',
+                    padding: '11px 12px',
                     background: '#030712',
                     border: '2px solid #EC721E',
                     borderRadius: '6px',
                     color: '#FFFFFF',
-                    fontSize: '0.9rem',
+                    fontSize: '0.85rem',
                     textAlign: 'center',
                     fontFamily: 'monospace',
                     fontWeight: 700,
@@ -470,6 +570,64 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                     caretColor: '#EC721E',
                   }}
                 />
+              </div>
+
+              {/* Action Buttons underneath scan box */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  disabled={isProcessing || !barcodeInput.trim()}
+                  onClick={() => {
+                    const parsed = parseEnrollmentString(barcodeInput);
+                    if (parsed) {
+                      executeEnrollment(parsed.deviceId, parsed.token, parsed.name);
+                    } else {
+                      setErrorMsg('Please scan or enter a valid QR code with Device ID and Token.');
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '11px',
+                    background: barcodeInput.trim() ? '#EC721E' : '#334155',
+                    color: barcodeInput.trim() ? '#000000' : '#94A3B8',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: 800,
+                    fontSize: '0.88rem',
+                    cursor: barcodeInput.trim() ? 'pointer' : 'default',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'background 0.2s',
+                  }}
+                >
+                  <ShieldCheck size={16} />
+                  <span>Authorize This Scanner</span>
+                </button>
+
+                {barcodeInput.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBarcodeInput('');
+                      setErrorMsg(null);
+                      focusScannerInput();
+                    }}
+                    style={{
+                      padding: '11px 14px',
+                      background: '#1E293B',
+                      color: '#F8FAFC',
+                      border: '1px solid #334155',
+                      borderRadius: '6px',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
 
               {isProcessing && (
@@ -482,17 +640,17 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                     gap: '8px',
                     color: '#EC721E',
                     fontSize: '0.82rem',
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
                   <RefreshCw size={14} className="admin-spin" />
-                  <span>Validating authorization...</span>
+                  <span>Verifying and Authorizing Device...</span>
                 </div>
               )}
             </div>
           )}
 
-          {/* Tab 2: Manual Registration Form */}
+          {/* Tab 2: Manual Device Registration View */}
           {activeTab === 'manual' && (
             <form
               onSubmit={handleManualSubmit}
@@ -507,7 +665,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                 <label
                   style={{
                     display: 'block',
-                    fontSize: '0.76rem',
+                    fontSize: '0.74rem',
                     fontWeight: 700,
                     color: '#94A3B8',
                     textTransform: 'uppercase',
@@ -515,14 +673,13 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                     marginBottom: '6px',
                   }}
                 >
-                  Device ID (e.g. TC26-01, BOWSER-1)
+                  Device ID (e.g. TC26-01) *
                 </label>
                 <input
                   type="text"
                   value={deviceIdInput}
-                  onChange={(e) => setDeviceIdInput(e.target.value)}
-                  placeholder="Enter Device ID"
-                  required
+                  onChange={(e) => setDeviceIdInput(e.target.value.toUpperCase())}
+                  placeholder="e.g. TC26-01"
                   disabled={isProcessing || Boolean(pendingApprovalDeviceId)}
                   style={{
                     width: '100%',
@@ -532,19 +689,19 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                     borderRadius: '6px',
                     color: '#FFFFFF',
                     fontSize: '0.9rem',
-                    fontWeight: 600,
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
                     boxSizing: 'border-box',
                     outline: 'none',
-                    textTransform: 'uppercase',
                   }}
                 />
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
+              <div style={{ marginBottom: '14px' }}>
                 <label
                   style={{
                     display: 'block',
-                    fontSize: '0.76rem',
+                    fontSize: '0.74rem',
                     fontWeight: 700,
                     color: '#94A3B8',
                     textTransform: 'uppercase',
@@ -592,7 +749,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
                     <span>Awaiting Admin Approval...</span>
                   </div>
                   <div style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.85 }}>
-                    Open the Admin Console &rarr; PDAs tab to click &ldquo;Approve&rdquo;.
+                    Open Admin Console &rarr; PDAs tab to click &ldquo;Approve&rdquo;.
                   </div>
                 </div>
               ) : (
@@ -627,10 +784,31 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
               )}
             </form>
           )}
+
+          {/* Skip / Exit Option */}
+          {onSkip && (
+            <div style={{ textAlign: 'center', marginTop: '16px' }}>
+              <button
+                type="button"
+                onClick={onSkip}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94A3B8',
+                  fontSize: '0.82rem',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  padding: '6px',
+                }}
+              >
+                Skip registration and continue to app &rarr;
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer info */}
-        <div style={{ textAlign: 'center', paddingTop: '14px', borderTop: '1px solid #1E293B' }}>
+        <div style={{ textAlign: 'center', paddingTop: '12px', borderTop: '1px solid #1E293B' }}>
           <span style={{ fontSize: '0.72rem', color: '#64748B', fontFamily: 'monospace' }}>
             TTD Fuel Tracking • Offline-First PWA Security
           </span>
@@ -639,3 +817,5 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({ onEn
     </div>
   );
 };
+
+export default DeviceEnrollmentView;

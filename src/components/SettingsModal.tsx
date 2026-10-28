@@ -10,6 +10,7 @@ interface SettingsModalProps {
   availableVersion: string | null;
   onUpdate: () => void;
   onDeregister?: () => void;
+  onOpenEnrollment?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -19,6 +20,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   availableVersion,
   onUpdate,
   onDeregister,
+  onOpenEnrollment,
 }) => {
   const currentDeviceId = getDeviceId();
   const currentDeviceName = getDeviceName();
@@ -67,10 +69,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="settings-card-label-row">
             <Smartphone size={16} className="settings-card-icon" />
             <span className="settings-card-label">PDA Device ID</span>
-            <span className="settings-saved-pill" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#16A34A', borderColor: 'rgba(34, 197, 94, 0.3)' }}>
-              <Check size={12} />
-              <span>Authorized</span>
-            </span>
+            {currentDeviceId ? (
+              <span className="settings-saved-pill" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#16A34A', borderColor: 'rgba(34, 197, 94, 0.3)' }}>
+                <Check size={12} />
+                <span>Authorized</span>
+              </span>
+            ) : (
+              <span className="settings-saved-pill" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#EAB308', borderColor: 'rgba(234, 179, 8, 0.3)' }}>
+                <span>Unregistered</span>
+              </span>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
             <div>
@@ -83,7 +91,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               )}
             </div>
-            {onDeregister && (
+            {currentDeviceId && onDeregister ? (
               <button
                 type="button"
                 className="btn-pda-rect"
@@ -92,10 +100,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               >
                 Deregister
               </button>
-            )}
+            ) : onOpenEnrollment ? (
+              <button
+                type="button"
+                className="btn-pda-rect"
+                style={{ padding: '6px 12px', fontSize: '0.78rem', color: '#000000', borderColor: '#EC721E', background: '#EC721E', fontWeight: 800 }}
+                onClick={() => {
+                  onClose();
+                  onOpenEnrollment();
+                }}
+              >
+                Pair Scanner
+              </button>
+            ) : null}
           </div>
           <div className="settings-card-helper" style={{ marginTop: '8px' }}>
-            Permanently assigned at registration. Recorded with all transactions.
+            {currentDeviceId
+              ? 'Permanently assigned at registration. Recorded with all transactions.'
+              : 'Pair with Admin Console QR code to permanently identify this PDA.'}
           </div>
         </div>
 
