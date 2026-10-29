@@ -475,36 +475,36 @@ export async function uploadTransactionToCloud(
     }
   }
 
-  // 1. FAIL-CLOSED DEVICE AUTHORIZATION GUARD
-  const isAdminPortal = typeof window !== 'undefined' && (
-    window.location.pathname.includes('admin') ||
-    tx.deviceId === 'Admin-Workstation'
-  );
-
-  if (!isAdminPortal) {
-    const currentDevId = getDeviceId();
-    const currentToken = getDeviceToken();
-    if (!currentDevId || !currentToken) {
-      return {
-        success: false,
-        uploadTimestamp,
-        error: 'DEVICE_UNAUTHORIZED: Device has no active enrollment token',
-      };
-    }
-
-    const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
-    if (!authCheck.valid || authCheck.status !== 'active') {
-      console.warn(`[Supabase Upload Blocked] Device ${currentDevId} is not active (status: ${authCheck.status}).`);
-      return {
-        success: false,
-        uploadTimestamp,
-        error: 'DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator',
-      };
-    }
-  }
-
-  // Supabase cloud path
+  // Supabase cloud path (wrapped in try/catch so transient network/DNS errors during Airplane mode transitions never throw unhandled exceptions)
   try {
+    // 1. FAIL-CLOSED DEVICE AUTHORIZATION GUARD
+    const isAdminPortal = typeof window !== 'undefined' && (
+      window.location.pathname.includes('admin') ||
+      tx.deviceId === 'Admin-Workstation'
+    );
+
+    if (!isAdminPortal) {
+      const currentDevId = getDeviceId();
+      const currentToken = getDeviceToken();
+      if (!currentDevId || !currentToken) {
+        return {
+          success: false,
+          uploadTimestamp,
+          error: 'DEVICE_UNAUTHORIZED: Device has no active enrollment token',
+        };
+      }
+
+      const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
+      if (!authCheck.valid || authCheck.status !== 'active') {
+        console.warn(`[Supabase Upload Blocked] Device ${currentDevId} is not active (status: ${authCheck.status}).`);
+        return {
+          success: false,
+          uploadTimestamp,
+          error: 'DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator',
+        };
+      }
+    }
+
     // Step 1: Build transaction payload
     const payload: Record<string, any> = {
       id: tx.id,
@@ -525,8 +525,10 @@ export async function uploadTransactionToCloud(
       device_id: tx.deviceId ?? null,
     };
 
-    // Save the transaction to Supabase
-    let { error: txError } = await client.from('transactions').insert(payload);
+    // Save the transaction to Supabase using atomic upsert (avoids destructive DELETE + INSERT race)
+    let { error: txError } = await client
+      .from('transactions')
+      .upsert(payload, { onConflict: 'id' });
 
     // Only upsert parent equipment if foreign key constraint (23503) failed (avoids redundant equipment_list write + Realtime event on every tx)
     if (txError && txError.code === '23503') {
@@ -554,7 +556,9 @@ export async function uploadTransactionToCloud(
             eqPayload.device_id = encodedCoords;
           }
           await client.from('equipment_list').upsert(eqPayload, { onConflict: 'equipment_id' });
-          const retryAfterEq = await client.from('transactions').insert(payload);
+          const retryAfterEq = await client
+            .from('transactions')
+            .upsert(payload, { onConflict: 'id' });
           txError = retryAfterEq.error;
         }
       } catch (eqErr) {
@@ -566,30 +570,34 @@ export async function uploadTransactionToCloud(
     if (txError && (txError as any).code === 'PGRST204' && (txError as any).message?.includes('device_id')) {
       const fallbackPayload = { ...payload };
       delete fallbackPayload.device_id;
-      const retryRes = await client.from('transactions').insert(fallbackPayload);
+      const retryRes = await client
+        .from('transactions')
+        .upsert(fallbackPayload, { onConflict: 'id' });
       txError = retryRes.error;
     }
 
-    // If duplicate key (code 23505) or RLS policy violation on existing row (code 42501):
-    // Delete the existing row and insert the updated payload to preserve the exact transaction ID.
+    // Fallback if UPDATE RLS policy is not enabled on transactions (code 42501 on upsert):
+    // Try standard insert; if row already exists (23505 duplicate key), treat as success unless explicitly edited
+    if (
+      txError &&
+      (txError.code === '42501' ||
+        (txError as any).message?.includes('row-level security'))
+    ) {
+      const insertRes = await client.from('transactions').insert(payload);
+      txError = insertRes.error;
+    }
+
     if (
       txError &&
       (txError.code === '23505' ||
-        txError.code === '42501' ||
         (txError as any).message?.includes('duplicate key') ||
-        (txError as any).message?.includes('already exists') ||
-        (txError as any).message?.includes('row-level security'))
+        (txError as any).message?.includes('already exists'))
     ) {
-      await client.from('transactions').delete().eq('id', tx.id);
-
-      const reinsertRes = await client.from('transactions').insert(payload);
-      txError = reinsertRes.error;
-
-      if (txError && (txError as any).code === 'PGRST204' && (txError as any).message?.includes('device_id')) {
-        const fallbackPayload = { ...payload };
-        delete fallbackPayload.device_id;
-        const retryRes = await client.from('transactions').insert(fallbackPayload);
-        txError = retryRes.error;
+      // Row with this exact UUID already exists in Supabase!
+      // Try updating in place; if already identical or UPDATE RLS not set, treat as uploaded without deleting the row.
+      const updateRes = await client.from('transactions').update(payload).eq('id', tx.id);
+      if (!updateRes.error || updateRes.error.code === '42501') {
+        txError = null;
       }
     }
 

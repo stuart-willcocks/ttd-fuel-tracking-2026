@@ -23,11 +23,7 @@ import { generateSecureDeviceToken, broadcastDeviceAuthEvent } from './device';
 
 export async function fetchRemoteEquipment(): Promise<Equipment[]> {
   if (isSupabaseConfigured()) {
-    try {
-      return await fetchEquipmentFromSupabase();
-    } catch (err) {
-      console.warn('Supabase fetch equipment failed, falling back to local API:', err);
-    }
+    return await fetchEquipmentFromSupabase();
   }
 
   const res = await fetch(`/api/equipment?t=${Date.now()}`, { cache: 'no-store' });
@@ -37,12 +33,8 @@ export async function fetchRemoteEquipment(): Promise<Equipment[]> {
 
 export async function postRemoteEquipment(equipment: Equipment): Promise<void> {
   if (isSupabaseConfigured()) {
-    try {
-      await saveEquipmentToSupabase(equipment);
-      return;
-    } catch (err) {
-      console.warn('Supabase save equipment failed, falling back to local API:', err);
-    }
+    await saveEquipmentToSupabase(equipment);
+    return;
   }
 
   const res = await fetch('/api/equipment', {
@@ -55,12 +47,8 @@ export async function postRemoteEquipment(equipment: Equipment): Promise<void> {
 
 export async function deleteRemoteEquipment(equipmentId: string): Promise<void> {
   if (isSupabaseConfigured()) {
-    try {
-      await deleteEquipmentFromSupabase(equipmentId);
-      return;
-    } catch (err) {
-      console.warn('Supabase delete equipment failed, falling back to local API:', err);
-    }
+    await deleteEquipmentFromSupabase(equipmentId);
+    return;
   }
 
   const res = await fetch(`/api/equipment?id=${encodeURIComponent(equipmentId)}`, {
@@ -71,11 +59,7 @@ export async function deleteRemoteEquipment(equipmentId: string): Promise<void> 
 
 export async function fetchRemoteTransactions(): Promise<Transaction[]> {
   if (isSupabaseConfigured()) {
-    try {
-      return await fetchTransactionsFromSupabase();
-    } catch (err) {
-      console.warn('Supabase fetch transactions failed, falling back to local API:', err);
-    }
+    return await fetchTransactionsFromSupabase();
   }
 
   const res = await fetch(`/api/transactions?t=${Date.now()}`, { cache: 'no-store' });

@@ -35,6 +35,9 @@ class SyncEngine {
   private isSimulatedOffline: boolean = false;
   private isSyncing: boolean = false;
   private isFlushing: boolean = false;
+  private activeFlushPromise: Promise<{ processed: number; errors: number }> | null = null;
+  private needsAnotherFlush: boolean = false;
+  private outboxRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private lastSyncTime: string | null = null;
   private lastError: string | null = null;
   private syncTimer: ReturnType<typeof setInterval> | null = null;
@@ -178,6 +181,10 @@ class SyncEngine {
       clearInterval(this.authTimer);
       this.authTimer = null;
     }
+    if (this.outboxRetryTimer) {
+      clearTimeout(this.outboxRetryTimer);
+      this.outboxRetryTimer = null;
+    }
   }
 
   public subscribe(listener: SyncListener): () => void {
@@ -221,7 +228,31 @@ class SyncEngine {
     this.notify();
     if (this.isEffectivelyOnline()) {
       this.syncWithRemote();
+      // Android/PDA radios often take 2-6 seconds after exiting Airplane Mode before DNS/internet is ready;
+      // schedule follow-up outbox checks so queued transactions always flush as soon as routing comes up.
+      this.scheduleOutboxRetry(2500);
     }
+  }
+
+  private scheduleOutboxRetry(delayMs: number = 3000) {
+    if (this.outboxRetryTimer) {
+      clearTimeout(this.outboxRetryTimer);
+    }
+    this.outboxRetryTimer = setTimeout(async () => {
+      this.outboxRetryTimer = null;
+      if (!this.isEffectivelyOnline()) return;
+      const pending = await this.getPendingCount();
+      if (pending > 0) {
+        const res = await this.flushOutbox();
+        const remaining = await this.getPendingCount();
+        if (remaining > 0 && this.isEffectivelyOnline()) {
+          const nextDelay = Math.min(delayMs * 2, 15000);
+          this.scheduleOutboxRetry(nextDelay);
+        } else if (res.processed > 0) {
+          this.syncWithRemote({ equipment: false, transactions: true });
+        }
+      }
+    }, delayMs);
   }
 
   public async getPendingCount(): Promise<number> {
@@ -446,7 +477,7 @@ class SyncEngine {
   /**
    * Verifies that this physical device has a valid active token on the central server.
    * If token is revoked or missing, triggers lockdown immediately.
-   * Caches positive verification for 8 seconds to avoid sluggish UI stalls.
+   * Caches positive verification for 60 seconds and gracefully allows offline operation when in Airplane mode.
    */
   public async verifyDeviceAuthorization(force: boolean = false): Promise<boolean> {
     if (!isDeviceEnrolled()) {
@@ -457,6 +488,11 @@ class SyncEngine {
     if (!currentDevId || !currentToken) {
       await this.lockdownRevokedDevice();
       return false;
+    }
+
+    // When offline / in Airplane mode, immediately trust local active enrollment without stalling on network calls
+    if (!this.isEffectivelyOnline()) {
+      return true;
     }
 
     const now = Date.now();
@@ -484,11 +520,10 @@ class SyncEngine {
       this.lastAuthCheckTime = now;
       return true;
     } catch (e) {
-      if (!this.isEffectivelyOnline()) {
-        return isDeviceEnrolled();
-      }
-      console.warn('[SyncEngine] Error during device verification while online:', e);
-      return this.lastAuthCheckResult && now - this.lastAuthCheckTime < 120000;
+      // Transient network error (e.g. Wi-Fi still associating right after turning off Airplane mode):
+      // never lock down or reject an enrolled device on a network error.
+      console.warn('[SyncEngine] Network error during device verification; allowing enrolled device:', e);
+      return isDeviceEnrolled();
     }
   }
 
@@ -503,22 +538,23 @@ class SyncEngine {
     const fetchEq = options?.equipment ?? true;
     const fetchTx = options?.transactions ?? true;
 
-    // Strict Device Authorization: If device has no active token, lock down immediately
-    if (isDeviceEnrolled()) {
-      const isAuthorized = await this.verifyDeviceAuthorization();
-      if (!isAuthorized) {
-        return;
-      }
-    } else {
-      return;
-    }
-
+    // Lock isSyncing synchronously BEFORE any await so concurrent 'online' + 'visibilitychange' events cannot race
     this.isSyncing = true;
     await this.notify();
 
     try {
-      // Step 1: Upload any pending outbox items from this device
-      const flushRes = await this.flushOutboxInternal();
+      // Strict Device Authorization: If device has no active token, lock down immediately
+      if (isDeviceEnrolled()) {
+        const isAuthorized = await this.verifyDeviceAuthorization();
+        if (!isAuthorized) {
+          return;
+        }
+      } else {
+        return;
+      }
+
+      // Step 1: Upload any pending outbox items from this device (serialized via flushOutbox)
+      const flushRes = await this.flushOutbox();
       let hadUpdates = flushRes.processed > 0;
 
       // Attempt remote deletion for all active tombstones
@@ -556,8 +592,35 @@ class SyncEngine {
         const outboxItems = await db.outbox.toArray();
         const pendingOutboxIdSet = new Set(outboxItems.map((o) => o.id));
 
-        // Delete local transactions that were removed from Supabase/server or marked deleted locally
         const allLocal = await db.transactions.toArray();
+
+        // Ensure any local transaction that is still marked 'pending' or 'failed' is protected
+        // (and re-queued in outbox if needed) so it can NEVER be deleted before being confirmed in remoteIdSet
+        for (const localTx of allLocal) {
+          if (
+            (localTx.syncStatus === 'pending' || localTx.syncStatus === 'failed') &&
+            !this.deletedTxIds.has(localTx.id)
+          ) {
+            if (remoteIdSet.has(localTx.id)) {
+              // Server already has this transaction! Mark synced and remove from outbox
+              pendingOutboxIdSet.delete(localTx.id);
+              await db.outbox.delete(localTx.id);
+            } else {
+              pendingOutboxIdSet.add(localTx.id);
+              const existingOutbox = await db.outbox.get(localTx.id);
+              if (!existingOutbox) {
+                await db.outbox.put({
+                  id: localTx.id,
+                  equipmentId: localTx.equipmentId,
+                  createdAt: localTx.createdAt || localTx.transactionTimestamp,
+                  attempts: 0,
+                });
+              }
+            }
+          }
+        }
+
+        // Delete local transactions that were removed from Supabase/server or marked deleted locally
         const idsToDelete = allLocal
           .filter((tx) => (!remoteIdSet.has(tx.id) && !pendingOutboxIdSet.has(tx.id)) || this.deletedTxIds.has(tx.id))
           .map((tx) => tx.id);
@@ -641,9 +704,15 @@ class SyncEngine {
     let processed = 0;
     let errors = 0;
 
+    if (!this.isEffectivelyOnline()) {
+      return { processed: 0, errors: 0 };
+    }
+
     const isAuth = await this.verifyDeviceAuthorization();
     if (!isAuth) {
-      await this.lockdownRevokedDevice();
+      if (!isDeviceEnrolled()) {
+        await this.lockdownRevokedDevice();
+      }
       return { processed: 0, errors: 1 };
     }
 
@@ -651,6 +720,10 @@ class SyncEngine {
 
     for (const item of items) {
       if (!this.isEffectivelyOnline()) break;
+
+      // Re-verify the item is still in outbox (guards against any earlier flush having processed it)
+      const stillQueued = await db.outbox.get(item.id);
+      if (!stillQueued) continue;
 
       const tx = await db.transactions.get(item.id);
       if (!tx) {
@@ -677,13 +750,23 @@ class SyncEngine {
 
         errors++;
         this.lastError = result.error || 'Failed to upload transaction';
+        const isTransientNetworkError =
+          !this.isEffectivelyOnline() ||
+          Boolean(
+            result.error &&
+              (result.error.includes('Failed to fetch') ||
+                result.error.includes('NetworkError') ||
+                result.error.includes('Load failed') ||
+                result.error.includes('network'))
+          );
+
         await db.outbox.update(item.id, {
           attempts: item.attempts + 1,
           lastAttempt: new Date().toISOString(),
           error: result.error,
         });
         await db.transactions.update(item.id, {
-          syncStatus: 'failed',
+          syncStatus: isTransientNetworkError ? 'pending' : 'failed',
           syncError: result.error,
         });
       }
@@ -695,22 +778,42 @@ class SyncEngine {
       pushDeviceTelemetry(false).catch(() => {});
     }
 
+    if (errors > 0 && this.isEffectivelyOnline()) {
+      this.scheduleOutboxRetry(3000);
+    }
+
     return { processed, errors };
   }
 
   public async flushOutbox(): Promise<{ processed: number; errors: number }> {
-    if (this.isFlushing) return { processed: 0, errors: 0 };
-    this.isFlushing = true;
-    try {
-      const res = await this.flushOutboxInternal();
-      if (res.processed > 0 || res.errors > 0) {
-        await this.notify();
-        this.notifyDataChange();
-      }
-      return res;
-    } finally {
-      this.isFlushing = false;
+    if (this.activeFlushPromise) {
+      this.needsAnotherFlush = true;
+      return this.activeFlushPromise;
     }
+
+    this.isFlushing = true;
+    this.activeFlushPromise = (async () => {
+      let totalProcessed = 0;
+      let totalErrors = 0;
+      try {
+        do {
+          this.needsAnotherFlush = false;
+          const res = await this.flushOutboxInternal();
+          totalProcessed += res.processed;
+          totalErrors += res.errors;
+          if (res.processed > 0 || res.errors > 0) {
+            await this.notify();
+            this.notifyDataChange();
+          }
+        } while (this.needsAnotherFlush && this.isEffectivelyOnline());
+        return { processed: totalProcessed, errors: totalErrors };
+      } finally {
+        this.isFlushing = false;
+        this.activeFlushPromise = null;
+      }
+    })();
+
+    return this.activeFlushPromise;
   }
 }
 
