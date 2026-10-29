@@ -1282,12 +1282,17 @@ export async function getAdminSession(): Promise<Session | null> {
   const client = getSupabaseClient();
   if (!client) return null;
   try {
-    const { data, error } = await client.auth.getSession();
-    if (error) {
-      console.warn('[Supabase Auth] getSession error:', error.message);
-      return null;
-    }
-    return data.session;
+    const sessionPromise = client.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        console.warn('[Supabase Auth] getSession error:', error.message);
+        return null;
+      }
+      return data.session;
+    });
+    const timeoutPromise = new Promise<Session | null>((resolve) =>
+      setTimeout(() => resolve(null), 3500)
+    );
+    return await Promise.race([sessionPromise, timeoutPromise]);
   } catch {
     return null;
   }

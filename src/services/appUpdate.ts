@@ -96,8 +96,11 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
       }
     } catch {}
 
+    const isAdminPage =
+      typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+
     // Immediately report the newly updated app version to the database if this is an enrolled PDA
-    if (typeof window !== 'undefined' && !window.location.pathname.includes('admin') && targetVersion) {
+    if (typeof window !== 'undefined' && !isAdminPage && targetVersion) {
       try {
         await Promise.race([
           reportDeviceAppVersionImmediately(String(targetVersion)),
@@ -106,28 +109,37 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
       } catch {}
     }
 
-    // 2. Unregister all service workers BEFORE deleting CacheStorage caches
+    // 2. Update or unregister service workers safely WITHOUT wiping active Workbox precaches out from under running tabs
     if ('serviceWorker' in navigator) {
       try {
         const registrations = await navigator.serviceWorker.getRegistrations();
         await Promise.all(
           registrations.map(async (reg) => {
             try {
-              await reg.unregister();
+              if (isAdminPage) {
+                // On /admin, trigger a non-destructive SW update check without deleting active precaches
+                await reg.update();
+              } else {
+                await reg.unregister();
+              }
             } catch {}
           }),
         );
       } catch (swErr) {
-        console.warn('[AppUpdate] SW unregister error:', swErr);
+        console.warn('[AppUpdate] SW update/unregister warning:', swErr);
       }
     }
 
-    // 3. Clear all browser CacheStorage caches so stale HTML/JS bundles are purged
-    if (typeof window !== 'undefined' && 'caches' in window) {
+    // 3. Only clear non-Workbox runtime caches when a Service Worker controller is still active
+    //    (deleting workbox-precache while a SW is active causes Workbox PrecacheStrategy to fail with ERR_FAILED)
+    if (typeof window !== 'undefined' && 'caches' in window && !isAdminPage) {
       try {
+        const hasActiveController = Boolean(navigator.serviceWorker?.controller);
         const cacheKeys = await caches.keys();
-        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
-        console.log('[AppUpdate] Purged CacheStorage caches:', cacheKeys);
+        const keysToDelete = hasActiveController
+          ? cacheKeys.filter((k) => !k.startsWith('workbox-precache'))
+          : cacheKeys;
+        await Promise.all(keysToDelete.map((key) => caches.delete(key)));
       } catch (cacheErr) {
         console.warn('[AppUpdate] Cache purge warning:', cacheErr);
       }

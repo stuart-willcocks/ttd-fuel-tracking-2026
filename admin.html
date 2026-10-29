@@ -65,6 +65,33 @@
         if (typeof MutationObserver !== 'undefined') {
           new MutationObserver(removeVercelToolbar).observe(document.documentElement, { childList: true, subtree: true });
         }
+
+        // Clean cache-busting ?v= parameter from URL bar immediately on load
+        try {
+          if (window.location.search.indexOf('v=') !== -1) {
+            var u = new URL(window.location.href);
+            u.searchParams.delete('v');
+            var q = u.searchParams.toString();
+            window.history.replaceState({}, '', u.pathname + (q ? '?' + q : '') + u.hash);
+          }
+        } catch (e) {}
+
+        // Self-healing guard if an older Service Worker had its precache emptied and blocked a shared chunk
+        window.addEventListener('error', function(ev) {
+          var t = ev && ev.target;
+          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+            if (!sessionStorage.getItem('ttd_admin_sw_healed')) {
+              sessionStorage.setItem('ttd_admin_sw_healed', '1');
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(regs) {
+                  return Promise.all(regs.map(function(r) { return r.update().catch(function() {}); }));
+                }).finally(function() {
+                  window.location.reload();
+                });
+              }
+            }
+          }
+        }, true);
       })();
     </script>
   </head>

@@ -90,9 +90,23 @@ export default defineConfig({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         navigateFallbackDenylist: [/^\/api/, /^\/version\.json$/, /^\/admin/],
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        globIgnores: ['**/admin.html', '**/assets/admin-*'],
+        globPatterns: ['**/*.{html,ico,png,svg,woff,woff2}'],
+        globIgnores: ['**/admin.html'],
         runtimeCaching: [
+          {
+            urlPattern: /\/assets\/.*\.(?:js|css)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ttd-hashed-assets-cache',
+              expiration: {
+                maxEntries: 60,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
