@@ -598,8 +598,8 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       position: relative;
       width: 32px;
       height: 32px;
-      border-radius: 7px;
-      background: #FFFFFF;
+      border-radius: 50%;
+      background: #EC721E;
       border: none;
       box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
       display: flex;
@@ -614,8 +614,8 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
     }
     .eq-map-chk-dot {
       position: absolute;
-      top: -4px;
-      left: -4px;
+      top: -2px;
+      left: -2px;
       width: 9px;
       height: 9px;
       border-radius: 50%;
@@ -623,8 +623,8 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
     }
     .eq-map-pwr-dot {
       position: absolute;
-      top: -4px;
-      right: -4px;
+      top: -2px;
+      right: -2px;
       width: 9px;
       height: 9px;
       border-radius: 50%;
@@ -953,7 +953,8 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
           boundsPoints.push(pt);
           seenIds[item.equipmentId] = true;
 
-          var iconColor = item.type === 'GENERATOR' ? '#EC721E' : item.type === 'TANK' ? '#2563EB' : '#16A34A';
+          var bgColor = item.type === 'GENERATOR' ? '#EC721E' : item.type === 'TANK' ? '#2563EB' : '#16A34A';
+          var iconColor = '#FFFFFF';
           var chkColor = item.checkInStatus === 'checked_in'
             ? '#16A34A'
             : item.checkInStatus === 'checked_out'
@@ -965,7 +966,7 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
             : '';
 
           var html = '<div class="eq-map-marker">' +
-            '<div class="eq-map-icon-box">' +
+            '<div class="eq-map-icon-box" style="background:' + bgColor + '">' +
               getEquipmentSvg(item.type, iconColor) +
               chkDotHtml +
               pwrDotHtml +
