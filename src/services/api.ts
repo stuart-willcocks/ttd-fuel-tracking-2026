@@ -9,6 +9,7 @@ import {
   updateTransactionInSupabase,
   fetchTransactionsFromSupabase,
   clearAllCloudData,
+  clearAllTransactionsFromSupabase,
   bulkImportEquipmentToSupabase,
   bulkImportTransactionsToSupabase,
   uploadTransactionToCloud,
@@ -176,11 +177,44 @@ export async function deleteAllFleetData(): Promise<void> {
   }
 }
 
-export async function bulkUploadEquipment(equipmentList: Equipment[]): Promise<number> {
+export async function deleteAllTransactionsOnly(): Promise<void> {
   if (isSupabaseConfigured()) {
-    const count = await bulkImportEquipmentToSupabase(equipmentList);
+    await clearAllTransactionsFromSupabase();
+  }
+
+  try {
+    await fetch('/api/transactions?all=true', { method: 'DELETE' });
+  } catch {
+    // Ignore in static hosting environments
+  }
+
+  // Clear local IndexedDB transactions and outbox (leaving equipments intact)
+  try {
+    await db.transactions.clear();
+    await db.outbox.clear();
+  } catch (err) {
+    console.warn('Local indexedDB clear transactions error:', err);
+  }
+
+  // Clear tombstone cache
+  try {
+    localStorage.removeItem('ttd_deleted_tx_ids');
+  } catch {
+    // Ignore
+  }
+}
+
+export async function bulkUploadEquipment(equipmentList: Equipment[]): Promise<number> {
+  const dedupedMap = new Map<string, Equipment>();
+  for (const eq of equipmentList) {
+    dedupedMap.set(eq.equipmentId.trim(), eq);
+  }
+  const dedupedList = Array.from(dedupedMap.values());
+
+  if (isSupabaseConfigured()) {
+    const count = await bulkImportEquipmentToSupabase(dedupedList);
     try {
-      await db.equipments.bulkPut(equipmentList);
+      await db.equipments.bulkPut(dedupedList);
     } catch (err) {
       console.warn('Local indexedDB bulkPut error:', err);
     }
@@ -188,15 +222,15 @@ export async function bulkUploadEquipment(equipmentList: Equipment[]): Promise<n
   }
 
   // Fallback to local API and local IndexedDB
-  for (const eq of equipmentList) {
+  for (const eq of dedupedList) {
     await postRemoteEquipment(eq);
   }
   try {
-    await db.equipments.bulkPut(equipmentList);
+    await db.equipments.bulkPut(dedupedList);
   } catch (err) {
     console.warn('Local indexedDB bulkPut error:', err);
   }
-  return equipmentList.length;
+  return dedupedList.length;
 }
 
 const MOCK_DEVICES_KEY = 'ttd_mock_authorized_devices';

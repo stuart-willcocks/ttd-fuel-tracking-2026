@@ -408,20 +408,54 @@ export async function clearAllCloudData(): Promise<void> {
 }
 
 /**
- * Bulk import equipment records into Supabase in chunks
+ * Wipe only transaction records from Supabase (leaving equipment_list intact)
+ */
+export async function clearAllTransactionsFromSupabase(): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const { error: txErr } = await client
+    .from('transactions')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+  if (txErr) throw txErr;
+
+  // Reset cached power timestamps on equipment_list since all transactions are cleared
+  const { error: eqErr } = await client
+    .from('equipment_list')
+    .update({
+      powered_up_timestamp: null,
+      powered_down_timestamp: null,
+      updated_at: new Date().toISOString(),
+    })
+    .neq('equipment_id', '__DUMMY_NEQ_ALL__');
+  if (eqErr) {
+    console.warn('Could not reset equipment power timestamps after clearing transactions:', eqErr);
+  }
+}
+
+/**
+ * Bulk import equipment records into Supabase in chunks (appends new IDs and overwrites duplicate IDs)
  */
 export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]): Promise<number> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
+  // Deduplicate by equipmentId (last occurrence wins) to prevent PostgreSQL 21000 error on batch upsert
+  const dedupedMap = new Map<string, Equipment>();
+  for (const eq of equipmentList) {
+    dedupedMap.set(eq.equipmentId.trim(), eq);
+  }
+  const dedupedList = Array.from(dedupedMap.values());
+
   // Resolve coordinates once per unique what3words address
   const uniqueW3w = Array.from(
-    new Set(equipmentList.map((eq) => normalizeWhat3Words(eq.what3words)).filter(Boolean))
+    new Set(dedupedList.map((eq) => normalizeWhat3Words(eq.what3words)).filter(Boolean))
   );
   await Promise.all(uniqueW3w.map((w3w) => convertWhat3WordsToCoordinates(w3w)));
 
   const resolvedList = await Promise.all(
-    equipmentList.map((eq) => resolveEquipmentCoordinates(eq))
+    dedupedList.map((eq) => resolveEquipmentCoordinates(eq))
   );
 
   const rows = resolvedList.map((eq) => {
@@ -431,7 +465,7 @@ export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]):
         ? JSON.stringify({ lat: eq.latitude, lng: eq.longitude, w3w: cleanW3w })
         : null;
 
-    return {
+    const payload: Record<string, unknown> = {
       equipment_id: eq.equipmentId,
       area: eq.area,
       location: eq.location,
@@ -440,10 +474,17 @@ export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]):
       type: eq.type,
       capacity: eq.capacity ?? null,
       rental_serial_number: eq.rentalSerialNumber,
-      powered_up_timestamp: eq.poweredUpTimestamp ?? null,
-      powered_down_timestamp: eq.poweredDownTimestamp ?? null,
       updated_at: new Date().toISOString(),
     };
+
+    if (eq.poweredUpTimestamp !== undefined) {
+      payload.powered_up_timestamp = eq.poweredUpTimestamp;
+    }
+    if (eq.poweredDownTimestamp !== undefined) {
+      payload.powered_down_timestamp = eq.poweredDownTimestamp;
+    }
+
+    return payload;
   });
 
   const chunkSize = 50;
@@ -453,7 +494,7 @@ export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]):
     if (error) throw error;
   }
 
-  return equipmentList.length;
+  return dedupedList.length;
 }
 
 /**

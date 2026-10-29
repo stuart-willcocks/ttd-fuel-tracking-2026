@@ -27,6 +27,7 @@ import {
   deleteRemoteTransaction,
   resetRemoteData,
   deleteAllFleetData,
+  deleteAllTransactionsOnly,
   bulkUploadEquipment,
   fetchRemoteAuthorizedDevices,
   updateRemoteDeviceStatus,
@@ -416,6 +417,21 @@ export const AdminApp: React.FC = () => {
     }
   };
 
+  // Delete all transactions only handler (Danger Zone — leaves equipment list intact)
+  const handleDeleteAllTransactions = async () => {
+    try {
+      await deleteAllTransactionsOnly();
+      setTransactions([]);
+      await loadFleetData(true);
+      showToast('All transaction records have been deleted.', 'success');
+    } catch (err: unknown) {
+      const msg = formatErrorMessage(err);
+      console.error('Failed to delete all transactions:', err);
+      showToast(`Failed to delete transactions: ${msg}`, 'error');
+      throw err;
+    }
+  };
+
   // Bulk upload equipment handler (Danger Zone)
   const handleBulkUploadEquipment = async (uploadedAssets: Equipment[]) => {
     try {
@@ -654,8 +670,10 @@ export const AdminApp: React.FC = () => {
         {isDangerZoneOpen && (
           <DangerZoneModal
             isOpen={isDangerZoneOpen}
+            existingAssets={assets}
             onClose={() => setIsDangerZoneOpen(false)}
             onDeleteAll={handleDeleteAllRecords}
+            onDeleteAllTransactions={handleDeleteAllTransactions}
             onBulkUpload={handleBulkUploadEquipment}
           />
         )}
