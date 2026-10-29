@@ -9,11 +9,13 @@ import { APP_VERSION, getIsStaging } from '../../version';
 
 interface AdminLoginViewProps {
   isPasswordRecovery?: boolean;
+  initialError?: string | null;
   onPasswordRecoveryComplete?: () => void;
 }
 
 export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
   isPasswordRecovery = false,
+  initialError = null,
   onPasswordRecoveryComplete,
 }) => {
   const isStaging = getIsStaging();
@@ -24,7 +26,7 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(initialError);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -184,10 +186,10 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
                 }}
               >
                 <KeyRound size={18} color="#EC721E" />
-                <span>Set New Admin Password</span>
+                <span>Set Your Admin Password</span>
               </div>
               <p style={{ margin: '0 0 18px 0', fontSize: '0.84rem', color: '#64748B' }}>
-                Enter a new password for your Admin Console account.
+                Choose a password for your Admin Console account to complete setup.
               </p>
 
               {errorMsg && (
@@ -606,3 +608,4 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
     </div>
   );
 };
+

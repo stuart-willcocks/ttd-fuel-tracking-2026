@@ -14,6 +14,38 @@ import {
 const STORAGE_KEY_URL = 'ttd_supabase_url';
 const STORAGE_KEY_ANON = 'ttd_supabase_anon_key';
 
+export interface InitialAuthUrlInfo {
+  isInviteOrRecovery: boolean;
+  authType: string | null;
+  errorDescription: string | null;
+}
+
+// Capture Supabase Auth hash/query parameters at module load time before createClient() consumes them
+const initialAuthUrlInfo: InitialAuthUrlInfo = (() => {
+  if (typeof window === 'undefined') {
+    return { isInviteOrRecovery: false, authType: null, errorDescription: null };
+  }
+  const rawHash = window.location.hash.startsWith('#')
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  const hashParams = new URLSearchParams(rawHash);
+  const searchParams = new URLSearchParams(window.location.search);
+  const authType = hashParams.get('type') || searchParams.get('type');
+  const errorDescription =
+    hashParams.get('error_description') || searchParams.get('error_description');
+  const isInviteOrRecovery =
+    authType === 'invite' || authType === 'recovery' || authType === 'signup';
+  return {
+    isInviteOrRecovery,
+    authType,
+    errorDescription: errorDescription ? errorDescription.replace(/\+/g, ' ') : null,
+  };
+})();
+
+export function getInitialAuthUrlInfo(): InitialAuthUrlInfo {
+  return initialAuthUrlInfo;
+}
+
 let cachedClient: SupabaseClient | null = null;
 
 export function getSupabaseConfig(): { url: string; anonKey: string } {

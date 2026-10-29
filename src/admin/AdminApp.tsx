@@ -39,14 +39,18 @@ import {
   getAdminSession,
   onAdminAuthStateChange,
   signOutAdmin,
+  getInitialAuthUrlInfo,
 } from '../services/supabase';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
 import { formatErrorMessage } from '../utils/errorMessage';
 
 export const AdminApp: React.FC = () => {
+  const initialAuthInfo = getInitialAuthUrlInfo();
   const [adminSession, setAdminSession] = useState<Session | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => isSupabaseConfigured());
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState<boolean>(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState<boolean>(
+    () => initialAuthInfo.isInviteOrRecovery
+  );
 
   const [currentView, setCurrentView] = useState<AdminViewType>('ASSETS');
   const [assets, setAssets] = useState<Equipment[]>([]);
@@ -442,9 +446,10 @@ export const AdminApp: React.FC = () => {
       ) : isSupabaseConfigured() && (!adminSession || isPasswordRecovery) ? (
         <AdminLoginView
           isPasswordRecovery={isPasswordRecovery}
+          initialError={initialAuthInfo.errorDescription}
           onPasswordRecoveryComplete={() => {
             setIsPasswordRecovery(false);
-            showToast('Password updated successfully.', 'success');
+            showToast('Password saved successfully.', 'success');
           }}
         />
       ) : (
