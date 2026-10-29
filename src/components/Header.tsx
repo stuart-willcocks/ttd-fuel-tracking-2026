@@ -63,7 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
         e.preventDefault();
       }}
     >
-      {/* Top Left: TTD Logo and App Title ("TTD Fuel Tracking" in white) */}
+      {/* Top Left: TTD Logo, App Title ("TTD Fuel Tracking"), and Version beneath */}
       <div className="header-title-box" title="TTD Fuel Tracking">
         <img
           src="/logo-01.png"
@@ -71,10 +71,23 @@ export const Header: React.FC<HeaderProps> = ({
           className="header-logo"
           draggable={false}
         />
-        <span className="header-app-title">TTD Fuel Tracking</span>
+        <div className="header-title-stack">
+          <span className="header-app-title">TTD Fuel Tracking</span>
+          <span
+            className="header-version-pill"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <span>V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
+            {hasUpdate && <span className="header-version-alert-mark">!</span>}
+          </span>
+        </div>
       </div>
 
-      {/* Top Right: Upload Queue, Version Chip, Refresh, Connection Status */}
+      {/* Top Right: Upload Queue, Refresh, Connection Status */}
       <div className="header-status-box">
         {/* Upload Queue Indicator (visible if items are queued) */}
         {syncState.pendingCount > 0 && (
@@ -88,19 +101,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span>{syncState.pendingCount}</span>
           </button>
         )}
-
-        {/* Version Chip positioned to the left of the Refresh icon */}
-        <span
-          className="header-version-pill"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-        >
-          <span>V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
-          {hasUpdate && <span className="header-version-alert-mark">!</span>}
-        </span>
 
         {/* Refresh / Sync Button (circular arrows spin, square border does NOT spin) */}
         <button
