@@ -39,6 +39,11 @@ class SyncEngine {
   private lastError: string | null = null;
   private syncTimer: ReturnType<typeof setInterval> | null = null;
   private authTimer: ReturnType<typeof setInterval> | null = null;
+  private realtimeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingRealtimeTables: { equipment: boolean; transactions: boolean } = {
+    equipment: false,
+    transactions: false,
+  };
   private lastAuthCheckResult: boolean = false;
   private lastAuthCheckTime: number = 0;
 
@@ -62,19 +67,21 @@ class SyncEngine {
         }
       });
 
-      // Poll every 3 seconds to keep all PDAs and PCs synchronized
+      // Low-frequency 5-minute fallback poll (Supabase Realtime handles instant push updates)
       this.syncTimer = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return;
         if (this.isEffectivelyOnline() && !this.isSyncing) {
           this.syncWithRemote();
         }
-      }, 3000);
+      }, 300000);
 
-      // Fast check every 2 seconds to instantly detect revocations / deletions from Admin Console
+      // Periodic 2-minute safety check for device status (Supabase Realtime handles instant revocations)
       this.authTimer = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return;
         if (this.isEffectivelyOnline() && isDeviceEnrolled()) {
           this.verifyDeviceAuthorization();
         }
-      }, 2000);
+      }, 120000);
 
       // Listen to cross-tab / cross-window instant authorization events
       onDeviceAuthBroadcast((event) => {
@@ -87,7 +94,7 @@ class SyncEngine {
         }
       });
 
-      // Subscribe to real-time cloud changes so PDAs update immediately
+      // Subscribe to real-time cloud changes so PDAs update immediately without polling
       if (isSupabaseConfigured()) {
         try {
           subscribeToCloudChanges((table, eventType, payload) => {
@@ -103,17 +110,32 @@ class SyncEngine {
                   this.lockdownRevokedDevice();
                   return;
                 }
+              } else if (eventType === 'DELETE' && !affectedId) {
+                // Only hit Supabase if a DELETE event lacked the old row's device_id
+                this.verifyDeviceAuthorization(true);
               }
-
-              // On ANY change to authorized_devices (including DELETE where affectedId might be empty),
-              // immediately verify authorization against Supabase
-              this.verifyDeviceAuthorization();
               return;
             }
 
-            if (this.isEffectivelyOnline() && !this.isSyncing) {
-              this.syncWithRemote();
+            if (!this.isEffectivelyOnline()) return;
+
+            if (table === 'equipment_list') {
+              this.pendingRealtimeTables.equipment = true;
+            } else if (table === 'transactions') {
+              this.pendingRealtimeTables.transactions = true;
             }
+
+            if (this.realtimeDebounceTimer) {
+              clearTimeout(this.realtimeDebounceTimer);
+            }
+            this.realtimeDebounceTimer = setTimeout(() => {
+              const opts = {
+                equipment: this.pendingRealtimeTables.equipment,
+                transactions: this.pendingRealtimeTables.transactions,
+              };
+              this.pendingRealtimeTables = { equipment: false, transactions: false };
+              this.syncWithRemote(opts);
+            }, 300);
           });
         } catch (e) {
           console.warn('Realtime subscription error in syncEngine:', e);
@@ -413,7 +435,7 @@ class SyncEngine {
     }
 
     const now = Date.now();
-    if (!force && this.lastAuthCheckResult && now - this.lastAuthCheckTime < 8000) {
+    if (!force && this.lastAuthCheckResult && now - this.lastAuthCheckTime < 60000) {
       return true;
     }
 
@@ -441,17 +463,20 @@ class SyncEngine {
         return isDeviceEnrolled();
       }
       console.warn('[SyncEngine] Error during device verification while online:', e);
-      return this.lastAuthCheckResult && now - this.lastAuthCheckTime < 30000;
+      return this.lastAuthCheckResult && now - this.lastAuthCheckTime < 120000;
     }
   }
 
   /**
-   * Full two-way sync:
+   * Two-way sync:
    * 1. Flush any pending outbox items from this device to the central server.
-   * 2. Pull remote transactions & equipment from the central server and update local IndexedDB.
+   * 2. Pull remote transactions and/or equipment from the central server and update local IndexedDB.
    */
-  public async syncWithRemote(): Promise<void> {
+  public async syncWithRemote(options?: { equipment?: boolean; transactions?: boolean }): Promise<void> {
     if (!this.isEffectivelyOnline() || this.isSyncing) return;
+
+    const fetchEq = options?.equipment ?? true;
+    const fetchTx = options?.transactions ?? true;
 
     // Strict Device Authorization: If device has no active token, lock down immediately
     if (isDeviceEnrolled()) {
@@ -482,16 +507,20 @@ class SyncEngine {
         }
       }
 
-      // Step 2: Download latest transactions and equipment from central server
+      // Step 2: Download only the requested tables from central server (protects Supabase egress quota)
       const [remoteEquipment, remoteTransactions] = await Promise.all([
-        fetchRemoteEquipment().catch((err) => {
-          console.warn('Could not fetch remote equipment:', err);
-          return null;
-        }),
-        fetchRemoteTransactions().catch((err) => {
-          console.warn('Could not fetch remote transactions:', err);
-          return null;
-        }),
+        fetchEq
+          ? fetchRemoteEquipment().catch((err) => {
+              console.warn('Could not fetch remote equipment:', err);
+              return null;
+            })
+          : Promise.resolve(null),
+        fetchTx
+          ? fetchRemoteTransactions().catch((err) => {
+              console.warn('Could not fetch remote transactions:', err);
+              return null;
+            })
+          : Promise.resolve(null),
       ]);
 
       // Step 3: Mirror server state & ensure deleted transactions are never re-inserted
@@ -535,6 +564,16 @@ class SyncEngine {
         }
         if (tombstonesChanged) {
           this.saveDeletedTxIds();
+        }
+
+        // If we only fetched transactions (not equipment), reconcile local equipment power states in-place
+        if (!remoteEquipment) {
+          const allLocalEq = await db.equipments.toArray();
+          if (allLocalEq.length > 0) {
+            const allLocalTxs = await db.transactions.toArray();
+            const reconciled = reconcileEquipmentPowerStates(allLocalEq, allLocalTxs);
+            await db.equipments.bulkPut(reconciled);
+          }
         }
       }
 

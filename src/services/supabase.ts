@@ -472,37 +472,7 @@ export async function uploadTransactionToCloud(
 
   // Supabase cloud path
   try {
-    // Step 1: Ensure parent equipment exists in Supabase equipment_list to satisfy Foreign Key constraint
-    try {
-      const localEq = await db.equipments.get(tx.equipmentId);
-      if (localEq) {
-        const cleanW3w = normalizeWhat3Words(localEq.what3words);
-        const encodedCoords =
-          typeof localEq.latitude === 'number' && typeof localEq.longitude === 'number'
-            ? JSON.stringify({ lat: localEq.latitude, lng: localEq.longitude, w3w: cleanW3w })
-            : undefined;
-        const eqPayload: Record<string, unknown> = {
-          equipment_id: localEq.equipmentId,
-          area: localEq.area || 'Site Area',
-          location: localEq.location || 'Field Grid',
-          what3words: localEq.what3words || '///field.power.setup',
-          type: localEq.type || 'GENERATOR',
-          capacity: localEq.capacity ?? null,
-          rental_serial_number: localEq.rentalSerialNumber || 'RSN-UNKNOWN',
-          powered_up_timestamp: localEq.poweredUpTimestamp ?? null,
-          powered_down_timestamp: localEq.poweredDownTimestamp ?? null,
-          updated_at: new Date().toISOString(),
-        };
-        if (encodedCoords !== undefined) {
-          eqPayload.device_id = encodedCoords;
-        }
-        await client.from('equipment_list').upsert(eqPayload, { onConflict: 'equipment_id' });
-      }
-    } catch (eqErr) {
-      console.warn('Equipment pre-check warning before transaction upload:', eqErr);
-    }
-
-    // Step 2: Upsert the transaction
+    // Step 1: Build transaction payload
     const payload: Record<string, any> = {
       id: tx.id,
       equipment_id: tx.equipmentId,
@@ -524,6 +494,40 @@ export async function uploadTransactionToCloud(
 
     // Save the transaction to Supabase
     let { error: txError } = await client.from('transactions').insert(payload);
+
+    // Only upsert parent equipment if foreign key constraint (23503) failed (avoids redundant equipment_list write + Realtime event on every tx)
+    if (txError && txError.code === '23503') {
+      try {
+        const localEq = await db.equipments.get(tx.equipmentId);
+        if (localEq) {
+          const cleanW3w = normalizeWhat3Words(localEq.what3words);
+          const encodedCoords =
+            typeof localEq.latitude === 'number' && typeof localEq.longitude === 'number'
+              ? JSON.stringify({ lat: localEq.latitude, lng: localEq.longitude, w3w: cleanW3w })
+              : undefined;
+          const eqPayload: Record<string, unknown> = {
+            equipment_id: localEq.equipmentId,
+            area: localEq.area || 'Site Area',
+            location: localEq.location || 'Field Grid',
+            what3words: localEq.what3words || '///field.power.setup',
+            type: localEq.type || 'GENERATOR',
+            capacity: localEq.capacity ?? null,
+            rental_serial_number: localEq.rentalSerialNumber || 'RSN-UNKNOWN',
+            powered_up_timestamp: localEq.poweredUpTimestamp ?? null,
+            powered_down_timestamp: localEq.poweredDownTimestamp ?? null,
+            updated_at: new Date().toISOString(),
+          };
+          if (encodedCoords !== undefined) {
+            eqPayload.device_id = encodedCoords;
+          }
+          await client.from('equipment_list').upsert(eqPayload, { onConflict: 'equipment_id' });
+          const retryAfterEq = await client.from('transactions').insert(payload);
+          txError = retryAfterEq.error;
+        }
+      } catch (eqErr) {
+        console.warn('Equipment FK recovery warning before transaction upload:', eqErr);
+      }
+    }
 
     // If device_id column does not exist yet on remote Supabase table, retry without device_id
     if (txError && (txError as any).code === 'PGRST204' && (txError as any).message?.includes('device_id')) {
@@ -738,20 +742,7 @@ export async function updateDeviceTelemetryInSupabase(
     .update(payload)
     .eq('device_id', cleanId);
 
-  // If native columns succeeded, clean up device_name if it previously contained the fallback string
   if (!error) {
-    try {
-      const { data: current } = await client
-        .from('authorized_devices')
-        .select('device_name')
-        .eq('device_id', cleanId)
-        .maybeSingle();
-
-      if (current?.device_name && current.device_name.includes('__TEL__')) {
-        const cleanName = current.device_name.split('__TEL__')[0] || cleanId;
-        await client.from('authorized_devices').update({ device_name: cleanName }).eq('device_id', cleanId);
-      }
-    } catch {}
     return;
   }
 
@@ -831,6 +822,9 @@ export async function deleteAuthorizedDeviceFromSupabase(deviceId: string): Prom
   }
 }
 
+// Throttle last_seen_at database writes to once every 5 minutes per device to prevent Realtime broadcast storms
+const lastSeenWriteByDevice = new Map<string, number>();
+
 /**
  * Verify device credentials against Supabase
  */
@@ -846,7 +840,7 @@ export async function verifyDeviceTokenWithSupabase(
 
   const { data, error } = await client
     .from('authorized_devices')
-    .select('*')
+    .select('device_id, device_name, auth_token, status')
     .eq('device_id', cleanId)
     .maybeSingle();
 
@@ -873,12 +867,16 @@ export async function verifyDeviceTokenWithSupabase(
   const isActive = data.status === 'active' && isTokenMatch;
 
   if (isActive) {
-    // Update heartbeat silently
-    client
-      .from('authorized_devices')
-      .update({ last_seen_at: new Date().toISOString() })
-      .eq('device_id', cleanId)
-      .then(() => {}, () => {});
+    const now = Date.now();
+    const lastWrite = lastSeenWriteByDevice.get(cleanId) || 0;
+    if (now - lastWrite >= 300000) {
+      lastSeenWriteByDevice.set(cleanId, now);
+      client
+        .from('authorized_devices')
+        .update({ last_seen_at: new Date(now).toISOString() })
+        .eq('device_id', cleanId)
+        .then(() => {}, () => {});
+    }
   }
 
   return {

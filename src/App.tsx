@@ -329,16 +329,19 @@ export const App: React.FC = () => {
     return asset;
   }, [refreshAssetsList]);
 
+  const isLaunchpadOnly = isDesktop && !isDetachedWindow && !stayInTab;
+
   // Automatic low-power battery & location telemetry tracking for enrolled PDAs
   useEffect(() => {
-    if (isEnrolled) {
+    if (isEnrolled && !isLaunchpadOnly) {
       const stop = startTelemetryMonitoring();
       return () => stop();
     }
-  }, [isEnrolled]);
+  }, [isEnrolled, isLaunchpadOnly]);
 
   // Boot & synchronization listeners
   useEffect(() => {
+    if (isLaunchpadOnly) return;
     const init = async () => {
       await initializeDatabase();
       await refreshAssetsList();
@@ -411,7 +414,7 @@ export const App: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', handleVisibility);
     };
-  }, [refreshAssetsList, loadAssetDetails]);
+  }, [refreshAssetsList, loadAssetDetails, isLaunchpadOnly]);
 
   const handleAssetScannedOrSelected = async (equipmentId: string) => {
     const isAuth = await syncEngine.verifyDeviceAuthorization();
@@ -543,8 +546,7 @@ export const App: React.FC = () => {
     setCurrentAsset(resolved);
     setIsEditingAsset(false);
     await refreshAssetsList();
-    postRemoteEquipment(resolved).catch(() => {});
-    await syncEngine.syncWithRemote();
+    await postRemoteEquipment(resolved).catch(() => {});
   };
 
   const handleUpdateTransaction = async (updatedTx: Transaction) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Boxes, ReceiptText, Smartphone } from 'lucide-react';
 import './admin.css';
 import { LaptopOnlyGuard } from './components/LaptopOnlyGuard';
@@ -69,47 +69,75 @@ export const AdminApp: React.FC = () => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Fetch initial data & animate refresh icon on every database sync
-  const loadFleetData = useCallback(async (silent = false) => {
-    const startTime = Date.now();
-    setIsRefreshing(true);
-    try {
-      const [fetchedAssets, fetchedTxs, fetchedDevices] = await Promise.all([
-        fetchRemoteEquipment(),
-        fetchRemoteTransactions(),
-        fetchRemoteAuthorizedDevices(),
-      ]);
+  const assetsRef = useRef<Equipment[]>(assets);
+  const transactionsRef = useRef<Transaction[]>(transactions);
+  useEffect(() => {
+    assetsRef.current = assets;
+  }, [assets]);
+  useEffect(() => {
+    transactionsRef.current = transactions;
+  }, [transactions]);
 
-      // Power state of any generator is determined by its most recent power transaction (OFF by default)
-      const reconciledAssets = reconcileEquipmentPowerStates(fetchedAssets, fetchedTxs);
-      setAssets(reconciledAssets);
-      setTransactions(fetchedTxs);
-      setDevices(fetchedDevices);
-      setIsSupabaseOnline(isSupabaseConfigured());
-    } catch (err: unknown) {
-      console.error('Failed to load fleet data:', err);
-      const msg = formatErrorMessage(err);
-      if (!silent) showToast(`Data sync warning: ${msg}`, 'error');
-    } finally {
-      const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, 600 - elapsed);
-      if (remaining > 0) {
-        setTimeout(() => setIsRefreshing(false), remaining);
-      } else {
-        setIsRefreshing(false);
+  // Fetch initial or table-scoped data & animate refresh icon on every database sync
+  const loadFleetData = useCallback(
+    async (
+      silent = false,
+      scope?: { equipment?: boolean; transactions?: boolean; devices?: boolean }
+    ) => {
+      const fetchEq = scope?.equipment ?? true;
+      const fetchTx = scope?.transactions ?? true;
+      const fetchDev = scope?.devices ?? true;
+
+      const startTime = Date.now();
+      setIsRefreshing(true);
+      try {
+        const [fetchedAssets, fetchedTxs, fetchedDevices] = await Promise.all([
+          fetchEq ? fetchRemoteEquipment() : Promise.resolve(null),
+          fetchTx ? fetchRemoteTransactions() : Promise.resolve(null),
+          fetchDev ? fetchRemoteAuthorizedDevices() : Promise.resolve(null),
+        ]);
+
+        const nextTxs = fetchedTxs ?? transactionsRef.current;
+        const baseAssets = fetchedAssets ?? assetsRef.current;
+
+        if (fetchedTxs) {
+          setTransactions(fetchedTxs);
+        }
+        if (fetchedAssets || fetchedTxs) {
+          const reconciledAssets = reconcileEquipmentPowerStates(baseAssets, nextTxs);
+          setAssets(reconciledAssets);
+        }
+        if (fetchedDevices) {
+          setDevices(fetchedDevices);
+        }
+        setIsSupabaseOnline(isSupabaseConfigured());
+      } catch (err: unknown) {
+        console.error('Failed to load fleet data:', err);
+        const msg = formatErrorMessage(err);
+        if (!silent) showToast(`Data sync warning: ${msg}`, 'error');
+      } finally {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 600 - elapsed);
+        if (remaining > 0) {
+          setTimeout(() => setIsRefreshing(false), remaining);
+        } else {
+          setIsRefreshing(false);
+        }
       }
-    }
-  }, [showToast]);
+    },
+    [showToast]
+  );
 
   useEffect(() => {
     document.body.classList.add('admin-body');
     loadFleetData();
 
-    // Auto-refresh interval every 30 seconds for live operations (pauses if editing modal is open)
+    // Low-frequency 5-minute safety fallback poll (Supabase Realtime handles instant updates)
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       if (isCreateModalOpen || Boolean(editingAsset) || isRegisterDeviceModalOpen) return;
       loadFleetData(true);
-    }, 30000);
+    }, 300000);
 
     return () => {
       document.body.classList.remove('admin-body');
@@ -117,19 +145,37 @@ export const AdminApp: React.FC = () => {
     };
   }, [loadFleetData, isCreateModalOpen, editingAsset, isRegisterDeviceModalOpen]);
 
-  // Real-time listener for database transactions and telemetry logged by field PDAs
+  // Real-time listener for database transactions, equipment, and telemetry logged by field PDAs
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const pendingTables = {
+      equipment: false,
+      transactions: false,
+      devices: false,
+    };
+
     const unsubscribe = subscribeToCloudChanges((table, eventType) => {
       // Avoid clobbering user input when an asset creation or edit modal is active
       if (isCreateModalOpen || Boolean(editingAsset) || isRegisterDeviceModalOpen) return;
 
-      console.log(`[Realtime Sync] ${table} event (${eventType}) from field PDA - refreshing`);
+      if (table === 'equipment_list') pendingTables.equipment = true;
+      if (table === 'transactions') pendingTables.transactions = true;
+      if (table === 'authorized_devices') pendingTables.devices = true;
+
+      console.log(`[Realtime Sync] ${table} event (${eventType}) from field PDA - refreshing changed table(s)`);
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        loadFleetData(true);
+        const scope = {
+          equipment: pendingTables.equipment,
+          transactions: pendingTables.transactions,
+          devices: pendingTables.devices,
+        };
+        pendingTables.equipment = false;
+        pendingTables.transactions = false;
+        pendingTables.devices = false;
+        loadFleetData(true, scope);
       }, 300);
     });
 
@@ -143,7 +189,7 @@ export const AdminApp: React.FC = () => {
   const handleSaveAsset = async (savedAsset: Equipment) => {
     try {
       await postRemoteEquipment(savedAsset);
-      await loadFleetData(true);
+      await loadFleetData(true, { equipment: true, transactions: false, devices: false });
       showToast(`Asset "${savedAsset.equipmentId}" saved successfully!`, 'success');
       setEditingAsset(null);
       setIsCreateModalOpen(false);
@@ -158,7 +204,7 @@ export const AdminApp: React.FC = () => {
   const handleDeleteAsset = async (equipmentId: string) => {
     try {
       await deleteRemoteEquipment(equipmentId);
-      await loadFleetData(true);
+      await loadFleetData(true, { equipment: true, transactions: true, devices: false });
       showToast(`Asset "${equipmentId}" decommissioned and removed.`, 'success');
       setAssetPendingDelete(null);
       if (selectedAssetId === equipmentId) {
@@ -175,7 +221,7 @@ export const AdminApp: React.FC = () => {
   const handleDeleteTransaction = async (transactionId: string) => {
     try {
       await deleteRemoteTransaction(transactionId);
-      await loadFleetData(true);
+      await loadFleetData(true, { equipment: false, transactions: true, devices: false });
       showToast('Transaction deleted. Generator power states recalculated.', 'success');
     } catch (err: unknown) {
       const msg = formatErrorMessage(err);
@@ -216,7 +262,7 @@ export const AdminApp: React.FC = () => {
       };
 
       await postRemoteTransaction(newTx);
-      await loadFleetData(true);
+      await loadFleetData(true, { equipment: false, transactions: true, devices: false });
       showToast(
         `${asset.equipmentId} is now ${isRunning ? 'OFF' : 'ON'}`,
         'success'
@@ -231,7 +277,7 @@ export const AdminApp: React.FC = () => {
   const handleSaveDevice = async (device: AuthorizedDevice) => {
     try {
       await postRemoteAuthorizedDevice(device);
-      await loadFleetData(true);
+      await loadFleetData(true, { equipment: false, transactions: false, devices: true });
       showToast(`Device "${device.deviceId}" authorized successfully!`, 'success');
     } catch (err: unknown) {
       const msg = formatErrorMessage(err);
@@ -243,7 +289,7 @@ export const AdminApp: React.FC = () => {
   const handleUpdateDeviceStatus = async (deviceId: string, status: DeviceStatus) => {
     try {
       await updateRemoteDeviceStatus(deviceId, status);
-      await loadFleetData(true);
+      await loadFleetData(true, { equipment: false, transactions: false, devices: true });
       showToast(`Device "${deviceId}" status updated to ${status}.`, 'success');
     } catch (err: unknown) {
       const msg = formatErrorMessage(err);
@@ -255,7 +301,7 @@ export const AdminApp: React.FC = () => {
   const handleDeleteDevice = async (deviceId: string) => {
     try {
       await deleteRemoteAuthorizedDevice(deviceId);
-      await loadFleetData(true);
+      await loadFleetData(true, { equipment: false, transactions: false, devices: true });
       showToast(`Device "${deviceId}" deleted from authorized devices.`, 'success');
     } catch (err: unknown) {
       const msg = formatErrorMessage(err);
