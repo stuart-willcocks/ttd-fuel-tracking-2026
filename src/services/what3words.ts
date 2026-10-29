@@ -734,12 +734,35 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
     }
     .tx-balloon-hdr {
       display: flex;
-      align-items: baseline;
-      gap: 6px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
       padding-bottom: 5px;
       margin-bottom: 5px;
       border-bottom: 1px solid #E2E8F0;
       white-space: nowrap;
+    }
+    .tx-balloon-hdr-left {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .tx-balloon-hdr-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .tx-balloon-status-sq {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
     }
     .tx-balloon-id {
       font-family: 'JetBrains Mono', monospace;
@@ -1036,10 +1059,23 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
             ? (item.area + ' / ' + item.location)
             : (item.area || item.location || '');
 
+          var chkSqSymbolSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+          var pwrSqSymbolSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg>';
+
+          var balloonStatusHtml = '<span class="tx-balloon-hdr-status">' +
+            '<span class="tx-balloon-status-sq" style="background:' + chkColor + '">' + chkSqSymbolSvg + '</span>' +
+            (item.type === 'GENERATOR'
+              ? '<span class="tx-balloon-status-sq" style="background:' + pwrColor + '">' + pwrSqSymbolSvg + '</span>'
+              : '') +
+          '</span>';
+
           var balloonHtml = '<div>' +
             '<div class="tx-balloon-hdr">' +
-              '<span class="tx-balloon-id">' + item.equipmentId + '</span>' +
-              (hdrMetaParts.length > 0 ? '<span class="tx-balloon-hdr-meta">• ' + hdrMetaParts.join(' • ') + '</span>' : '') +
+              '<span class="tx-balloon-hdr-left">' +
+                '<span class="tx-balloon-id">' + item.equipmentId + '</span>' +
+                (hdrMetaParts.length > 0 ? '<span class="tx-balloon-hdr-meta">• ' + hdrMetaParts.join(' • ') + '</span>' : '') +
+              '</span>' +
+              balloonStatusHtml +
             '</div>' +
             '<div class="tx-balloon-sub">' +
               '<span>' + areaLocStr + '</span>' +
