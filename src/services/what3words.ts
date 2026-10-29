@@ -600,7 +600,7 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       height: 32px;
       border-radius: 7px;
       background: #FFFFFF;
-      border: 2px solid #EC721E;
+      border: none;
       box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
       display: flex;
       align-items: center;
@@ -953,8 +953,7 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
           boundsPoints.push(pt);
           seenIds[item.equipmentId] = true;
 
-          var borderColor = item.type === 'GENERATOR' ? '#2563EB' : item.type === 'TANK' ? '#EA580C' : '#0D9488';
-          var iconColor = '#EC721E';
+          var iconColor = item.type === 'GENERATOR' ? '#EC721E' : item.type === 'TANK' ? '#2563EB' : '#16A34A';
           var chkColor = item.checkInStatus === 'checked_in'
             ? '#16A34A'
             : item.checkInStatus === 'checked_out'
@@ -966,7 +965,7 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
             : '';
 
           var html = '<div class="eq-map-marker">' +
-            '<div class="eq-map-icon-box" style="border-color:' + borderColor + '">' +
+            '<div class="eq-map-icon-box">' +
               getEquipmentSvg(item.type, iconColor) +
               chkDotHtml +
               pwrDotHtml +
