@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { saveDeviceEnrollment, getDeviceStatus, getDeviceId } from '../services/device';
 import { verifyRemoteDeviceToken, registerRemoteDeviceRequest, postRemoteAuthorizedDevice } from '../services/api';
+import { APP_VERSION } from '../version';
 
 interface DeviceEnrollmentViewProps {
   onEnrolled: () => void;
@@ -143,6 +144,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
             status: 'active',
             registeredAt: new Date().toISOString(),
             lastSeenAt: new Date().toISOString(),
+            appVersion: APP_VERSION,
           });
         } catch (err) {
           console.warn('Backend sync deferred (will sync automatically when online):', err);

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getDeviceName } from '../services/device';
 import { APP_VERSION, BUILD_NUMBER, getIsStaging } from '../version';
 import { checkRemoteAppVersion, performAppUpdate } from '../services/appUpdate';
+import { reportDeviceAppVersionImmediately } from '../services/telemetry';
 
 interface SplashScreenProps {
   onContinue: () => void;
@@ -36,6 +37,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
           setVersionText(`Updated to version ${justUpdatedVersion}${stagingSuffix}`);
           setIsContinueEnabled(true);
           isCheckingRef.current = false;
+          reportDeviceAppVersionImmediately(APP_VERSION).catch(() => {});
           return;
         }
       } catch {

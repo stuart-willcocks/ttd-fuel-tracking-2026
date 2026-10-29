@@ -491,6 +491,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               <tr>
                 <th>Device ID</th>
                 <th>Device Label / Description</th>
+                <th>APP VERSION</th>
                 <th>Status</th>
                 <th>Last Active / Synced</th>
                 <th>Time Since Last Sync</th>
@@ -528,6 +529,28 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                       <span style={{ fontWeight: 500, color: 'var(--adm-text-primary)' }}>
                         {dev.deviceName || '—'}
                       </span>
+                    </td>
+
+                    <td>
+                      {dev.appVersion ? (
+                        <span
+                          style={{
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontWeight: 700,
+                            fontSize: '0.84rem',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            background: 'var(--adm-surface-2, #F8FAFC)',
+                            border: '1px solid var(--adm-border-subtle)',
+                            color: 'var(--adm-text-primary)',
+                            display: 'inline-block',
+                          }}
+                        >
+                          V{String(dev.appVersion).replace(/^[vV]/, '')}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--adm-text-muted)', fontSize: '0.82rem' }}>—</span>
+                      )}
                     </td>
 
                     <td>

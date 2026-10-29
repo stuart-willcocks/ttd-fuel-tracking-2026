@@ -1,4 +1,5 @@
 import { BUILD_NUMBER, APP_VERSION } from '../version';
+import { reportDeviceAppVersionImmediately } from './telemetry';
 
 export interface VersionCheckResult {
   hasUpdate: boolean;
@@ -94,6 +95,16 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
         sessionStorage.setItem('ttd_just_updated_to', String(targetVersion));
       }
     } catch {}
+
+    // Immediately report the newly updated app version to the database if this is an enrolled PDA
+    if (typeof window !== 'undefined' && !window.location.pathname.includes('admin') && targetVersion) {
+      try {
+        await Promise.race([
+          reportDeviceAppVersionImmediately(String(targetVersion)),
+          new Promise((r) => setTimeout(r, 1500)),
+        ]);
+      } catch {}
+    }
 
     // 2. Unregister all service workers BEFORE deleting CacheStorage caches
     if ('serviceWorker' in navigator) {

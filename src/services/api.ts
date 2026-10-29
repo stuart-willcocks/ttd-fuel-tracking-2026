@@ -359,6 +359,7 @@ export async function updateRemoteDeviceTelemetry(
     if (typeof telemetry.latitude === 'number') target.latitude = telemetry.latitude;
     if (typeof telemetry.longitude === 'number') target.longitude = telemetry.longitude;
     if (typeof telemetry.locationAccuracy === 'number') target.locationAccuracy = telemetry.locationAccuracy;
+    if (telemetry.appVersion) target.appVersion = telemetry.appVersion;
     target.lastTelemetryAt = telemetry.lastTelemetryAt || new Date().toISOString();
     target.lastSeenAt = new Date().toISOString();
     saveMockDevices(current);

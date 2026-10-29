@@ -66,6 +66,7 @@ export interface DeviceTelemetry {
   longitude?: number | null;
   locationAccuracy?: number | null; // in meters
   lastTelemetryAt?: string | null; // ISO timestamp
+  appVersion?: string | null; // Running PDA build/version string
 }
 
 export interface AuthorizedDevice extends DeviceTelemetry {

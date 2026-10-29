@@ -1,6 +1,7 @@
 import type { DeviceTelemetry } from '../types';
 import { isDeviceEnrolled, getDeviceId } from './device';
 import { updateRemoteDeviceTelemetry } from './api';
+import { APP_VERSION } from '../version';
 
 // Cache of last transmitted telemetry to eliminate duplicate network calls
 let lastSentTelemetry: DeviceTelemetry | null = null;
@@ -222,7 +223,40 @@ export async function collectDeviceTelemetry(): Promise<DeviceTelemetry> {
     longitude: location ? location.longitude : null,
     locationAccuracy: location ? location.locationAccuracy : null,
     lastTelemetryAt: new Date().toISOString(),
+    appVersion: APP_VERSION,
   };
+}
+
+/**
+ * Immediately reports the running (or newly updated) app build version to the database
+ * without waiting on a slow hardware GPS satellite lock.
+ */
+export async function reportDeviceAppVersionImmediately(versionOverride?: string): Promise<void> {
+  if (!isDeviceEnrolled()) return;
+  const deviceId = getDeviceId();
+  if (!deviceId) return;
+
+  const targetVer = versionOverride || APP_VERSION;
+  try {
+    const battery = await getBatteryStatus().catch(() => null);
+    const snapshot: DeviceTelemetry = {
+      batteryLevel: battery ? battery.batteryLevel : (lastSentTelemetry?.batteryLevel ?? null),
+      isCharging: battery ? battery.isCharging : (lastSentTelemetry?.isCharging ?? null),
+      latitude: cachedLocation ? cachedLocation.latitude : (lastSentTelemetry?.latitude ?? null),
+      longitude: cachedLocation ? cachedLocation.longitude : (lastSentTelemetry?.longitude ?? null),
+      locationAccuracy: cachedLocation ? cachedLocation.locationAccuracy : (lastSentTelemetry?.locationAccuracy ?? null),
+      lastTelemetryAt: new Date().toISOString(),
+      appVersion: targetVer,
+    };
+    await updateRemoteDeviceTelemetry(deviceId, snapshot);
+    lastSentTelemetry = snapshot;
+    lastSentTime = Date.now();
+    try {
+      localStorage.setItem('ttd_last_reported_app_version', targetVer);
+    } catch {}
+  } catch (err) {
+    console.debug('[Telemetry] Immediate appVersion report skipped:', err);
+  }
 }
 
 /**
@@ -230,6 +264,9 @@ export async function collectDeviceTelemetry(): Promise<DeviceTelemetry> {
  */
 function shouldSendTelemetry(newTel: DeviceTelemetry, force: boolean): boolean {
   if (force || !lastSentTelemetry) return true;
+
+  // Send immediately if app version changed
+  if (newTel.appVersion && newTel.appVersion !== lastSentTelemetry.appVersion) return true;
 
   const now = Date.now();
   // Always send if at least 5 minutes have passed since last upload
@@ -290,6 +327,11 @@ export async function pushDeviceTelemetry(force: boolean = false): Promise<void>
       await updateRemoteDeviceTelemetry(deviceId, telemetry);
       lastSentTelemetry = telemetry;
       lastSentTime = Date.now();
+      try {
+        if (telemetry.appVersion) {
+          localStorage.setItem('ttd_last_reported_app_version', telemetry.appVersion);
+        }
+      } catch {}
       console.log('[Telemetry] Transmitted PDA telemetry update:', telemetry);
     }
   } catch (err) {
@@ -307,7 +349,15 @@ export async function pushDeviceTelemetry(force: boolean = false): Promise<void>
 export function startTelemetryMonitoring(): () => void {
   if (typeof window === 'undefined') return () => {};
 
-  // Initial immediate collection on boot (sends battery immediately)
+  // If the app version changed (e.g. after an app update), report the new version immediately without waiting on GPS
+  try {
+    const lastVer = localStorage.getItem('ttd_last_reported_app_version');
+    if (lastVer !== APP_VERSION) {
+      reportDeviceAppVersionImmediately(APP_VERSION);
+    }
+  } catch {}
+
+  // Initial immediate collection on boot (sends battery + location + appVersion)
   pushDeviceTelemetry(true);
 
   // Periodic heartbeat every 5 minutes (low-frequency to protect free tier quotas)
