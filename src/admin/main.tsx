@@ -1,6 +1,9 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { setupServiceWorkerAutoReload } from '../services/appUpdate';
 import { AdminApp } from './AdminApp';
+
+setupServiceWorkerAutoReload();
 
 const rootEl = document.getElementById('admin-root');
 

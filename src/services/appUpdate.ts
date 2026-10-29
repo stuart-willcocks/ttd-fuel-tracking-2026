@@ -124,14 +124,22 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
 
     // 4. Prime the HTTP cache with fresh HTML from the network, then navigate with cache-busting query param
     const cleanUrl = window.location.origin + window.location.pathname;
+    const urlsToRevalidate = [cleanUrl];
+    if (window.location.pathname.startsWith('/admin')) {
+      urlsToRevalidate.push(`${window.location.origin}/admin`, `${window.location.origin}/admin.html`);
+    }
     try {
-      await fetch(cleanUrl, {
-        cache: 'reload',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
-        },
-      });
+      await Promise.all(
+        Array.from(new Set(urlsToRevalidate)).map((u) =>
+          fetch(u, {
+            cache: 'reload',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              Pragma: 'no-cache',
+            },
+          }).catch(() => {})
+        )
+      );
     } catch {
       // Ignore network pre-fetch error and proceed to reload
     }

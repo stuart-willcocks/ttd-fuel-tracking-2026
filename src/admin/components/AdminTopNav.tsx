@@ -35,34 +35,60 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
       } catch {}
     }
 
-    const checkVersion = async (isInitialLoad = false) => {
+    const checkVersion = async () => {
       const res = await checkRemoteAppVersion();
       if (res.hasUpdate) {
         setHasNewVersion(true);
         if (res.remoteVersion) setNewVersionTag(res.remoteVersion);
 
-        // If the browser served a stale cached bundle on initial open/refresh,
-        // automatically bust cache and reload into the new version immediately.
-        if (isInitialLoad && res.remoteVersion) {
+        // Automatically bust cache and reload into the new version whenever a newer build is live.
+        // Uses a 12-second cooldown per version so if an edge cache wasn't warm on the first reload, it retries cleanly.
+        if (res.remoteVersion) {
           try {
-            const lastAutoAttempt = sessionStorage.getItem('ttd_admin_auto_update_target');
-            if (lastAutoAttempt !== res.remoteVersion) {
-              sessionStorage.setItem('ttd_admin_auto_update_target', res.remoteVersion);
+            const rawAttempt = sessionStorage.getItem('ttd_admin_auto_update_target');
+            let shouldAutoUpdate = true;
+            if (rawAttempt) {
+              try {
+                const parsed = JSON.parse(rawAttempt) as { version?: string; ts?: number };
+                if (parsed.version === res.remoteVersion && parsed.ts && Date.now() - parsed.ts < 12000) {
+                  shouldAutoUpdate = false;
+                }
+              } catch {
+                // Legacy string value: allow retry
+              }
+            }
+            if (shouldAutoUpdate) {
+              sessionStorage.setItem(
+                'ttd_admin_auto_update_target',
+                JSON.stringify({ version: res.remoteVersion, ts: Date.now() })
+              );
               performAppUpdate(res.remoteVersion);
               return;
             }
           } catch {}
         }
       } else {
+        setHasNewVersion(false);
         try {
           sessionStorage.removeItem('ttd_admin_auto_update_target');
         } catch {}
       }
     };
 
-    checkVersion(true);
-    const interval = setInterval(() => checkVersion(false), 30000);
-    return () => clearInterval(interval);
+    checkVersion();
+    const interval = setInterval(() => checkVersion(), 15000);
+    const onFocusOrVisible = () => {
+      if (typeof document === 'undefined' || !document.hidden) {
+        checkVersion();
+      }
+    };
+    window.addEventListener('focus', onFocusOrVisible);
+    document.addEventListener('visibilitychange', onFocusOrVisible);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocusOrVisible);
+      document.removeEventListener('visibilitychange', onFocusOrVisible);
+    };
   }, []);
 
   return (
