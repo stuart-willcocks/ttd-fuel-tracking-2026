@@ -1099,7 +1099,11 @@ export function getFleetSatelliteMapSrcDoc(
 
           var bgColor = item.type === 'GENERATOR' ? '#EC721E' : item.type === 'TANK' ? '#2563EB' : '#16A34A';
           var iconColor = '#FFFFFF';
-          var chkColor = item.checkInStatus === 'checked_in' ? '#16A34A' : '#DC2626';
+          var chkColor = item.checkInStatus === 'checked_in'
+            ? '#16A34A'
+            : item.checkInStatus === 'checked_out'
+              ? '#DC2626'
+              : '#94A3B8';
           var pwrColor = item.isOn ? '#16A34A' : '#DC2626';
           var statusSqHtml = item.type === 'GENERATOR'
             ? '<span class="eq-map-status-cluster">' +

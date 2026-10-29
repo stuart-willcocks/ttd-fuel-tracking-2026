@@ -41,7 +41,9 @@ interface AssetsViewProps {
   onOpenDangerZone?: () => void;
 }
 
-type FilterType = 'ALL' | 'GENERATOR' | 'TANK' | 'PLANT' | 'RUNNING' | 'STANDBY';
+type TypeFilter = 'ALL' | 'GENERATOR' | 'TANK' | 'PLANT';
+type CheckInFilter = 'ALL' | 'NONE' | 'CHECKED_IN' | 'CHECKED_OUT';
+type PowerFilter = 'ALL' | 'POWERED_UP' | 'POWERED_DOWN';
 
 export const AssetsView: React.FC<AssetsViewProps> = ({
   assets,
@@ -54,7 +56,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   onOpenDangerZone,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('ALL');
+  const [checkInFilter, setCheckInFilter] = useState<CheckInFilter>('ALL');
+  const [powerFilter, setPowerFilter] = useState<PowerFilter>('ALL');
   const [coordResolveTick, setCoordResolveTick] = useState(0);
   const mapIframeRef = useRef<HTMLIFrameElement | null>(null);
   const staticMapSrcDoc = useMemo(
@@ -62,14 +66,30 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     [viewMode]
   );
 
-  // Transaction counts per asset
-  const txCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const t of transactions) {
-      map[t.equipmentId] = (map[t.equipmentId] || 0) + 1;
+  // Transaction counts and latest check-in/check-out status per asset
+  const { txCounts, checkInStatusByAsset } = useMemo(() => {
+    const countMap: Record<string, number> = {};
+    const latestCheckTxTime: Record<string, number> = {};
+    const statusMap: Record<string, 'checked_in' | 'checked_out' | 'none'> = {};
+
+    for (const a of assets) {
+      statusMap[a.equipmentId] = 'none';
     }
-    return map;
-  }, [transactions]);
+
+    for (const t of transactions) {
+      countMap[t.equipmentId] = (countMap[t.equipmentId] || 0) + 1;
+      const typeStr = (t.transactionType || '').toString();
+      if (typeStr.includes('CheckIn') || typeStr.includes('CheckOut')) {
+        const ts = new Date(t.transactionTimestamp).getTime() || 0;
+        if (latestCheckTxTime[t.equipmentId] === undefined || ts >= latestCheckTxTime[t.equipmentId]) {
+          latestCheckTxTime[t.equipmentId] = ts;
+          statusMap[t.equipmentId] = typeStr.includes('CheckIn') ? 'checked_in' : 'checked_out';
+        }
+      }
+    }
+
+    return { txCounts: countMap, checkInStatusByAsset: statusMap };
+  }, [assets, transactions]);
 
   // Filtered Assets
   const filteredAssets = useMemo(() => {
@@ -86,17 +106,26 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
       if (!matchesSearch) return false;
 
-      // Classification / Power filter
-      const isRunning = asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
-      if (activeFilter === 'GENERATOR' && asset.type !== 'GENERATOR') return false;
-      if (activeFilter === 'TANK' && asset.type !== 'TANK') return false;
-      if (activeFilter === 'PLANT' && asset.type !== 'PLANT') return false;
-      if (activeFilter === 'RUNNING' && (!isRunning || asset.type !== 'GENERATOR')) return false;
-      if (activeFilter === 'STANDBY' && (isRunning || asset.type !== 'GENERATOR')) return false;
+      // 1. Equipment Type filter
+      if (typeFilter !== 'ALL' && asset.type !== typeFilter) return false;
+
+      // 2. Check-in / Check-out status filter
+      const chkStatus = checkInStatusByAsset[asset.equipmentId] || 'none';
+      if (checkInFilter === 'NONE' && chkStatus !== 'none') return false;
+      if (checkInFilter === 'CHECKED_IN' && chkStatus !== 'checked_in') return false;
+      if (checkInFilter === 'CHECKED_OUT' && chkStatus !== 'checked_out') return false;
+
+      // 3. Generator Power status filter (generators only)
+      if (powerFilter !== 'ALL') {
+        if (asset.type !== 'GENERATOR') return false;
+        const isRunning = getGeneratorPowerState(asset.equipmentId, transactions).isOn;
+        if (powerFilter === 'POWERED_UP' && !isRunning) return false;
+        if (powerFilter === 'POWERED_DOWN' && isRunning) return false;
+      }
 
       return true;
     });
-  }, [assets, transactions, searchQuery, activeFilter]);
+  }, [assets, transactions, searchQuery, typeFilter, checkInFilter, powerFilter, checkInStatusByAsset]);
 
   // Counts for pills
   const counts = useMemo(() => {
@@ -105,10 +134,13 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       generator: assets.filter((a) => a.type === 'GENERATOR').length,
       tank: assets.filter((a) => a.type === 'TANK').length,
       plant: assets.filter((a) => a.type === 'PLANT').length,
-      running: assets.filter((a) => a.type === 'GENERATOR' && getGeneratorPowerState(a.equipmentId, transactions).isOn).length,
-      standby: assets.filter((a) => a.type === 'GENERATOR' && !getGeneratorPowerState(a.equipmentId, transactions).isOn).length,
+      noCheckInOut: assets.filter((a) => (checkInStatusByAsset[a.equipmentId] || 'none') === 'none').length,
+      checkedIn: assets.filter((a) => checkInStatusByAsset[a.equipmentId] === 'checked_in').length,
+      checkedOut: assets.filter((a) => checkInStatusByAsset[a.equipmentId] === 'checked_out').length,
+      poweredUp: assets.filter((a) => a.type === 'GENERATOR' && getGeneratorPowerState(a.equipmentId, transactions).isOn).length,
+      poweredDown: assets.filter((a) => a.type === 'GENERATOR' && !getGeneratorPowerState(a.equipmentId, transactions).isOn).length,
     };
-  }, [assets, transactions]);
+  }, [assets, transactions, checkInStatusByAsset]);
 
   // Sorting State
   type AssetSortField = 'equipmentId' | 'type' | 'capacity' | 'location' | 'what3words' | 'rentalSerialNumber' | 'powerState' | 'transactions';
@@ -448,20 +480,34 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       </div>
 
       {/* Filter Tabs */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+        {/* Group 1: Equipment Type (All equipment, Generators, Tanks, Plant) */}
         {[
-          { key: 'ALL', label: 'All Equipment', count: counts.all },
-          { key: 'GENERATOR', label: 'Generators', icon: <EquipmentTypeIcon type="GENERATOR" size={13} />, count: counts.generator },
-          { key: 'TANK', label: 'Fuel Tanks', icon: <EquipmentTypeIcon type="TANK" size={13} />, count: counts.tank },
-          { key: 'PLANT', label: 'Plant', icon: <EquipmentTypeIcon type="PLANT" size={13} />, count: counts.plant },
-          { key: 'RUNNING', label: 'Generators (ON)', icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ADE80', display: 'inline-block' }} />, count: counts.running },
-          { key: 'STANDBY', label: 'Generators (OFF)', icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#94A3B8', display: 'inline-block' }} />, count: counts.standby },
+          { key: 'ALL' as TypeFilter, label: 'All equipment', count: counts.all },
+          { key: 'GENERATOR' as TypeFilter, label: 'Generators', icon: <EquipmentTypeIcon type="GENERATOR" size={13} />, count: counts.generator },
+          { key: 'TANK' as TypeFilter, label: 'Tanks', icon: <EquipmentTypeIcon type="TANK" size={13} />, count: counts.tank },
+          { key: 'PLANT' as TypeFilter, label: 'Plant', icon: <EquipmentTypeIcon type="PLANT" size={13} />, count: counts.plant },
         ].map((tab) => {
-          const isSelected = activeFilter === tab.key;
+          const isSelected =
+            tab.key === 'ALL'
+              ? typeFilter === 'ALL' && checkInFilter === 'ALL' && powerFilter === 'ALL'
+              : typeFilter === tab.key;
           return (
             <button
-              key={tab.key}
-              onClick={() => setActiveFilter(tab.key as FilterType)}
+              key={`type-${tab.key}`}
+              type="button"
+              onClick={() => {
+                if (tab.key === 'ALL') {
+                  setTypeFilter('ALL');
+                  setCheckInFilter('ALL');
+                  setPowerFilter('ALL');
+                } else {
+                  setTypeFilter((prev) => (prev === tab.key ? 'ALL' : tab.key));
+                  if (tab.key !== 'GENERATOR') {
+                    setPowerFilter('ALL');
+                  }
+                }
+              }}
               className={`admin-btn ${isSelected ? 'admin-btn-primary' : 'admin-btn-outline'} admin-btn-sm`}
               style={{
                 background: isSelected ? '#2563EB' : 'transparent',
@@ -490,10 +536,160 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             </button>
           );
         })}
+
+        <span style={{ width: '1px', height: '22px', background: 'var(--adm-border-medium)', margin: '0 2px' }} />
+
+        {/* Group 2: Check-In / Check-Out Status (No check-in/check-out recorded, Checked-in, Checked-out) */}
+        {[
+          {
+            key: 'NONE' as CheckInFilter,
+            label: 'No check-in/check-out recorded',
+            sqColor: '#94A3B8',
+            count: counts.noCheckInOut,
+          },
+          {
+            key: 'CHECKED_IN' as CheckInFilter,
+            label: 'Checked-in',
+            sqColor: '#16A34A',
+            count: counts.checkedIn,
+          },
+          {
+            key: 'CHECKED_OUT' as CheckInFilter,
+            label: 'Checked-out',
+            sqColor: '#DC2626',
+            count: counts.checkedOut,
+          },
+        ].map((tab) => {
+          const isSelected = checkInFilter === tab.key;
+          return (
+            <button
+              key={`chk-${tab.key}`}
+              type="button"
+              onClick={() => setCheckInFilter((prev) => (prev === tab.key ? 'ALL' : tab.key))}
+              className={`admin-btn ${isSelected ? 'admin-btn-primary' : 'admin-btn-outline'} admin-btn-sm`}
+              style={{
+                background: isSelected ? '#2563EB' : 'transparent',
+                borderColor: isSelected ? '#2563EB' : 'var(--adm-border-medium)',
+                color: isSelected ? '#FFFFFF' : 'var(--adm-text-primary)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontWeight: isSelected ? 700 : 500,
+              }}
+            >
+              <span
+                style={{
+                  width: 13,
+                  height: 13,
+                  borderRadius: 3,
+                  background: tab.sqColor,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="#FFFFFF" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </span>
+              <span>{tab.label}</span>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  padding: '1px 6px',
+                  borderRadius: '999px',
+                  background: isSelected ? 'rgba(255, 255, 255, 0.25)' : 'var(--adm-surface-3)',
+                  color: isSelected ? '#FFFFFF' : 'var(--adm-text-secondary)',
+                  fontFamily: 'var(--adm-font-mono)',
+                }}
+              >
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
+
+        <span style={{ width: '1px', height: '22px', background: 'var(--adm-border-medium)', margin: '0 2px' }} />
+
+        {/* Group 3: Power Status [Generators Only] (Powered up, Powered down) */}
+        {[
+          {
+            key: 'POWERED_UP' as PowerFilter,
+            label: 'Powered up',
+            sqColor: '#16A34A',
+            count: counts.poweredUp,
+          },
+          {
+            key: 'POWERED_DOWN' as PowerFilter,
+            label: 'Powered down',
+            sqColor: '#DC2626',
+            count: counts.poweredDown,
+          },
+        ].map((tab) => {
+          const isSelected = powerFilter === tab.key;
+          return (
+            <button
+              key={`pwr-${tab.key}`}
+              type="button"
+              onClick={() => {
+                setPowerFilter((prev) => {
+                  const next = prev === tab.key ? 'ALL' : tab.key;
+                  if (next !== 'ALL' && typeFilter !== 'ALL' && typeFilter !== 'GENERATOR') {
+                    setTypeFilter('GENERATOR');
+                  }
+                  return next;
+                });
+              }}
+              className={`admin-btn ${isSelected ? 'admin-btn-primary' : 'admin-btn-outline'} admin-btn-sm`}
+              style={{
+                background: isSelected ? '#2563EB' : 'transparent',
+                borderColor: isSelected ? '#2563EB' : 'var(--adm-border-medium)',
+                color: isSelected ? '#FFFFFF' : 'var(--adm-text-primary)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontWeight: isSelected ? 700 : 500,
+              }}
+              title="Generators only"
+            >
+              <span
+                style={{
+                  width: 13,
+                  height: 13,
+                  borderRadius: 3,
+                  background: tab.sqColor,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="#FFFFFF" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v10" />
+                  <path d="M18.4 6.6a9 9 0 1 1-12.77.04" />
+                </svg>
+              </span>
+              <span>{tab.label}</span>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  padding: '1px 6px',
+                  borderRadius: '999px',
+                  background: isSelected ? 'rgba(255, 255, 255, 0.25)' : 'var(--adm-surface-3)',
+                  color: isSelected ? '#FFFFFF' : 'var(--adm-text-secondary)',
+                  fontFamily: 'var(--adm-font-mono)',
+                }}
+              >
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Main Content Area */}
-      {filteredAssets.length === 0 ? (
+      {viewMode === 'TABLE' && filteredAssets.length === 0 ? (
         <div
           style={{
             textAlign: 'center',
@@ -513,7 +709,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           <button
             onClick={() => {
               setSearchQuery('');
-              setActiveFilter('ALL');
+              setTypeFilter('ALL');
+              setCheckInFilter('ALL');
+              setPowerFilter('ALL');
             }}
             className="admin-btn admin-btn-secondary"
           >
