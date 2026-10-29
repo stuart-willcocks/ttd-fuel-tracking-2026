@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { X, Edit, Code, Trash2, Check, AlertTriangle } from 'lucide-react';
+import { X, Edit, Trash2, Check, AlertTriangle } from 'lucide-react';
 import type { Transaction, TransactionType, Equipment } from '../../types';
 import { formatAdminTimestamp } from '../../utils/dateFormat';
 
@@ -18,11 +18,9 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   asset,
   isOpen,
   onClose,
-  onSelectAsset,
   onUpdateTransaction,
   onDeleteTransaction,
 }) => {
-  const [showJson, setShowJson] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'SAVE' | 'DELETE' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isMouseDownOnBackdrop = useRef<boolean>(false);
@@ -276,9 +274,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               <h3 style={{ fontFamily: 'var(--adm-font-display)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--adm-text-primary)', margin: 0 }}>
                 Edit Transaction
               </h3>
-              <p style={{ fontSize: '0.78rem', color: 'var(--adm-text-secondary)', fontFamily: 'var(--adm-font-mono)', margin: '2px 0 0' }}>
-                UUID: {transaction.id}
-              </p>
             </div>
           </div>
           <button
@@ -306,9 +301,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           }}
         >
           <div>
-            <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--adm-text-muted)', fontWeight: 700 }}>
-              Equipment Asset
-            </span>
             <div style={{ fontFamily: 'var(--adm-font-mono)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--adm-accent-yellow)' }}>
               {transaction.equipmentId}
             </div>
@@ -318,19 +310,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               </div>
             )}
           </div>
-
-          {onSelectAsset && (
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onSelectAsset(transaction.equipmentId);
-              }}
-              className="admin-btn admin-btn-outline admin-btn-sm"
-            >
-              View Asset ↗
-            </button>
-          )}
         </div>
 
         {/* Metadata Summary Grid */}
@@ -343,7 +322,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           </div>
 
           <div style={{ background: 'var(--adm-surface-2)', padding: '10px 14px', borderRadius: '8px' }}>
-            <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Recorded By Device</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--adm-text-muted)' }}>Device</span>
             <div style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.84rem', color: '#0284c7', marginTop: '2px' }}>
               {transaction.deviceId || 'Field PDA (Zebra)'}
             </div>
@@ -567,38 +546,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           )}
         </div>
 
-        {/* Raw JSON toggle */}
-        <div style={{ marginBottom: '16px' }}>
-          <button
-            type="button"
-            onClick={() => setShowJson(!showJson)}
-            className="admin-btn admin-btn-outline admin-btn-sm"
-            style={{ fontSize: '0.76rem' }}
-          >
-            <Code size={14} />
-            <span>{showJson ? 'Hide Raw JSON Payload' : 'Inspect Raw JSON Payload'}</span>
-          </button>
-
-          {showJson && (
-            <pre
-              style={{
-                marginTop: '10px',
-                padding: '12px',
-                background: '#04070d',
-                borderRadius: '8px',
-                border: '1px solid var(--adm-border-subtle)',
-                fontSize: '0.75rem',
-                fontFamily: 'var(--adm-font-mono)',
-                color: '#34d399',
-                overflowX: 'auto',
-                maxHeight: '160px',
-              }}
-            >
-              {JSON.stringify(buildUpdatedTransaction(), null, 2)}
-            </pre>
-          )}
-        </div>
-
         {/* Footer Actions */}
         <div
           style={{
@@ -615,8 +562,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               type="button"
               onClick={() => setConfirmAction('DELETE')}
               disabled={isSubmitting}
-              className="admin-btn admin-btn-outline"
-              style={{ color: '#EF4444', borderColor: 'rgba(239, 68, 68, 0.4)', gap: '6px' }}
+              className="admin-btn admin-btn-danger"
+              style={{
+                background: '#EF4444',
+                borderColor: '#DC2626',
+                color: '#FFFFFF',
+                fontWeight: 600,
+                gap: '6px',
+              }}
               title="Delete transaction"
             >
               <Trash2 size={15} />
