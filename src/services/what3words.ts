@@ -620,15 +620,17 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       height: 9px;
       border-radius: 50%;
       border: 1.5px solid #FFFFFF;
+      z-index: 2;
     }
     .eq-map-pwr-dot {
       position: absolute;
-      top: -2px;
-      right: -2px;
+      bottom: -2px;
+      left: -2px;
       width: 9px;
       height: 9px;
       border-radius: 50%;
       border: 1.5px solid #FFFFFF;
+      z-index: 2;
     }
     .eq-map-label {
       margin-top: 2px;
