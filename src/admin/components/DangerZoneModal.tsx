@@ -26,6 +26,8 @@ interface DangerZoneModalProps {
 
 type ModalStep = 'MAIN' | 'CONFIRM_DELETE_ALL' | 'CONFIRM_DELETE_TXS' | 'VERIFY_UPLOAD';
 
+const PREVIEW_ROW_LIMIT = 5;
+
 export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
   isOpen,
   existingAssets = [],
@@ -159,6 +161,10 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
     return 'Danger Zone';
   };
 
+  const previewRows = validationResult
+    ? validationResult.equipmentList.slice(0, PREVIEW_ROW_LIMIT)
+    : [];
+
   return (
     <div
       className="admin-modal-backdrop"
@@ -173,7 +179,7 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
         }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxWidth: step === 'VERIFY_UPLOAD' ? '580px' : step === 'MAIN' ? '520px' : '480px',
+          maxWidth: step === 'VERIFY_UPLOAD' ? '740px' : step === 'MAIN' ? '520px' : '480px',
           borderColor: 'rgba(239, 68, 68, 0.45)',
         }}
       >
@@ -213,7 +219,7 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                 justifyContent: 'center',
                 color:
                   step === 'VERIFY_UPLOAD' && validationResult?.isValid
-                    ? '#22c55e'
+                    ? '#16a34a'
                     : '#ef4444',
               }}
             >
@@ -245,10 +251,11 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
             style={{
               padding: '12px 16px',
               borderRadius: '8px',
-              background: 'rgba(239, 68, 68, 0.15)',
+              background: 'rgba(239, 68, 68, 0.12)',
               border: '1px solid rgba(239, 68, 68, 0.35)',
-              color: '#fca5a5',
+              color: '#dc2626',
               fontSize: '0.88rem',
+              fontWeight: 600,
               marginBottom: '18px',
             }}
           >
@@ -517,14 +524,14 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
               )}
             </div>
 
-            {/* Upsert Warning Box */}
+            {/* Upsert Warning Box — Grey background with yellow text */}
             <div
               style={{
                 padding: '12px 14px',
                 borderRadius: '8px',
-                background: 'rgba(245, 158, 11, 0.12)',
-                border: '1px solid rgba(245, 158, 11, 0.4)',
-                color: '#fcd34d',
+                background: '#475569',
+                border: '1px solid #334155',
+                color: '#fde047',
                 fontSize: '0.86rem',
                 lineHeight: 1.45,
                 marginBottom: '14px',
@@ -533,7 +540,7 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                 alignItems: 'flex-start',
               }}
             >
-              <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px', color: '#f59e0b' }} />
+              <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px', color: '#fde047' }} />
               <div>
                 <strong>Important:</strong> Uploaded equipment details will be appended to any existing
                 equipment rows. In the event of any duplicate equipment IDs, the new uploaded values
@@ -547,14 +554,14 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                 style={{
                   padding: '14px 16px',
                   borderRadius: '8px',
-                  background: 'rgba(22, 163, 74, 0.14)',
+                  background: 'rgba(22, 163, 74, 0.12)',
                   border: '1px solid rgba(22, 163, 74, 0.4)',
-                  color: '#86efac',
+                  color: 'var(--adm-text-primary)',
                   fontSize: '0.9rem',
-                  marginBottom: '18px',
+                  marginBottom: '14px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, marginBottom: '8px', color: '#4ade80' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, marginBottom: '8px', color: '#15803d' }}>
                   <CheckCircle2 size={18} />
                   <span>All column headings and data rows look good!</span>
                 </div>
@@ -564,7 +571,7 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                   <div>• New equipment IDs to be appended: <strong>{validationResult.newCount}</strong></div>
                   <div>• Existing equipment IDs to be overwritten: <strong>{validationResult.overwriteCount}</strong></div>
                   {validationResult.inFileDuplicateCount > 0 && (
-                    <div style={{ color: '#fcd34d' }}>
+                    <div style={{ color: '#b45309', fontWeight: 600 }}>
                       • Duplicate rows within uploaded sheet merged: <strong>{validationResult.inFileDuplicateCount}</strong>
                     </div>
                   )}
@@ -575,22 +582,22 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                 style={{
                   padding: '14px 16px',
                   borderRadius: '8px',
-                  background: 'rgba(239, 68, 68, 0.14)',
+                  background: 'rgba(239, 68, 68, 0.1)',
                   border: '1px solid rgba(239, 68, 68, 0.4)',
-                  color: '#fca5a5',
+                  color: '#991b1b',
                   fontSize: '0.88rem',
-                  marginBottom: '18px',
+                  marginBottom: '14px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, marginBottom: '8px', color: '#f87171' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, marginBottom: '8px', color: '#dc2626' }}>
                   <XCircle size={18} />
                   <span>Validation errors found ({validationResult.errors.length}) — database was not modified:</span>
                 </div>
                 <div
                   style={{
-                    maxHeight: '190px',
+                    maxHeight: '170px',
                     overflowY: 'auto',
-                    background: 'rgba(15, 23, 42, 0.55)',
+                    background: '#334155',
                     borderRadius: '6px',
                     padding: '10px 12px',
                     fontSize: '0.82rem',
@@ -603,6 +610,117 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                       • {err}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sheet Preview Table (first few rows to be imported) */}
+            {previewRows.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <div
+                  style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: 'var(--adm-text-secondary)',
+                    marginBottom: '6px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <span>
+                    Preview ({previewRows.length} of {validationResult.equipmentList.length}{' '}
+                    {validationResult.equipmentList.length === 1 ? 'row' : 'rows'} to be imported)
+                  </span>
+                </div>
+                <div
+                  style={{
+                    overflowX: 'auto',
+                    border: '1px solid var(--adm-border-medium)',
+                    borderRadius: '6px',
+                    background: '#ffffff',
+                  }}
+                >
+                  <table
+                    style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      fontSize: '0.78rem',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          background: 'var(--adm-surface-2)',
+                          borderBottom: '1px solid var(--adm-border-medium)',
+                          color: 'var(--adm-text-secondary)',
+                          fontWeight: 700,
+                        }}
+                      >
+                        <th style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>EquipmentId</th>
+                        <th style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>Area</th>
+                        <th style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>Location</th>
+                        <th style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>what3words</th>
+                        <th style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>Type</th>
+                        <th style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>Size</th>
+                        <th style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>SerialNumber</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewRows.map((eq, idx) => (
+                        <tr
+                          key={eq.equipmentId}
+                          style={{
+                            borderBottom:
+                              idx < previewRows.length - 1
+                                ? '1px solid var(--adm-border-subtle)'
+                                : 'none',
+                            color: 'var(--adm-text-primary)',
+                          }}
+                        >
+                          <td
+                            style={{
+                              padding: '6px 10px',
+                              fontFamily: 'var(--adm-font-mono)',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {eq.equipmentId}
+                          </td>
+                          <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{eq.area}</td>
+                          <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{eq.location}</td>
+                          <td
+                            style={{
+                              padding: '6px 10px',
+                              fontFamily: 'var(--adm-font-mono)',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {eq.what3words}
+                          </td>
+                          <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                            {eq.type}
+                          </td>
+                          <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
+                            {eq.capacity !== undefined
+                              ? `${eq.capacity} ${eq.type === 'GENERATOR' ? 'kVA' : 'L'}`
+                              : '—'}
+                          </td>
+                          <td
+                            style={{
+                              padding: '6px 10px',
+                              fontFamily: 'var(--adm-font-mono)',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {eq.rentalSerialNumber}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
