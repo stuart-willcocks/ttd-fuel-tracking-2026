@@ -293,7 +293,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           ? 'checked_in'
           : 'checked_out';
 
-      const recentTransactions: FleetMapTransactionItem[] = assetTxs.slice(0, 8).map((tx) => ({
+      const recentTransactions: FleetMapTransactionItem[] = assetTxs.slice(0, 10).map((tx) => ({
         id: tx.id,
         timestamp: formatPdaTimestamp(tx.transactionTimestamp),
         type: tx.transactionType,

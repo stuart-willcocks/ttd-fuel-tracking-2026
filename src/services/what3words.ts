@@ -718,11 +718,12 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       color: #0F172A !important;
       border: 1px solid #CBD5E1 !important;
       border-radius: 8px !important;
-      padding: 8px 10px !important;
+      padding: 8px 12px !important;
       box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38) !important;
-      min-width: 245px;
-      max-width: 320px;
-      white-space: normal !important;
+      min-width: 280px;
+      width: max-content !important;
+      max-width: none !important;
+      white-space: nowrap !important;
       pointer-events: none;
     }
     .leaflet-tooltip-top.eq-tx-balloon::before {
@@ -733,33 +734,42 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
     }
     .tx-balloon-hdr {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+      align-items: baseline;
+      gap: 6px;
       padding-bottom: 5px;
       margin-bottom: 5px;
       border-bottom: 1px solid #E2E8F0;
+      white-space: nowrap;
     }
     .tx-balloon-id {
       font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
       font-weight: 800;
       color: #0F172A;
+      white-space: nowrap;
     }
-    .tx-balloon-badge {
-      font-size: 10px;
-      font-weight: 700;
-      padding: 1px 6px;
-      border-radius: 999px;
-      background: #EFF6FF;
-      color: #1D4ED8;
-      border: 1px solid #BFDBFE;
+    .tx-balloon-hdr-meta {
+      font-size: 11px;
+      font-weight: 500;
+      color: #475569;
+      white-space: nowrap;
     }
     .tx-balloon-sub {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       font-size: 11px;
-      color: #64748B;
+      color: #475569;
       margin-bottom: 6px;
       line-height: 1.3;
+      white-space: nowrap;
+    }
+    .tx-balloon-w3w {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: #2563EB;
+      white-space: nowrap;
     }
     .tx-balloon-list {
       display: flex;
@@ -770,12 +780,13 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 3px 5px;
+      padding: 3px 6px;
       border-radius: 4px;
       background: #F8FAFC;
       border: 1px solid #F1F5F9;
       font-size: 11px;
       line-height: 1.25;
+      white-space: nowrap;
     }
     .tx-balloon-icon {
       display: inline-flex;
@@ -797,8 +808,6 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       font-size: 11px;
       font-weight: 600;
       color: #0F172A;
-      overflow: hidden;
-      text-overflow: ellipsis;
       white-space: nowrap;
       flex: 1;
     }
@@ -986,7 +995,7 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
             : 'Unrated';
 
           var txList = Array.isArray(item.recentTransactions) ? item.recentTransactions : [];
-          var maxBalloonTx = 6;
+          var maxBalloonTx = 10;
           var visibleTx = txList.slice(0, maxBalloonTx);
           var txRowsHtml = '';
 
@@ -1008,12 +1017,34 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
             }
           }
 
+          var hdrMetaParts = [];
+          if (item.type === 'GENERATOR' && item.capacity) {
+            hdrMetaParts.push(item.capacity + ' kVA');
+          } else if (item.type === 'TANK' && item.capacity) {
+            hdrMetaParts.push(item.capacity + ' L');
+          } else if (item.capacity) {
+            hdrMetaParts.push(String(item.capacity));
+          }
+          if (item.rentalSerialNumber) {
+            hdrMetaParts.push(item.rentalSerialNumber);
+          }
+
+          var w3wDisplay = item.what3words
+            ? (item.what3words.indexOf('///') === 0 ? item.what3words : '///' + item.what3words)
+            : '';
+          var areaLocStr = (item.area && item.location)
+            ? (item.area + ' / ' + item.location)
+            : (item.area || item.location || '');
+
           var balloonHtml = '<div>' +
             '<div class="tx-balloon-hdr">' +
               '<span class="tx-balloon-id">' + item.equipmentId + '</span>' +
-              '<span class="tx-balloon-badge">' + (item.txCount || 0) + ' tx</span>' +
+              (hdrMetaParts.length > 0 ? '<span class="tx-balloon-hdr-meta">• ' + hdrMetaParts.join(' • ') + '</span>' : '') +
             '</div>' +
-            '<div class="tx-balloon-sub">' + item.area + ' • ' + item.location + '</div>' +
+            '<div class="tx-balloon-sub">' +
+              '<span>' + areaLocStr + '</span>' +
+              (w3wDisplay ? '<span>•</span><span class="tx-balloon-w3w">' + w3wDisplay + '</span>' : '') +
+            '</div>' +
             txRowsHtml +
           '</div>';
 
