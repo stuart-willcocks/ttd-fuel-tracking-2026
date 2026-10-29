@@ -193,12 +193,12 @@ export const AdminApp: React.FC = () => {
     if (!isAuthenticated) return;
     loadFleetData();
 
-    // Low-frequency 5-minute safety fallback poll (Supabase Realtime handles instant updates)
+    // Deep 60-minute safety fallback poll (Supabase Realtime + reconnect handler handle instant updates)
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       if (isCreateModalOpen || Boolean(editingAsset) || isRegisterDeviceModalOpen) return;
       loadFleetData(true);
-    }, 300000);
+    }, 3600000);
 
     return () => {
       clearInterval(interval);
@@ -216,28 +216,35 @@ export const AdminApp: React.FC = () => {
       devices: false,
     };
 
-    const unsubscribe = subscribeToCloudChanges((table, eventType) => {
-      // Avoid clobbering user input when an asset creation or edit modal is active
-      if (isCreateModalOpen || Boolean(editingAsset) || isRegisterDeviceModalOpen) return;
+    const unsubscribe = subscribeToCloudChanges(
+      (table, eventType) => {
+        // Avoid clobbering user input when an asset creation or edit modal is active
+        if (isCreateModalOpen || Boolean(editingAsset) || isRegisterDeviceModalOpen) return;
 
-      if (table === 'equipment_list') pendingTables.equipment = true;
-      if (table === 'transactions') pendingTables.transactions = true;
-      if (table === 'authorized_devices') pendingTables.devices = true;
+        if (table === 'equipment_list') pendingTables.equipment = true;
+        if (table === 'transactions') pendingTables.transactions = true;
+        if (table === 'authorized_devices') pendingTables.devices = true;
 
-      console.log(`[Realtime Sync] ${table} event (${eventType}) from field PDA - refreshing changed table(s)`);
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        const scope = {
-          equipment: pendingTables.equipment,
-          transactions: pendingTables.transactions,
-          devices: pendingTables.devices,
-        };
-        pendingTables.equipment = false;
-        pendingTables.transactions = false;
-        pendingTables.devices = false;
-        loadFleetData(true, scope);
-      }, 300);
-    });
+        console.log(`[Realtime Sync] ${table} event (${eventType}) from field PDA - refreshing changed table(s)`);
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          const scope = {
+            equipment: pendingTables.equipment,
+            transactions: pendingTables.transactions,
+            devices: pendingTables.devices,
+          };
+          pendingTables.equipment = false;
+          pendingTables.transactions = false;
+          pendingTables.devices = false;
+          loadFleetData(true, scope);
+        }, 300);
+      },
+      () => {
+        // Automatically refresh if Realtime WebSocket disconnected and reconnected
+        if (isCreateModalOpen || Boolean(editingAsset) || isRegisterDeviceModalOpen) return;
+        loadFleetData(true);
+      }
+    );
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);

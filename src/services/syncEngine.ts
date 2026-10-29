@@ -38,6 +38,7 @@ class SyncEngine {
   private lastSyncTime: string | null = null;
   private lastError: string | null = null;
   private syncTimer: ReturnType<typeof setInterval> | null = null;
+  private outboxTimer: ReturnType<typeof setInterval> | null = null;
   private authTimer: ReturnType<typeof setInterval> | null = null;
   private realtimeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingRealtimeTables: { equipment: boolean; transactions: boolean } = {
@@ -67,21 +68,33 @@ class SyncEngine {
         }
       });
 
-      // Low-frequency 5-minute fallback poll (Supabase Realtime handles instant push updates)
+      // 1-minute local outbox check (0 bytes of network traffic unless local pending transactions exist)
+      this.outboxTimer = setInterval(async () => {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        if (!this.isEffectivelyOnline() || this.isSyncing || this.isFlushing) return;
+        const pendingCount = await this.getPendingCount();
+        if (pendingCount > 0) {
+          this.flushOutbox();
+        } else if (this.deletedTxIds.size > 0) {
+          this.syncWithRemote({ equipment: false, transactions: false });
+        }
+      }, 60000);
+
+      // Deep 60-minute safety fallback poll (Supabase Realtime + reconnect handler handle instant updates)
       this.syncTimer = setInterval(() => {
         if (typeof document !== 'undefined' && document.hidden) return;
         if (this.isEffectivelyOnline() && !this.isSyncing) {
           this.syncWithRemote();
         }
-      }, 300000);
+      }, 3600000);
 
-      // Periodic 2-minute safety check for device status (Supabase Realtime handles instant revocations)
+      // Periodic 5-minute safety check for device status (Supabase Realtime handles instant revocations)
       this.authTimer = setInterval(() => {
         if (typeof document !== 'undefined' && document.hidden) return;
         if (this.isEffectivelyOnline() && isDeviceEnrolled()) {
           this.verifyDeviceAuthorization();
         }
-      }, 120000);
+      }, 300000);
 
       // Listen to cross-tab / cross-window instant authorization events
       onDeviceAuthBroadcast((event) => {
@@ -97,46 +110,54 @@ class SyncEngine {
       // Subscribe to real-time cloud changes so PDAs update immediately without polling
       if (isSupabaseConfigured()) {
         try {
-          subscribeToCloudChanges((table, eventType, payload) => {
-            if (table === 'authorized_devices') {
-              const myId = getDeviceId();
-              const newRow = payload?.new as { device_id?: string; status?: string } | undefined;
-              const oldRow = payload?.old as { device_id?: string; status?: string } | undefined;
-              const affectedId = (newRow?.device_id || oldRow?.device_id || '').toUpperCase();
+          subscribeToCloudChanges(
+            (table, eventType, payload) => {
+              if (table === 'authorized_devices') {
+                const myId = getDeviceId();
+                const newRow = payload?.new as { device_id?: string; status?: string } | undefined;
+                const oldRow = payload?.old as { device_id?: string; status?: string } | undefined;
+                const affectedId = (newRow?.device_id || oldRow?.device_id || '').toUpperCase();
 
-              if (affectedId && myId && affectedId === myId.toUpperCase()) {
-                if (newRow?.status !== 'active' || eventType === 'DELETE') {
-                  console.warn(`[SyncEngine Realtime] PDA ${myId} status changed to ${newRow?.status || 'deleted'}. Locking down.`);
-                  this.lockdownRevokedDevice();
-                  return;
+                if (affectedId && myId && affectedId === myId.toUpperCase()) {
+                  if (newRow?.status !== 'active' || eventType === 'DELETE') {
+                    console.warn(`[SyncEngine Realtime] PDA ${myId} status changed to ${newRow?.status || 'deleted'}. Locking down.`);
+                    this.lockdownRevokedDevice();
+                    return;
+                  }
+                } else if (eventType === 'DELETE' && !affectedId) {
+                  // Only hit Supabase if a DELETE event lacked the old row's device_id
+                  this.verifyDeviceAuthorization(true);
                 }
-              } else if (eventType === 'DELETE' && !affectedId) {
-                // Only hit Supabase if a DELETE event lacked the old row's device_id
-                this.verifyDeviceAuthorization(true);
+                return;
               }
-              return;
-            }
 
-            if (!this.isEffectivelyOnline()) return;
+              if (!this.isEffectivelyOnline()) return;
 
-            if (table === 'equipment_list') {
-              this.pendingRealtimeTables.equipment = true;
-            } else if (table === 'transactions') {
-              this.pendingRealtimeTables.transactions = true;
-            }
+              if (table === 'equipment_list') {
+                this.pendingRealtimeTables.equipment = true;
+              } else if (table === 'transactions') {
+                this.pendingRealtimeTables.transactions = true;
+              }
 
-            if (this.realtimeDebounceTimer) {
-              clearTimeout(this.realtimeDebounceTimer);
+              if (this.realtimeDebounceTimer) {
+                clearTimeout(this.realtimeDebounceTimer);
+              }
+              this.realtimeDebounceTimer = setTimeout(() => {
+                const opts = {
+                  equipment: this.pendingRealtimeTables.equipment,
+                  transactions: this.pendingRealtimeTables.transactions,
+                };
+                this.pendingRealtimeTables = { equipment: false, transactions: false };
+                this.syncWithRemote(opts);
+              }, 300);
+            },
+            () => {
+              // Automatically catch up if Realtime WebSocket disconnected and reconnected
+              if (this.isEffectivelyOnline() && !this.isSyncing) {
+                this.syncWithRemote();
+              }
             }
-            this.realtimeDebounceTimer = setTimeout(() => {
-              const opts = {
-                equipment: this.pendingRealtimeTables.equipment,
-                transactions: this.pendingRealtimeTables.transactions,
-              };
-              this.pendingRealtimeTables = { equipment: false, transactions: false };
-              this.syncWithRemote(opts);
-            }, 300);
-          });
+          );
         } catch (e) {
           console.warn('Realtime subscription error in syncEngine:', e);
         }
@@ -148,6 +169,10 @@ class SyncEngine {
     if (this.syncTimer) {
       clearInterval(this.syncTimer);
       this.syncTimer = null;
+    }
+    if (this.outboxTimer) {
+      clearInterval(this.outboxTimer);
+      this.outboxTimer = null;
     }
     if (this.authTimer) {
       clearInterval(this.authTimer);

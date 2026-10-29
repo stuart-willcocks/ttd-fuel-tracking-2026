@@ -1036,10 +1036,14 @@ export function subscribeToCloudChanges(
     table: 'transactions' | 'equipment_list' | 'authorized_devices',
     eventType: string,
     payload?: { new?: Record<string, unknown>; old?: Record<string, unknown> }
-  ) => void
+  ) => void,
+  onReconnect?: () => void
 ): () => void {
   const client = getSupabaseClient();
   if (!client) return () => {};
+
+  let hasConnectedOnce = false;
+  let wasDisconnected = false;
 
   const channel = client
     .channel('ttd-cloud-realtime')
@@ -1066,7 +1070,18 @@ export function subscribeToCloudChanges(
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        console.log('[Supabase Realtime] Connected to live transaction feed from field PDAs');
+        if (hasConnectedOnce && wasDisconnected) {
+          wasDisconnected = false;
+          console.log('[Supabase Realtime] Reconnected after WebSocket drop — syncing missed changes');
+          onReconnect?.();
+        } else {
+          hasConnectedOnce = true;
+          console.log('[Supabase Realtime] Connected to live transaction feed from field PDAs');
+        }
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        if (hasConnectedOnce) {
+          wasDisconnected = true;
+        }
       }
     });
 
