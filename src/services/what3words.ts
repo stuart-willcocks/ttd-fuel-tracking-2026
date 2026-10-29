@@ -612,24 +612,17 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       box-shadow: 0 5px 14px rgba(0, 0, 0, 0.6);
       z-index: 10;
     }
-    .eq-map-chk-dot {
+    .eq-map-status-sq {
       position: absolute;
-      top: -2px;
-      left: -2px;
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
+      top: -3px;
+      left: -3px;
+      width: 11px;
+      height: 11px;
+      border-radius: 2px;
       border: 1.5px solid #FFFFFF;
-      z-index: 2;
-    }
-    .eq-map-pwr-dot {
-      position: absolute;
-      bottom: -2px;
-      left: -2px;
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      border: 1.5px solid #FFFFFF;
+      box-sizing: border-box;
+      overflow: hidden;
+      display: block;
       z-index: 2;
     }
     .eq-map-label {
@@ -957,21 +950,19 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
 
           var bgColor = item.type === 'GENERATOR' ? '#EC721E' : item.type === 'TANK' ? '#2563EB' : '#16A34A';
           var iconColor = '#FFFFFF';
-          var chkColor = item.checkInStatus === 'checked_in'
-            ? '#16A34A'
-            : item.checkInStatus === 'checked_out'
-              ? '#DC2626'
-              : '#94A3B8';
-          var chkDotHtml = '<span class="eq-map-chk-dot" style="background:' + chkColor + '"></span>';
-          var pwrDotHtml = item.type === 'GENERATOR'
-            ? '<span class="eq-map-pwr-dot" style="background:' + (item.isOn ? '#16A34A' : '#DC2626') + '"></span>'
-            : '';
+          var chkColor = item.checkInStatus === 'checked_in' ? '#16A34A' : '#DC2626';
+          var pwrColor = item.isOn ? '#16A34A' : '#DC2626';
+          var statusSqHtml = item.type === 'GENERATOR'
+            ? '<svg class="eq-map-status-sq" viewBox="0 0 10 10" width="11" height="11">' +
+                '<rect x="0" y="0" width="10" height="10" fill="' + pwrColor + '"/>' +
+                '<polygon points="0,0 10,0 0,10" fill="' + chkColor + '"/>' +
+              '</svg>'
+            : '<span class="eq-map-status-sq" style="background:' + chkColor + '"></span>';
 
           var html = '<div class="eq-map-marker">' +
             '<div class="eq-map-icon-box" style="background:' + bgColor + '">' +
               getEquipmentSvg(item.type, iconColor) +
-              chkDotHtml +
-              pwrDotHtml +
+              statusSqHtml +
             '</div>' +
             '<div class="eq-map-label">' + item.equipmentId + '</div>' +
           '</div>';
