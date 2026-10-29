@@ -604,10 +604,11 @@ export async function uploadTransactionToCloud(
       device_id: tx.deviceId ?? null,
     };
 
-    // Save the transaction to Supabase using atomic upsert (avoids destructive DELETE + INSERT race)
+    // Save the transaction to Supabase:
+    // 1. Try standard insert first (fast path for new transactions; requires only INSERT RLS policy)
     let { error: txError } = await client
       .from('transactions')
-      .upsert(payload, { onConflict: 'id' });
+      .insert(payload);
 
     // Only upsert parent equipment if foreign key constraint (23503) failed (avoids redundant equipment_list write + Realtime event on every tx)
     if (txError && txError.code === '23503') {
@@ -637,7 +638,7 @@ export async function uploadTransactionToCloud(
           await client.from('equipment_list').upsert(eqPayload, { onConflict: 'equipment_id' });
           const retryAfterEq = await client
             .from('transactions')
-            .upsert(payload, { onConflict: 'id' });
+            .insert(payload);
           txError = retryAfterEq.error;
         }
       } catch (eqErr) {
@@ -651,32 +652,58 @@ export async function uploadTransactionToCloud(
       delete fallbackPayload.device_id;
       const retryRes = await client
         .from('transactions')
-        .upsert(fallbackPayload, { onConflict: 'id' });
+        .insert(fallbackPayload);
       txError = retryRes.error;
     }
 
-    // Fallback if UPDATE RLS policy is not enabled on transactions (code 42501 on upsert):
-    // Try standard insert; if row already exists (23505 duplicate key), treat as success unless explicitly edited
-    if (
-      txError &&
-      (txError.code === '42501' ||
-        (txError as any).message?.includes('row-level security'))
-    ) {
-      const insertRes = await client.from('transactions').insert(payload);
-      txError = insertRes.error;
-    }
-
+    // 2. If row with this UUID already exists in Supabase (23505):
+    //    Check whether the existing row already has the exact same values (Airplane mode retry)
+    //    or if the user edited the transaction values and the row needs to be updated.
     if (
       txError &&
       (txError.code === '23505' ||
         (txError as any).message?.includes('duplicate key') ||
         (txError as any).message?.includes('already exists'))
     ) {
-      // Row with this exact UUID already exists in Supabase!
-      // Try updating in place; if already identical or UPDATE RLS not set, treat as uploaded without deleting the row.
-      const updateRes = await client.from('transactions').update(payload).eq('id', tx.id);
-      if (!updateRes.error || updateRes.error.code === '42501') {
+      const { data: existingRow } = await client
+        .from('transactions')
+        .select('*')
+        .eq('id', tx.id)
+        .maybeSingle();
+
+      const isSameAsExisting = Boolean(
+        existingRow &&
+        existingRow.transaction_type === payload.transaction_type &&
+        (existingRow.check_in_fuel_percentage ?? null) === (payload.check_in_fuel_percentage ?? null) &&
+        (existingRow.check_out_fuel_percentage ?? null) === (payload.check_out_fuel_percentage ?? null) &&
+        (existingRow.check_in_def_percentage ?? null) === (payload.check_in_def_percentage ?? null) &&
+        (existingRow.check_out_def_percentage ?? null) === (payload.check_out_def_percentage ?? null) &&
+        (existingRow.check_in_kwh ?? null) === (payload.check_in_kwh ?? null) &&
+        (existingRow.check_out_kwh ?? null) === (payload.check_out_kwh ?? null) &&
+        (existingRow.check_in_fuel_eighths ?? null) === (payload.check_in_fuel_eighths ?? null) &&
+        (existingRow.check_out_fuel_eighths ?? null) === (payload.check_out_fuel_eighths ?? null) &&
+        (existingRow.fuel_transfer_litres ?? null) === (payload.fuel_transfer_litres ?? null) &&
+        (existingRow.def_transfer_litres ?? null) === (payload.def_transfer_litres ?? null)
+      );
+
+      if (isSameAsExisting) {
+        // Row in Supabase is already identical — do not delete or touch it
         txError = null;
+      } else {
+        // Transaction was edited! Try in-place UPDATE first; if 0 rows affected (e.g. no UPDATE RLS policy), replace via DELETE + INSERT
+        const { data: updatedRows, error: updateErr } = await client
+          .from('transactions')
+          .update(payload)
+          .eq('id', tx.id)
+          .select('id');
+
+        if (!updateErr && updatedRows && updatedRows.length > 0) {
+          txError = null;
+        } else {
+          await client.from('transactions').delete().eq('id', tx.id);
+          const replaceRes = await client.from('transactions').insert(payload);
+          txError = replaceRes.error;
+        }
       }
     }
 

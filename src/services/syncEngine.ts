@@ -589,20 +589,38 @@ class SyncEngine {
         // Exclude all tombstoned transactions so they CANNOT be re-inserted into IndexedDB
         const filteredRemote = remoteTransactions.filter((t) => !this.deletedTxIds.has(t.id));
         const remoteIdSet = new Set(filteredRemote.map((t) => t.id));
+        const remoteTxById = new Map(filteredRemote.map((t) => [t.id, t]));
         const outboxItems = await db.outbox.toArray();
         const pendingOutboxIdSet = new Set(outboxItems.map((o) => o.id));
 
         const allLocal = await db.transactions.toArray();
 
         // Ensure any local transaction that is still marked 'pending' or 'failed' is protected
-        // (and re-queued in outbox if needed) so it can NEVER be deleted before being confirmed in remoteIdSet
+        // (and re-queued in outbox if needed) so it can NEVER be deleted or overwritten by stale server values
+        // before the server confirms the exact updated values
         for (const localTx of allLocal) {
           if (
             (localTx.syncStatus === 'pending' || localTx.syncStatus === 'failed') &&
             !this.deletedTxIds.has(localTx.id)
           ) {
-            if (remoteIdSet.has(localTx.id)) {
-              // Server already has this transaction! Mark synced and remove from outbox
+            const remoteMatch = remoteTxById.get(localTx.id);
+            const isIdenticalOnServer = Boolean(
+              remoteMatch &&
+              remoteMatch.transactionType === localTx.transactionType &&
+              (remoteMatch.checkInFuelPercentage ?? null) === (localTx.checkInFuelPercentage ?? null) &&
+              (remoteMatch.checkOutFuelPercentage ?? null) === (localTx.checkOutFuelPercentage ?? null) &&
+              (remoteMatch.checkInDefPercentage ?? null) === (localTx.checkInDefPercentage ?? null) &&
+              (remoteMatch.checkOutDefPercentage ?? null) === (localTx.checkOutDefPercentage ?? null) &&
+              (remoteMatch.checkInKWH ?? null) === (localTx.checkInKWH ?? null) &&
+              (remoteMatch.checkOutKWH ?? null) === (localTx.checkOutKWH ?? null) &&
+              (remoteMatch.checkInFuelEighths ?? null) === (localTx.checkInFuelEighths ?? null) &&
+              (remoteMatch.checkOutFuelEighths ?? null) === (localTx.checkOutFuelEighths ?? null) &&
+              (remoteMatch.fuelTransferLitres ?? null) === (localTx.fuelTransferLitres ?? null) &&
+              (remoteMatch.defTransferLitres ?? null) === (localTx.defTransferLitres ?? null)
+            );
+
+            if (isIdenticalOnServer) {
+              // Server already has this exact transaction (including any edits)! Mark synced and remove from outbox
               pendingOutboxIdSet.delete(localTx.id);
               await db.outbox.delete(localTx.id);
             } else {
