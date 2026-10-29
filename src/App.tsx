@@ -684,8 +684,6 @@ export const App: React.FC = () => {
         onToggleFullscreen={toggleFullscreen}
         onOpenOutbox={() => setIsOutboxModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
-        onOpenUpdate={() => setIsSettingsModalOpen(true)}
-        onShowSplash={() => setCurrentView('SPLASH_SCREEN')}
       />
 
       <main className="app-main">

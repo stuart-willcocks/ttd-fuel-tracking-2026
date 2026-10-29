@@ -1,5 +1,5 @@
-import React from 'react';
-import { Wifi, WifiOff, RefreshCw, UploadCloud, Settings } from 'lucide-react';
+import React, { useRef, useCallback } from 'react';
+import { Wifi, WifiOff, RefreshCw, UploadCloud } from 'lucide-react';
 import type { SyncState } from '../services/syncEngine';
 import { APP_VERSION, getIsStaging } from '../version';
 
@@ -14,67 +14,68 @@ interface HeaderProps {
   onToggleFullscreen?: () => void;
   onOpenOutbox: () => void;
   onOpenSettings?: () => void;
-  onOpenUpdate?: () => void;
-  onShowSplash?: () => void;
 }
+
+const LONG_PRESS_DURATION_MS = 600;
 
 export const Header: React.FC<HeaderProps> = ({
   syncState,
   hasUpdate = false,
-  availableVersion,
-  settingsRequiresAttention,
   onToggleSimulatedOffline,
   onTriggerSync,
   onOpenOutbox,
   onOpenSettings,
-  onOpenUpdate,
-  onShowSplash,
 }) => {
-  const requiresAttention = settingsRequiresAttention ?? hasUpdate;
   const isStaging = getIsStaging();
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLElement>) => {
+      // Ignore presses on interactive buttons inside the status box (Refresh, Wifi, Outbox)
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest('button')) {
+        return;
+      }
+      clearLongPress();
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        onOpenSettings?.();
+      }, LONG_PRESS_DURATION_MS);
+    },
+    [clearLongPress, onOpenSettings]
+  );
+
   return (
-    <header className="app-header">
-      {/* Top Left: TTD Logo, App Title ("TTD Fuel Tracking" in white), and Version Chip */}
-      <div
-        className="header-title-box"
-        onClick={onShowSplash}
-        style={{ cursor: onShowSplash ? 'pointer' : 'default' }}
-        title="TTD Fuel Tracking"
-      >
+    <header
+      className="app-header"
+      onPointerDown={handlePointerDown}
+      onPointerUp={clearLongPress}
+      onPointerLeave={clearLongPress}
+      onPointerCancel={clearLongPress}
+      onContextMenu={(e) => {
+        // Prevent Android/browser context menu from interrupting a long-press on the banner
+        e.preventDefault();
+      }}
+    >
+      {/* Top Left: TTD Logo and App Title ("TTD Fuel Tracking" in white) */}
+      <div className="header-title-box" title="TTD Fuel Tracking">
         <img
           src="/logo-01.png"
           alt="The Technical Department Ltd"
           className="header-logo"
+          draggable={false}
         />
         <span className="header-app-title">TTD Fuel Tracking</span>
-        {hasUpdate ? (
-          <span
-            className="header-version-pill"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onOpenUpdate) {
-                onOpenUpdate();
-              } else {
-                onOpenSettings?.();
-              }
-            }}
-            title={`Update available: ${availableVersion ? `V${availableVersion}` : 'New version'}. Tap to update.`}
-            style={{
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            <span>V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
-            <span className="header-version-alert-mark">!</span>
-          </span>
-        ) : (
-          <span className="header-version-pill">V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
-        )}
       </div>
 
-      {/* Top Right: Upload Queue, Refresh, Connection Status, Settings */}
+      {/* Top Right: Upload Queue, Version Chip, Refresh, Connection Status */}
       <div className="header-status-box">
         {/* Upload Queue Indicator (visible if items are queued) */}
         {syncState.pendingCount > 0 && (
@@ -88,6 +89,19 @@ export const Header: React.FC<HeaderProps> = ({
             <span>{syncState.pendingCount}</span>
           </button>
         )}
+
+        {/* Version Chip positioned to the left of the Refresh icon */}
+        <span
+          className="header-version-pill"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          <span>V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
+          {hasUpdate && <span className="header-version-alert-mark">!</span>}
+        </span>
 
         {/* Refresh / Sync Button (circular arrows spin, square border does NOT spin) */}
         <button
@@ -114,32 +128,6 @@ export const Header: React.FC<HeaderProps> = ({
         >
           {syncState.isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}
         </button>
-
-        {/* Settings Button: Gear icon (displays orange exclamation mark in front when attention is required) */}
-        {onOpenSettings && (
-          <button
-            type="button"
-            className={`icon-btn settings-btn ${requiresAttention ? 'has-attention' : ''}`}
-            onClick={onOpenSettings}
-            title={requiresAttention ? "Settings require attention (App update available)" : "Settings"}
-            aria-label={requiresAttention ? "Settings (requires attention)" : "Settings"}
-          >
-            {requiresAttention && (
-              <svg
-                width="5"
-                height="15"
-                viewBox="0 0 5 15"
-                fill="none"
-                className="settings-attention-mark"
-                aria-hidden="true"
-              >
-                <line x1="2.5" y1="1.5" x2="2.5" y2="9.5" stroke="#EC721E" strokeWidth="2.5" strokeLinecap="round" />
-                <circle cx="2.5" cy="13.2" r="1.3" fill="#EC721E" />
-              </svg>
-            )}
-            <Settings size={15} />
-          </button>
-        )}
       </div>
     </header>
   );

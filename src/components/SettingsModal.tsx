@@ -50,10 +50,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const currentVerStr = formatVersionTag(APP_VERSION);
   const availableVerStr = availableVersion ? formatVersionTag(availableVersion) : null;
-
-  const versionText = hasUpdate && availableVerStr
-    ? `Current version: ${currentVerStr} (${availableVerStr} is available)`
-    : `Current version: ${currentVerStr} (latest)`;
+  const canUpdate = Boolean(hasUpdate && availableVerStr);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -76,7 +73,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Device ID & Authorization Card */}
         <div className="settings-device-card">
           <div className="settings-card-label-row">
-            <Smartphone size={16} className="settings-card-icon" />
+            <Smartphone size={15} className="settings-card-icon" />
             <span className="settings-card-label">PDA Device ID</span>
             {currentDeviceId ? (
               <span className="settings-saved-pill" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#16A34A', borderColor: 'rgba(34, 197, 94, 0.3)' }}>
@@ -89,22 +86,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
-            <div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'monospace', color: 'var(--text-primary)' }}>
+          <div className="settings-card-rows">
+            <div className="settings-info-row">
+              <span className="settings-row-label">Device ID</span>
+              <span className="settings-row-value settings-row-mono">
                 {currentDeviceId || 'UNREGISTERED'}
-              </div>
-              {currentDeviceName && currentDeviceName !== currentDeviceId && (
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  {currentDeviceName}
-                </div>
-              )}
+              </span>
             </div>
+            {currentDeviceName && currentDeviceName !== currentDeviceId && (
+              <div className="settings-info-row">
+                <span className="settings-row-label">Device Label</span>
+                <span className="settings-row-value">{currentDeviceName}</span>
+              </div>
+            )}
             {!currentDeviceId && onOpenEnrollment ? (
               <button
                 type="button"
                 className="btn-pda-rect"
-                style={{ padding: '6px 12px', fontSize: '0.78rem', color: '#000000', borderColor: '#EC721E', background: '#EC721E', fontWeight: 800 }}
+                style={{ marginTop: '4px', height: '38px', fontSize: '13px', color: '#000000', borderColor: '#EC721E', background: '#EC721E', fontWeight: 700 }}
                 onClick={() => {
                   onClose();
                   onOpenEnrollment();
@@ -117,26 +116,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Hardware Telemetry Card */}
-        <div className="settings-device-card" style={{ marginTop: '12px' }}>
+        <div className="settings-device-card">
           <div className="settings-card-label-row">
-            <Navigation size={16} className="settings-card-icon" style={{ color: '#3B82F6' }} />
+            <Navigation size={15} className="settings-card-icon" style={{ color: '#2563EB' }} />
             <span className="settings-card-label">Hardware Telemetry</span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+          <div className="settings-card-rows">
             {/* Battery Row */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Battery</span>
-              <span style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                {batteryInfo?.isCharging ? <BatteryCharging size={16} color="#10B981" /> : <Battery size={16} color="#10B981" />}
-                {batteryInfo ? `${batteryInfo.batteryLevel}% ${batteryInfo.isCharging ? '(Charging)' : ''}` : 'Reading...'}
+            <div className="settings-info-row">
+              <span className="settings-row-label">Battery</span>
+              <span className="settings-row-value" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                {batteryInfo?.isCharging ? <BatteryCharging size={15} color="#10B981" /> : <Battery size={15} color="#10B981" />}
+                <span>{batteryInfo ? `${batteryInfo.batteryLevel}%${batteryInfo.isCharging ? ' (Charging)' : ''}` : 'Reading...'}</span>
               </span>
             </div>
 
             {/* GPS Location Row */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>GPS Location</span>
-              <span style={{ fontWeight: 700, color: telemetry.cachedLocation ? '#2563EB' : 'var(--text-secondary)', textAlign: 'right' }}>
+            <div className="settings-info-row">
+              <span className="settings-row-label">GPS Location</span>
+              <span className="settings-row-value" style={{ color: telemetry.cachedLocation ? '#2563EB' : 'var(--text-muted)' }}>
                 {telemetry.cachedLocation
                   ? `${telemetry.cachedLocation.latitude}, ${telemetry.cachedLocation.longitude} (±${telemetry.cachedLocation.locationAccuracy}m)`
                   : (telemetry.lastLocationError || 'Waiting for fix...')}
@@ -145,38 +144,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
-        {/* App Version & Update Card */}
-        <div className="settings-version-card">
-          <div className="settings-version-status-row">
-            {hasUpdate ? (
-              <Sparkles size={20} className="update-available-icon" />
+        {/* Current Version & Update Card */}
+        <div className="settings-device-card">
+          <div className="settings-card-label-row">
+            {canUpdate ? (
+              <Sparkles size={15} className="update-available-icon" />
             ) : (
-              <CheckCircle2 size={20} className="update-latest-icon" />
+              <CheckCircle2 size={15} className="update-latest-icon" />
             )}
-            <div className="settings-version-text">{versionText}</div>
+            <span className="settings-card-label">Current Version</span>
           </div>
 
-          {hasUpdate && availableVerStr && (
+          <div className="settings-card-rows">
+            <div className="settings-info-row">
+              <span className="settings-row-label">Current version</span>
+              <span className="settings-row-value settings-row-mono">{currentVerStr}</span>
+            </div>
+
             <button
               type="button"
-              className="btn-pda-rect btn-pda-green settings-update-btn"
-              disabled={isUpdating}
+              className={`btn-pda-rect ${canUpdate ? 'btn-pda-green' : 'settings-update-btn-disabled'} settings-update-btn`}
+              disabled={!canUpdate || isUpdating}
               onClick={() => {
+                if (!canUpdate) return;
                 setIsUpdating(true);
                 onUpdate();
               }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
             >
               {isUpdating ? (
                 <>
                   <RefreshCw size={14} className="spinning" />
                   <span>Applying Update...</span>
                 </>
-              ) : (
+              ) : canUpdate ? (
                 <span>Update to {availableVerStr}</span>
+              ) : (
+                <span>Update</span>
               )}
             </button>
-          )}
+          </div>
         </div>
 
         {/* Close Button */}
