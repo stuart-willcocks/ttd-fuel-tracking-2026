@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react';
-import { Wifi, WifiOff, RefreshCw, UploadCloud } from 'lucide-react';
+import { Wifi, RefreshCw, UploadCloud } from 'lucide-react';
 import type { SyncState } from '../services/syncEngine';
 import { APP_VERSION, getIsStaging } from '../version';
 
@@ -123,7 +123,26 @@ export const Header: React.FC<HeaderProps> = ({
           title={syncState.isOnline ? 'Online' : 'Offline'}
           aria-label={syncState.isOnline ? 'Online' : 'Offline'}
         >
-          {syncState.isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}
+          {syncState.isOnline ? (
+            <Wifi size={16} color="#FFFFFF" strokeWidth={2.2} />
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 20h.01" stroke="#94A3B8" strokeWidth="2.2" />
+              <path d="M2 8.82a15 15 0 0 1 20 0" stroke="#94A3B8" strokeWidth="2.2" />
+              <path d="M5 12.859a10 10 0 0 1 14 0" stroke="#94A3B8" strokeWidth="2.2" />
+              <path d="M8.5 16.429a5 5 0 0 1 7 0" stroke="#94A3B8" strokeWidth="2.2" />
+              <path d="M5 5l14 14" stroke="#EF4444" strokeWidth="2.8" />
+              <path d="M19 5L5 19" stroke="#EF4444" strokeWidth="2.8" />
+            </svg>
+          )}
         </span>
       </div>
     </header>
