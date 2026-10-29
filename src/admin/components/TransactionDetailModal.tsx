@@ -37,7 +37,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
   const isPowerEvent = Boolean(
     transaction &&
-      (transaction.transactionType === 'PoweredUp' || transaction.transactionType === 'PoweredDown')
+    (transaction.transactionType === 'PoweredUp' || transaction.transactionType === 'PoweredDown')
   );
   const isFuelTransfer = Boolean(
     transaction && transaction.transactionType.includes('FuelTransfer')

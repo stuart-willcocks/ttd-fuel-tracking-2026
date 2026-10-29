@@ -6,8 +6,6 @@ import {
   QrCode,
   Edit,
   MapPin,
-  Map as MapIcon,
-  Table as TableIcon,
   AlertTriangle,
   ArrowUpDown,
   ArrowUp,
@@ -35,6 +33,7 @@ import { postRemoteEquipment } from '../../services/api';
 interface AssetsViewProps {
   assets: Equipment[];
   transactions: Transaction[];
+  viewMode?: 'TABLE' | 'MAP';
   onOpenCreateModal: () => void;
   onOpenEditModal: (asset: Equipment) => void;
   onOpenQRModal: (asset: Equipment) => void;
@@ -44,11 +43,10 @@ interface AssetsViewProps {
 
 type FilterType = 'ALL' | 'GENERATOR' | 'TANK' | 'PLANT' | 'RUNNING' | 'STANDBY';
 
-let rememberedAssetsViewMode: 'TABLE' | 'MAP' = 'TABLE';
-
 export const AssetsView: React.FC<AssetsViewProps> = ({
   assets,
   transactions,
+  viewMode = 'TABLE',
   onOpenCreateModal,
   onOpenEditModal,
   onOpenQRModal,
@@ -57,11 +55,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
-  const [viewMode, setViewModeState] = useState<'TABLE' | 'MAP'>(() => rememberedAssetsViewMode);
-  const setViewMode = (nextMode: 'TABLE' | 'MAP') => {
-    rememberedAssetsViewMode = nextMode;
-    setViewModeState(nextMode);
-  };
   const [coordResolveTick, setCoordResolveTick] = useState(0);
   const mapIframeRef = useRef<HTMLIFrameElement | null>(null);
   const staticMapSrcDoc = useMemo(
@@ -424,7 +417,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         )}
       </div>
 
-      {/* Control Bar: Search & View Toggle */}
+      {/* Control Bar: Search */}
       <div
         style={{
           display: 'flex',
@@ -451,28 +444,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
               placeholder="Search"
             />
           </div>
-        </div>
-
-        {/* View Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--adm-surface-2)', padding: '3px', borderRadius: '8px' }}>
-          <button
-            onClick={() => setViewMode('TABLE')}
-            className={`admin-btn ${viewMode === 'TABLE' ? 'admin-btn-secondary' : 'admin-btn-outline'} admin-btn-sm`}
-            style={{ padding: '6px 10px' }}
-            title="Data Table View"
-          >
-            <TableIcon size={15} />
-            <span>Table</span>
-          </button>
-          <button
-            onClick={() => setViewMode('MAP')}
-            className={`admin-btn ${viewMode === 'MAP' ? 'admin-btn-secondary' : 'admin-btn-outline'} admin-btn-sm`}
-            style={{ padding: '6px 10px' }}
-            title="Satellite Map View"
-          >
-            <MapIcon size={15} />
-            <span>Map</span>
-          </button>
         </div>
       </div>
 

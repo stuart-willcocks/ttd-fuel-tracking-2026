@@ -8,7 +8,7 @@ import {
 import { APP_VERSION, getIsStaging } from '../../version';
 import { checkRemoteAppVersion, performAppUpdate } from '../../services/appUpdate';
 
-export type AdminViewType = 'ASSETS' | 'TRANSACTIONS' | 'SETTINGS' | 'DEVICES';
+export type AdminViewType = 'ASSETS' | 'MAP' | 'TRANSACTIONS' | 'SETTINGS' | 'DEVICES';
 
 interface AdminTopNavProps {
   isSupabaseOnline: boolean;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Boxes, ReceiptText, Smartphone } from 'lucide-react';
+import { Boxes, Map as MapIcon, ReceiptText, Smartphone } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import './admin.css';
 import { LaptopOnlyGuard } from './components/LaptopOnlyGuard';
@@ -479,8 +479,20 @@ export const AdminApp: React.FC = () => {
             className={`admin-nav-tab ${currentView === 'ASSETS' ? 'active' : ''}`}
           >
             <Boxes size={18} />
-            <span>Equipment</span>
+            <span>Equipment list</span>
             <span className="admin-nav-tab-badge">{assets.length}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setCurrentView('MAP');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`admin-nav-tab ${currentView === 'MAP' ? 'active' : ''}`}
+          >
+            <MapIcon size={18} />
+            <span>Map</span>
           </button>
 
           <button
@@ -507,7 +519,7 @@ export const AdminApp: React.FC = () => {
             className={`admin-nav-tab ${currentView === 'DEVICES' ? 'active' : ''}`}
           >
             <Smartphone size={18} />
-            <span>PDAs</span>
+            <span>Devices</span>
             <span className="admin-nav-tab-badge">
               {devices.filter((d) => d.status === 'active').length}
             </span>
@@ -517,10 +529,11 @@ export const AdminApp: React.FC = () => {
         {/* Main Content Viewport spanning full width */}
         <div className="admin-main-wrap">
           <main style={{ flex: 1, minWidth: 0, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-            {currentView === 'ASSETS' && (
+            {(currentView === 'ASSETS' || currentView === 'MAP') && (
               <AssetsView
                 assets={assets}
                 transactions={transactions}
+                viewMode={currentView === 'MAP' ? 'MAP' : 'TABLE'}
                 onOpenCreateModal={() => setIsCreateModalOpen(true)}
                 onOpenEditModal={(asset) => setEditingAsset(asset)}
                 onOpenQRModal={(asset) => setQrAsset(asset)}
