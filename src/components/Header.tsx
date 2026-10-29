@@ -21,11 +21,15 @@ const LONG_PRESS_DURATION_MS = 600;
 export const Header: React.FC<HeaderProps> = ({
   syncState,
   hasUpdate = false,
+  availableVersion,
   onTriggerSync,
   onOpenOutbox,
   onOpenSettings,
 }) => {
   const isStaging = getIsStaging();
+  const nextVersionLabel = availableVersion
+    ? String(availableVersion).replace(/^[vV]/, '')
+    : String(Number(APP_VERSION) + 1);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearLongPress = useCallback(() => {
@@ -78,11 +82,15 @@ export const Header: React.FC<HeaderProps> = ({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '5px',
             }}
           >
             <span>V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
-            {hasUpdate && <span className="header-version-alert-mark">!</span>}
+            {hasUpdate && (
+              <span className="header-version-update-badge">
+                V{nextVersionLabel} AVAILABLE
+              </span>
+            )}
           </span>
         </div>
       </div>
