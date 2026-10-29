@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, CheckCircle2, Smartphone, Check, RefreshCw, Navigation, Battery, BatteryCharging } from 'lucide-react';
+import { X, RefreshCw, Battery, BatteryCharging } from 'lucide-react';
 import { APP_VERSION } from '../version';
 import { getDeviceId, getDeviceName } from '../services/device';
 import {
@@ -70,35 +70,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Device ID & Authorization Card */}
+        {/* Consolidated Device ID, Battery, GPS Location & Version Tile */}
         <div className="settings-device-card">
-          <div className="settings-card-label-row">
-            <Smartphone size={15} className="settings-card-icon" />
-            <span className="settings-card-label">PDA Device ID</span>
-            {currentDeviceId ? (
-              <span className="settings-saved-pill" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#16A34A', borderColor: 'rgba(34, 197, 94, 0.3)' }}>
-                <Check size={12} />
-                <span>Authorized</span>
-              </span>
-            ) : (
-              <span className="settings-saved-pill" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#EAB308', borderColor: 'rgba(234, 179, 8, 0.3)' }}>
-                <span>Unregistered</span>
-              </span>
-            )}
-          </div>
           <div className="settings-card-rows">
+            {/* Device ID Row */}
             <div className="settings-info-row">
               <span className="settings-row-label">Device ID</span>
               <span className="settings-row-value settings-row-mono">
                 {currentDeviceId || 'UNREGISTERED'}
               </span>
             </div>
+
             {currentDeviceName && currentDeviceName !== currentDeviceId && (
               <div className="settings-info-row">
                 <span className="settings-row-label">Device Label</span>
                 <span className="settings-row-value">{currentDeviceName}</span>
               </div>
             )}
+
             {!currentDeviceId && onOpenEnrollment ? (
               <button
                 type="button"
@@ -112,17 +101,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 Pair Scanner
               </button>
             ) : null}
-          </div>
-        </div>
 
-        {/* Hardware Telemetry Card */}
-        <div className="settings-device-card">
-          <div className="settings-card-label-row">
-            <Navigation size={15} className="settings-card-icon" style={{ color: '#2563EB' }} />
-            <span className="settings-card-label">Hardware Telemetry</span>
-          </div>
-
-          <div className="settings-card-rows">
             {/* Battery Row */}
             <div className="settings-info-row">
               <span className="settings-row-label">Battery</span>
@@ -141,21 +120,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   : (telemetry.lastLocationError || 'Waiting for fix...')}
               </span>
             </div>
-          </div>
-        </div>
 
-        {/* Current Version & Update Card */}
-        <div className="settings-device-card">
-          <div className="settings-card-label-row">
-            {canUpdate ? (
-              <Sparkles size={15} className="update-available-icon" />
-            ) : (
-              <CheckCircle2 size={15} className="update-latest-icon" />
-            )}
-            <span className="settings-card-label">Current Version</span>
-          </div>
-
-          <div className="settings-card-rows">
+            {/* Current Version Row */}
             <div className="settings-info-row">
               <span className="settings-row-label">Current version</span>
               <span className="settings-row-value settings-row-mono">{currentVerStr}</span>

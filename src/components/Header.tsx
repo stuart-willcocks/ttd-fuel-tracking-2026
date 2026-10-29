@@ -9,7 +9,7 @@ interface HeaderProps {
   hasUpdate?: boolean;
   availableVersion?: string | null;
   settingsRequiresAttention?: boolean;
-  onToggleSimulatedOffline: () => void;
+  onToggleSimulatedOffline?: () => void;
   onTriggerSync: () => void;
   onToggleFullscreen?: () => void;
   onOpenOutbox: () => void;
@@ -21,7 +21,6 @@ const LONG_PRESS_DURATION_MS = 600;
 export const Header: React.FC<HeaderProps> = ({
   syncState,
   hasUpdate = false,
-  onToggleSimulatedOffline,
   onTriggerSync,
   onOpenOutbox,
   onOpenSettings,
@@ -118,16 +117,14 @@ export const Header: React.FC<HeaderProps> = ({
           />
         </button>
 
-        {/* Connection Status: Wifi icon only (no "online" text) */}
-        <button
-          type="button"
+        {/* Connection Status: Wifi icon only (read-only indicator) */}
+        <span
           className={`status-pill ${syncState.isOnline ? 'online' : 'offline'}`}
-          onClick={onToggleSimulatedOffline}
-          title={syncState.isOnline ? 'Online (Tap to toggle offline mode)' : 'Offline (Tap to reconnect)'}
+          title={syncState.isOnline ? 'Online' : 'Offline'}
           aria-label={syncState.isOnline ? 'Online' : 'Offline'}
         >
           {syncState.isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}
-        </button>
+        </span>
       </div>
     </header>
   );

@@ -365,7 +365,7 @@ iframe[src*="vercel.live"],
 }
 
 .header-logo {
-  height: 38px;
+  height: 48px;
   width: auto;
   object-fit: contain;
   display: block;
@@ -424,7 +424,7 @@ iframe[src*="vercel.live"],
   width: 30px;
   height: 30px;
   padding: 0;
-  cursor: pointer;
+  cursor: default;
   border-radius: 4px !important;
 }
 
