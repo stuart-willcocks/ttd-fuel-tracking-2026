@@ -309,6 +309,85 @@ export async function deleteTransactionFromSupabase(transactionId: string): Prom
 }
 
 /**
+ * Update an existing transaction in Supabase and reconcile generator power state if applicable
+ */
+export async function updateTransactionInSupabase(tx: Transaction): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  const isAdminPortal = typeof window !== 'undefined' && window.location.pathname.includes('admin');
+  if (!isAdminPortal) {
+    const currentDevId = getDeviceId();
+    const currentToken = getDeviceToken();
+    if (!currentDevId || !currentToken) {
+      throw new Error('DEVICE_UNAUTHORIZED: Device has no active enrollment token');
+    }
+    const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
+    if (!authCheck.valid || authCheck.status !== 'active') {
+      throw new Error('DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator');
+    }
+  }
+
+  const uploadTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const payload: Record<string, unknown> = {
+    id: tx.id,
+    equipment_id: tx.equipmentId,
+    transaction_timestamp: tx.transactionTimestamp,
+    upload_timestamp: uploadTimestamp,
+    transaction_type: tx.transactionType,
+    check_in_fuel_eighths: tx.checkInFuelEighths ?? null,
+    check_out_fuel_eighths: tx.checkOutFuelEighths ?? null,
+    check_in_fuel_percentage: tx.checkInFuelPercentage ?? null,
+    check_out_fuel_percentage: tx.checkOutFuelPercentage ?? null,
+    check_in_def_percentage: tx.checkInDefPercentage ?? null,
+    check_out_def_percentage: tx.checkOutDefPercentage ?? null,
+    fuel_transfer_litres: tx.fuelTransferLitres ?? null,
+    def_transfer_litres: tx.defTransferLitres ?? null,
+    check_in_kwh: tx.checkInKWH ?? null,
+    check_out_kwh: tx.checkOutKWH ?? null,
+    device_id: tx.deviceId ?? null,
+  };
+
+  // 1. Try direct in-place UPDATE
+  const { data: updatedRows, error: updateErr } = await client
+    .from('transactions')
+    .update(payload)
+    .eq('id', tx.id)
+    .select('id');
+
+  // 2. If UPDATE RLS policy is not set or returned 0 updated rows, fallback to delete + insert for explicit edit
+  if (updateErr || !updatedRows || updatedRows.length === 0) {
+    await client.from('transactions').delete().eq('id', tx.id);
+    const { error: insertErr } = await client.from('transactions').insert(payload);
+    if (insertErr) throw insertErr;
+  }
+
+  // 3. Reconcile generator power state if this transaction is a power event
+  if (tx.transactionType === 'PoweredUp' || tx.transactionType === 'PoweredDown') {
+    const { data: remainingPowerTxs } = await client
+      .from('transactions')
+      .select('transaction_type, transaction_timestamp')
+      .eq('equipment_id', tx.equipmentId)
+      .in('transaction_type', ['PoweredUp', 'PoweredDown'])
+      .order('transaction_timestamp', { ascending: false })
+      .limit(1);
+
+    if (remainingPowerTxs && remainingPowerTxs.length > 0) {
+      const latest = remainingPowerTxs[0];
+      const isPoweredUp = latest.transaction_type === 'PoweredUp';
+      await client
+        .from('equipment_list')
+        .update({
+          powered_up_timestamp: isPoweredUp ? latest.transaction_timestamp : null,
+          powered_down_timestamp: !isPoweredUp ? latest.transaction_timestamp : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('equipment_id', tx.equipmentId);
+    }
+  }
+}
+
+/**
  * Wipe all transactions and equipment from Supabase
  */
 export async function clearAllCloudData(): Promise<void> {

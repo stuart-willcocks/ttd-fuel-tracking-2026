@@ -6,6 +6,7 @@ import {
   saveEquipmentToSupabase,
   deleteEquipmentFromSupabase,
   deleteTransactionFromSupabase,
+  updateTransactionInSupabase,
   fetchTransactionsFromSupabase,
   clearAllCloudData,
   bulkImportEquipmentToSupabase,
@@ -85,6 +86,21 @@ export async function postRemoteTransaction(
   });
   if (!res.ok) throw new Error(`Failed to post transaction: ${res.statusText}`);
   return await res.json();
+}
+
+export async function updateRemoteTransaction(tx: Transaction): Promise<void> {
+  if (isSupabaseConfigured()) {
+    await updateTransactionInSupabase(tx);
+    try {
+      await db.transactions.put({ ...tx, syncStatus: 'synced' });
+    } catch {}
+    return;
+  }
+
+  await postRemoteTransaction(tx);
+  try {
+    await db.transactions.put({ ...tx, syncStatus: 'synced' });
+  } catch {}
 }
 
 export async function deleteRemoteTransaction(transactionId: string): Promise<void> {

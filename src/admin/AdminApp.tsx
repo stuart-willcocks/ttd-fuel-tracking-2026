@@ -23,6 +23,7 @@ import {
   deleteRemoteEquipment,
   fetchRemoteTransactions,
   postRemoteTransaction,
+  updateRemoteTransaction,
   deleteRemoteTransaction,
   resetRemoteData,
   deleteAllFleetData,
@@ -286,6 +287,19 @@ export const AdminApp: React.FC = () => {
     } catch (err: unknown) {
       const msg = formatErrorMessage(err);
       showToast(`Failed to delete asset: ${msg}`, 'error');
+      throw err;
+    }
+  };
+
+  // Update Transaction Handler (reconciles generator power state automatically)
+  const handleUpdateTransaction = async (updatedTx: Transaction) => {
+    try {
+      await updateRemoteTransaction(updatedTx);
+      await loadFleetData(true, { equipment: true, transactions: true, devices: false });
+      showToast(`Transaction for "${updatedTx.equipmentId}" updated successfully!`, 'success');
+    } catch (err: unknown) {
+      const msg = formatErrorMessage(err);
+      showToast(`Failed to update transaction: ${msg}`, 'error');
       throw err;
     }
   };
@@ -599,13 +613,17 @@ export const AdminApp: React.FC = () => {
           />
         )}
 
-        {/* Transaction Detail Inspector Modal */}
+        {/* Transaction Edit / Delete Modal */}
         {inspectingTransaction && (
           <TransactionDetailModal
             transaction={inspectingTransaction}
             asset={assets.find((a) => a.equipmentId === inspectingTransaction.equipmentId)}
             isOpen={Boolean(inspectingTransaction)}
             onClose={() => setInspectingTransaction(null)}
+            onUpdateTransaction={async (updatedTx) => {
+              await handleUpdateTransaction(updatedTx);
+              setInspectingTransaction(null);
+            }}
             onDeleteTransaction={async (id) => {
               await handleDeleteTransaction(id);
               setInspectingTransaction(null);

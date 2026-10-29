@@ -161,6 +161,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   assets,
   selectedAssetId,
   onSelectAsset,
+  onInspectTransaction,
   onOpenEditModal,
   onOpenQRModal,
   onTogglePower,
@@ -668,12 +669,13 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     {renderSortIndicator('deviceId')}
                   </div>
                 </th>
-                <th style={{ cursor: 'pointer', userSelect: 'none', paddingRight: '20px' }} onClick={() => handleSort('syncStatus')}>
+                <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('syncStatus')}>
                   <div style={{ display: 'inline-flex', alignItems: 'center' }}>
                     <span>Sync to database</span>
                     {renderSortIndicator('syncStatus')}
                   </div>
                 </th>
+                <th style={{ textAlign: 'right', whiteSpace: 'nowrap', paddingRight: '20px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -759,7 +761,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                     </td>
 
                     {/* Sync Status */}
-                    <td style={{ paddingRight: '20px' }}>
+                    <td>
                       <span
                         style={{ display: 'inline-flex', alignItems: 'center', color: '#10b981' }}
                         title="Synced"
@@ -767,6 +769,27 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                       >
                         <CheckCircle2 size={15} />
                       </span>
+                    </td>
+
+                    {/* Edit Action Button */}
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', paddingRight: '20px' }}>
+                      <button
+                        type="button"
+                        onClick={() => onInspectTransaction?.(tx)}
+                        className="admin-btn admin-btn-outline admin-btn-sm"
+                        title="Edit or delete transaction"
+                        style={{
+                          padding: '4px 10px',
+                          fontWeight: 700,
+                          fontSize: '0.75rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}
+                      >
+                        <Edit size={13} />
+                        <span>EDIT</span>
+                      </button>
                     </td>
                   </tr>
                 );
