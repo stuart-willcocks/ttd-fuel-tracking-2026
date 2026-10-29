@@ -283,6 +283,16 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         .slice()
         .sort((a, b) => new Date(b.transactionTimestamp).getTime() - new Date(a.transactionTimestamp).getTime());
 
+      const latestCheckInOutTx = assetTxs.find((tx) => {
+        const t = (tx.transactionType || '').toString();
+        return t.includes('CheckIn') || t.includes('CheckOut');
+      });
+      const checkInStatus: 'checked_in' | 'checked_out' | 'none' = !latestCheckInOutTx
+        ? 'none'
+        : (latestCheckInOutTx.transactionType || '').toString().includes('CheckIn')
+          ? 'checked_in'
+          : 'checked_out';
+
       const recentTransactions: FleetMapTransactionItem[] = assetTxs.slice(0, 8).map((tx) => ({
         id: tx.id,
         timestamp: formatPdaTimestamp(tx.transactionTimestamp),
@@ -299,6 +309,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         capacity: asset.capacity,
         rentalSerialNumber: asset.rentalSerialNumber,
         isOn,
+        checkInStatus,
         txCount: txCounts[asset.equipmentId] || 0,
         recentTransactions,
         lat: coords.lat,

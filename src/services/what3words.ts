@@ -545,6 +545,7 @@ export interface FleetMapMarkerItem {
   capacity?: number;
   rentalSerialNumber: string;
   isOn?: boolean;
+  checkInStatus?: 'checked_in' | 'checked_out' | 'none';
   txCount?: number;
   recentTransactions?: FleetMapTransactionItem[];
   lat: number;
@@ -610,6 +611,15 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       transform: scale(1.14);
       box-shadow: 0 5px 14px rgba(0, 0, 0, 0.6);
       z-index: 10;
+    }
+    .eq-map-chk-dot {
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      border: 1.5px solid #FFFFFF;
     }
     .eq-map-pwr-dot {
       position: absolute;
@@ -945,6 +955,12 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
 
           var borderColor = item.type === 'GENERATOR' ? '#2563EB' : item.type === 'TANK' ? '#EA580C' : '#0D9488';
           var iconColor = '#EC721E';
+          var chkColor = item.checkInStatus === 'checked_in'
+            ? '#16A34A'
+            : item.checkInStatus === 'checked_out'
+              ? '#DC2626'
+              : '#94A3B8';
+          var chkDotHtml = '<span class="eq-map-chk-dot" style="background:' + chkColor + '"></span>';
           var pwrDotHtml = item.type === 'GENERATOR'
             ? '<span class="eq-map-pwr-dot" style="background:' + (item.isOn ? '#16A34A' : '#DC2626') + '"></span>'
             : '';
@@ -952,6 +968,7 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
           var html = '<div class="eq-map-marker">' +
             '<div class="eq-map-icon-box" style="border-color:' + borderColor + '">' +
               getEquipmentSvg(item.type, iconColor) +
+              chkDotHtml +
               pwrDotHtml +
             '</div>' +
             '<div class="eq-map-label">' + item.equipmentId + '</div>' +
