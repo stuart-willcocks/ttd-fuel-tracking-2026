@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Boxes, ReceiptText, Smartphone } from 'lucide-react';
+import type { Session } from '@supabase/supabase-js';
 import './admin.css';
 import { LaptopOnlyGuard } from './components/LaptopOnlyGuard';
+import { AdminLoginView } from './components/AdminLoginView';
 import { AdminTopNav, type AdminViewType } from './components/AdminTopNav';
 import { AssetsView } from './views/AssetsView';
 import { TransactionsView } from './views/TransactionsView';
@@ -31,11 +33,21 @@ import {
   updateRemoteDeviceStatus,
   deleteRemoteAuthorizedDevice,
 } from '../services/api';
-import { isSupabaseConfigured, subscribeToCloudChanges } from '../services/supabase';
+import {
+  isSupabaseConfigured,
+  subscribeToCloudChanges,
+  getAdminSession,
+  onAdminAuthStateChange,
+  signOutAdmin,
+} from '../services/supabase';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
 import { formatErrorMessage } from '../utils/errorMessage';
 
 export const AdminApp: React.FC = () => {
+  const [adminSession, setAdminSession] = useState<Session | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => isSupabaseConfigured());
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState<boolean>(false);
+
   const [currentView, setCurrentView] = useState<AdminViewType>('ASSETS');
   const [assets, setAssets] = useState<Equipment[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -128,8 +140,53 @@ export const AdminApp: React.FC = () => {
     [showToast]
   );
 
+  const isAuthenticated = !isSupabaseConfigured() || (Boolean(adminSession) && !isPasswordRecovery);
+
   useEffect(() => {
     document.body.classList.add('admin-body');
+    return () => {
+      document.body.classList.remove('admin-body');
+    };
+  }, []);
+
+  // Supabase Auth session check & listener for Admin Console
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setIsAuthChecking(false);
+      return;
+    }
+
+    let mounted = true;
+    getAdminSession()
+      .then((session) => {
+        if (mounted) {
+          setAdminSession(session);
+          setIsAuthChecking(false);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setIsAuthChecking(false);
+        }
+      });
+
+    const unsubscribe = onAdminAuthStateChange((event, session) => {
+      if (!mounted) return;
+      setAdminSession(session);
+      setIsAuthChecking(false);
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
     loadFleetData();
 
     // Low-frequency 5-minute safety fallback poll (Supabase Realtime handles instant updates)
@@ -140,14 +197,13 @@ export const AdminApp: React.FC = () => {
     }, 300000);
 
     return () => {
-      document.body.classList.remove('admin-body');
       clearInterval(interval);
     };
-  }, [loadFleetData, isCreateModalOpen, editingAsset, isRegisterDeviceModalOpen]);
+  }, [isAuthenticated, loadFleetData, isCreateModalOpen, editingAsset, isRegisterDeviceModalOpen]);
 
   // Real-time listener for database transactions, equipment, and telemetry logged by field PDAs
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
+    if (!isSupabaseConfigured() || !isAuthenticated) return;
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const pendingTables = {
@@ -183,7 +239,17 @@ export const AdminApp: React.FC = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       unsubscribe();
     };
-  }, [loadFleetData, isCreateModalOpen, editingAsset, isRegisterDeviceModalOpen]);
+  }, [isAuthenticated, loadFleetData, isCreateModalOpen, editingAsset, isRegisterDeviceModalOpen]);
+
+  const handleSignOut = async () => {
+    try {
+      await signOutAdmin();
+      setAdminSession(null);
+    } catch (err: unknown) {
+      const msg = formatErrorMessage(err);
+      showToast(`Sign out failed: ${msg}`, 'error');
+    }
+  };
 
   // Create / Update Asset Handler
   const handleSaveAsset = async (savedAsset: Equipment) => {
@@ -358,13 +424,39 @@ export const AdminApp: React.FC = () => {
 
   return (
     <LaptopOnlyGuard>
-      <div className="admin-shell">
-        {/* Full-Width Orange Top Navigation Menu */}
-        <AdminTopNav
-          isSupabaseOnline={isSupabaseOnline}
-          isRefreshing={isRefreshing}
-          onRefresh={() => loadFleetData()}
+      {isAuthChecking ? (
+        <div
+          style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#0F172A',
+            color: '#94A3B8',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+          }}
+        >
+          Verifying administrator session...
+        </div>
+      ) : isSupabaseConfigured() && (!adminSession || isPasswordRecovery) ? (
+        <AdminLoginView
+          isPasswordRecovery={isPasswordRecovery}
+          onPasswordRecoveryComplete={() => {
+            setIsPasswordRecovery(false);
+            showToast('Password updated successfully.', 'success');
+          }}
         />
+      ) : (
+        <div className="admin-shell">
+          {/* Full-Width Orange Top Navigation Menu */}
+          <AdminTopNav
+            isSupabaseOnline={isSupabaseOnline}
+            isRefreshing={isRefreshing}
+            onRefresh={() => loadFleetData()}
+            adminEmail={adminSession?.user?.email}
+            onSignOut={isSupabaseConfigured() ? handleSignOut : undefined}
+          />
 
         {/* Navigation Tabs Bar directly below top banner */}
         <div className="admin-nav-tabs-bar">
@@ -557,10 +649,11 @@ export const AdminApp: React.FC = () => {
             onBulkUpload={handleBulkUploadEquipment}
           />
         )}
-
-        {/* Toast Alerts */}
-        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       </div>
+      )}
+
+      {/* Toast Alerts */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </LaptopOnlyGuard>
   );
 };

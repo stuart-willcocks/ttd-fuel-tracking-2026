@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient, type Session, type AuthChangeEvent } from '@supabase/supabase-js';
 import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus, DeviceTelemetry } from '../types';
 import { generateSecureDeviceToken, getDeviceId, getDeviceName, getDeviceToken } from './device';
 import { APP_VERSION } from '../version';
@@ -1227,4 +1227,124 @@ export async function checkNativeTelemetryColumns(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Retrieves the currently active Supabase Auth session for the Admin Console.
+ */
+export async function getAdminSession(): Promise<Session | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+  try {
+    const { data, error } = await client.auth.getSession();
+    if (error) {
+      console.warn('[Supabase Auth] getSession error:', error.message);
+      return null;
+    }
+    return data.session;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Subscribes to Supabase Auth state changes (sign in, sign out, token refresh, password recovery).
+ */
+export function onAdminAuthStateChange(
+  callback: (event: AuthChangeEvent, session: Session | null) => void
+): () => void {
+  const client = getSupabaseClient();
+  if (!client) return () => {};
+  const { data } = client.auth.onAuthStateChange((event, session) => {
+    callback(event, session);
+  });
+  return () => {
+    data.subscription.unsubscribe();
+  };
+}
+
+/**
+ * Signs in an Admin Console user with email and password via Supabase Auth.
+ */
+export async function signInAdminWithPassword(email: string, password: string): Promise<Session> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase is not configured');
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Invalid login credentials');
+  }
+  if (!data.session) {
+    throw new Error('Authentication failed: no active session returned');
+  }
+  return data.session;
+}
+
+/**
+ * Signs out the currently authenticated Admin Console user.
+ */
+export async function signOutAdmin(): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) return;
+  const { error } = await client.auth.signOut();
+  if (error) {
+    throw new Error(error.message || 'Failed to sign out');
+  }
+}
+
+/**
+ * Sends a password reset email for an Admin Console user.
+ */
+export async function sendAdminPasswordResetEmail(email: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase is not configured');
+
+  const redirectTo =
+    typeof window !== 'undefined' ? `${window.location.origin}/admin` : undefined;
+
+  const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo,
+  });
+  if (error) {
+    throw new Error(error.message || 'Failed to send password reset email');
+  }
+}
+
+/**
+ * Updates the password for the currently authenticated Admin Console user (e.g. after password recovery).
+ */
+export async function updateAdminPassword(newPassword: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase is not configured');
+
+  const { error } = await client.auth.updateUser({
+    password: newPassword,
+  });
+  if (error) {
+    throw new Error(error.message || 'Failed to update password');
+  }
+}
+
+export const ADMIN_AUTH_RLS_SQL_MIGRATION = `-- TTD Fuel Tracking: Lock down Admin-only destructive operations to authenticated Admin users
+-- Paste and run in Supabase Dashboard -> SQL Editor
+
+-- 1. Equipment List: Allow read/upsert for enrolled PDAs & Admins, but restrict DELETE to authenticated Admins only
+DROP POLICY IF EXISTS "Allow upsert equipment for anon" ON public.equipment_list;
+DROP POLICY IF EXISTS "Allow insert equipment for all" ON public.equipment_list;
+DROP POLICY IF EXISTS "Allow update equipment for all" ON public.equipment_list;
+DROP POLICY IF EXISTS "Allow delete equipment for authenticated admins" ON public.equipment_list;
+
+CREATE POLICY "Allow insert equipment for all" ON public.equipment_list FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "Allow update equipment for all" ON public.equipment_list FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow delete equipment for authenticated admins" ON public.equipment_list FOR DELETE TO authenticated USING (true);
+
+-- 2. Authorized Devices: Restrict DELETE from whitelist to authenticated Admins only
+DROP POLICY IF EXISTS "Allow delete authorized_devices for anon" ON public.authorized_devices;
+DROP POLICY IF EXISTS "Allow delete authorized_devices for authenticated admins" ON public.authorized_devices;
+CREATE POLICY "Allow delete authorized_devices for authenticated admins" ON public.authorized_devices FOR DELETE TO authenticated USING (true);
+`;
+
 

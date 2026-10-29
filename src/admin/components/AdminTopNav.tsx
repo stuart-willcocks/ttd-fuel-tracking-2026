@@ -3,6 +3,7 @@ import {
   RefreshCw,
   Smartphone,
   ExternalLink,
+  LogOut,
 } from 'lucide-react';
 import { APP_VERSION, getIsStaging } from '../../version';
 import { checkRemoteAppVersion, performAppUpdate } from '../../services/appUpdate';
@@ -13,12 +14,16 @@ interface AdminTopNavProps {
   isSupabaseOnline: boolean;
   isRefreshing: boolean;
   onRefresh: () => void;
+  adminEmail?: string | null;
+  onSignOut?: () => void;
 }
 
 export const AdminTopNav: React.FC<AdminTopNavProps> = ({
   isSupabaseOnline,
   isRefreshing,
   onRefresh,
+  adminEmail,
+  onSignOut,
 }) => {
   const [hasNewVersion, setHasNewVersion] = useState(false);
   const [newVersionTag, setNewVersionTag] = useState<string | null>(null);
@@ -165,6 +170,19 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
           <span>LAUNCH PDA APP</span>
           <ExternalLink size={12} />
         </a>
+
+        {/* Signed-in Admin User & Sign Out */}
+        {onSignOut && (
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="admin-top-tool-btn"
+            title={adminEmail ? `Signed in as ${adminEmail} — Click to sign out` : 'Sign out of Admin Console'}
+          >
+            <LogOut size={14} />
+            <span>SIGN OUT</span>
+          </button>
+        )}
       </div>
     </header>
   );
