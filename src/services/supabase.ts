@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient, type Session, type AuthChangeEvent } from '@supabase/supabase-js';
 import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus, DeviceTelemetry } from '../types';
 import { generateSecureDeviceToken, getDeviceId, getDeviceName, getDeviceToken } from './device';
-import { APP_VERSION } from '../version';
+import { getReportedAppVersion } from '../version';
 import { db } from '../db/indexedDB';
 import { postRemoteTransaction } from './api';
 import {
@@ -816,7 +816,7 @@ export async function updateDeviceTelemetryInSupabase(
       ? parseDeviceNameAndVersion(localLabel, cleanId).cleanName
       : cleanId);
 
-  const runningVersion = telemetry.appVersion || APP_VERSION;
+  const runningVersion = getReportedAppVersion(telemetry.appVersion);
   const payload: Record<string, unknown> = {
     device_name: `${baseName}__VER__${runningVersion}`,
     last_seen_at: new Date().toISOString(),
@@ -948,16 +948,16 @@ export async function verifyDeviceTokenWithSupabase(
   knownDeviceNamesById.set(cleanId, cleanName);
 
   const isTokenMatch =
-    data.auth_token === cleanToken ||
-    cleanToken === 'approved_by_admin' ||
-    cleanToken === '';
+    Boolean(cleanToken) &&
+    (data.auth_token === cleanToken || cleanToken === 'approved_by_admin');
   const isActive = data.status === 'active' && isTokenMatch;
 
   if (isActive) {
     const now = Date.now();
     const lastWrite = lastSeenWriteByDevice.get(cleanId) || 0;
     const isAdminPortal = typeof window !== 'undefined' && window.location.pathname.includes('admin');
-    const versionMismatch = !isAdminPortal && storedVersion !== APP_VERSION;
+    const reportedVer = getReportedAppVersion();
+    const versionMismatch = !isAdminPortal && storedVersion !== reportedVer;
 
     if (versionMismatch || now - lastWrite >= 300000) {
       lastSeenWriteByDevice.set(cleanId, now);
@@ -965,7 +965,7 @@ export async function verifyDeviceTokenWithSupabase(
         last_seen_at: new Date(now).toISOString(),
       };
       if (!isAdminPortal) {
-        updateFields.device_name = `${cleanName}__VER__${APP_VERSION}`;
+        updateFields.device_name = `${cleanName}__VER__${reportedVer}`;
       }
       client
         .from('authorized_devices')
@@ -984,7 +984,8 @@ export async function verifyDeviceTokenWithSupabase(
 }
 
 /**
- * Submit a device registration request from a PDA
+ * Submit a device registration request from a PDA.
+ * Always places the device in 'pending' status awaiting explicit Admin Console approval.
  */
 export async function registerDeviceRequestToSupabase(
   deviceId: string,
@@ -997,30 +998,22 @@ export async function registerDeviceRequestToSupabase(
   const cleanId = deviceId.trim().toUpperCase();
   const token = authToken || generateSecureDeviceToken();
   const now = new Date().toISOString();
+  const rawName = (deviceName || cleanId).trim();
+  const { cleanName } = parseDeviceNameAndVersion(rawName, cleanId);
+  knownDeviceNamesById.set(cleanId, cleanName);
+  const storedName = `${cleanName}__VER__${getReportedAppVersion()}`;
 
-  // Check if device already exists
-  const { data: existing } = await client
-    .from('authorized_devices')
-    .select('*')
-    .eq('device_id', cleanId)
-    .maybeSingle();
-
-  if (existing) {
-    if (existing.status === 'active') {
-      return { status: 'active', token: existing.auth_token };
-    }
-    return { status: existing.status as DeviceStatus, token: existing.auth_token };
-  }
-
-  // Insert new pending device
-  const { error } = await client.from('authorized_devices').insert({
-    device_id: cleanId,
-    device_name: deviceName || cleanId,
-    auth_token: token,
-    status: 'pending',
-    registered_at: now,
-    last_seen_at: now,
-  });
+  const { error } = await client.from('authorized_devices').upsert(
+    {
+      device_id: cleanId,
+      device_name: storedName,
+      auth_token: token,
+      status: 'pending',
+      registered_at: now,
+      last_seen_at: now,
+    },
+    { onConflict: 'device_id' }
+  );
 
   if (error) throw error;
   return { status: 'pending', token };

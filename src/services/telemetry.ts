@@ -1,7 +1,7 @@
 import type { DeviceTelemetry } from '../types';
 import { isDeviceEnrolled, getDeviceId } from './device';
 import { updateRemoteDeviceTelemetry } from './api';
-import { APP_VERSION } from '../version';
+import { APP_VERSION, getReportedAppVersion } from '../version';
 
 // Cache of last transmitted telemetry to eliminate duplicate network calls
 let lastSentTelemetry: DeviceTelemetry | null = null;
@@ -223,7 +223,7 @@ export async function collectDeviceTelemetry(): Promise<DeviceTelemetry> {
     longitude: location ? location.longitude : null,
     locationAccuracy: location ? location.locationAccuracy : null,
     lastTelemetryAt: new Date().toISOString(),
-    appVersion: APP_VERSION,
+    appVersion: getReportedAppVersion(APP_VERSION),
   };
 }
 
@@ -236,7 +236,7 @@ export async function reportDeviceAppVersionImmediately(versionOverride?: string
   const deviceId = getDeviceId();
   if (!deviceId) return;
 
-  const targetVer = versionOverride || APP_VERSION;
+  const targetVer = getReportedAppVersion(versionOverride || APP_VERSION);
   try {
     const battery = await getBatteryStatus().catch(() => null);
     const snapshot: DeviceTelemetry = {
@@ -351,9 +351,10 @@ export function startTelemetryMonitoring(): () => void {
 
   // If the app version changed (e.g. after an app update), report the new version immediately without waiting on GPS
   try {
+    const reportedVer = getReportedAppVersion(APP_VERSION);
     const lastVer = localStorage.getItem('ttd_last_reported_app_version');
-    if (lastVer !== APP_VERSION) {
-      reportDeviceAppVersionImmediately(APP_VERSION);
+    if (lastVer !== reportedVer) {
+      reportDeviceAppVersionImmediately(reportedVer);
     }
   } catch {}
 

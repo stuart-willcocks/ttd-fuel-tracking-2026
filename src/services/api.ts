@@ -290,9 +290,8 @@ export async function verifyRemoteDeviceToken(
     return { valid: false, status: 'revoked' };
   }
   const match =
-    target.authToken === cleanToken ||
-    cleanToken === 'approved_by_admin' ||
-    cleanToken === '';
+    Boolean(cleanToken) &&
+    (target.authToken === cleanToken || cleanToken === 'approved_by_admin');
   if (match && target.status === 'active') {
     target.lastSeenAt = new Date().toISOString();
     saveMockDevices(current);
@@ -319,12 +318,17 @@ export async function registerRemoteDeviceRequest(
   }
   const current = getMockDevices();
   const cleanId = deviceId.trim().toUpperCase();
-  const existing = current.find((d) => d.deviceId === cleanId);
-  if (existing) {
-    return { status: existing.status, token: existing.authToken };
-  }
   const finalToken = token || generateSecureDeviceToken();
   const now = new Date().toISOString();
+  const existing = current.find((d) => d.deviceId === cleanId);
+  if (existing) {
+    existing.deviceName = deviceName || cleanId;
+    existing.authToken = finalToken;
+    existing.status = 'pending';
+    existing.lastSeenAt = now;
+    saveMockDevices(current);
+    return { status: 'pending', token: finalToken };
+  }
   current.unshift({
     deviceId: cleanId,
     deviceName: deviceName || cleanId,

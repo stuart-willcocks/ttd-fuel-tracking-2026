@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
   Smartphone,
-  Plus,
-  QrCode,
   ShieldCheck,
   ShieldAlert,
   Clock,
@@ -24,7 +22,6 @@ import { TELEMETRY_SQL_MIGRATION, checkNativeTelemetryColumns } from '../../serv
 
 interface DevicesViewProps {
   devices: AuthorizedDevice[];
-  onOpenRegisterModal: (device?: AuthorizedDevice) => void;
   onUpdateStatus: (deviceId: string, status: DeviceStatus) => Promise<void>;
   onDeleteDevice: (deviceId: string) => Promise<void>;
   onRefresh: () => void;
@@ -33,7 +30,6 @@ interface DevicesViewProps {
 
 export const DevicesView: React.FC<DevicesViewProps> = ({
   devices,
-  onOpenRegisterModal,
   onUpdateStatus,
   onDeleteDevice,
   onRefresh,
@@ -306,15 +302,6 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             <RefreshCw size={14} className={isRefreshing ? 'admin-spin' : ''} />
             <span>Refresh</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => onOpenRegisterModal()}
-            className="admin-btn admin-btn-primary"
-          >
-            <Plus size={16} />
-            <span>Register New PDA</span>
-          </button>
         </div>
       </div>
 
@@ -469,21 +456,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--adm-text-primary)' }}>
               No PDA devices found
             </div>
-            <p style={{ fontSize: '0.84rem', margin: '4px 0 16px 0' }}>
+            <p style={{ fontSize: '0.84rem', margin: '4px 0 0 0' }}>
               {devices.length === 0
-                ? 'No handheld scanners have been registered yet. Click "Register New PDA" to authorize your first Zebra scanner.'
+                ? 'No handheld scanners have requested registration yet. Submit a registration request from a PDA to approve it here.'
                 : 'No devices match your filter criteria.'}
             </p>
-            {devices.length === 0 && (
-              <button
-                type="button"
-                onClick={() => onOpenRegisterModal()}
-                className="admin-btn admin-btn-primary"
-              >
-                <Plus size={15} />
-                <span>Register First Zebra PDA</span>
-              </button>
-            )}
           </div>
         ) : (
           <table className="admin-table">
@@ -616,18 +593,6 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
-                        {/* Show QR Code */}
-                        <button
-                          type="button"
-                          onClick={() => onOpenRegisterModal(dev)}
-                          className="admin-btn admin-btn-outline admin-btn-sm"
-                          title="Show Enrollment QR Code for Zebra scanner pairing"
-                          style={{ padding: '5px 8px' }}
-                        >
-                          <QrCode size={14} />
-                          <span style={{ fontSize: '0.76rem' }}>QR</span>
-                        </button>
-
                         {/* Approve Button (if pending) */}
                         {isPending && (
                           <button

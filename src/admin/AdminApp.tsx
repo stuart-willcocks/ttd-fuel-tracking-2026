@@ -14,7 +14,6 @@ import { DeleteAssetModal } from './components/DeleteAssetModal';
 import { AssetQRLabelModal } from './components/AssetQRLabelModal';
 import { TransactionDetailModal } from './components/TransactionDetailModal';
 import { DangerZoneModal } from './components/DangerZoneModal';
-import { RegisterDeviceModal } from './components/RegisterDeviceModal';
 import { ToastContainer, type ToastMessage } from './components/Toast';
 
 import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus } from '../types';
@@ -29,7 +28,6 @@ import {
   deleteAllFleetData,
   bulkUploadEquipment,
   fetchRemoteAuthorizedDevices,
-  postRemoteAuthorizedDevice,
   updateRemoteDeviceStatus,
   deleteRemoteAuthorizedDevice,
 } from '../services/api';
@@ -67,8 +65,6 @@ export const AdminApp: React.FC = () => {
   const [qrAsset, setQrAsset] = useState<Equipment | null>(null);
   const [inspectingTransaction, setInspectingTransaction] = useState<Transaction | null>(null);
   const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
-  const [isRegisterDeviceModalOpen, setIsRegisterDeviceModalOpen] = useState(false);
-  const [registeringDevice, setRegisteringDevice] = useState<AuthorizedDevice | null>(null);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -196,14 +192,14 @@ export const AdminApp: React.FC = () => {
     // Deep 60-minute safety fallback poll (Supabase Realtime + reconnect handler handle instant updates)
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
-      if (isCreateModalOpen || Boolean(editingAsset) || isRegisterDeviceModalOpen) return;
+      if (isCreateModalOpen || Boolean(editingAsset)) return;
       loadFleetData(true);
     }, 3600000);
 
     return () => {
       clearInterval(interval);
     };
-  }, [isAuthenticated, loadFleetData, isCreateModalOpen, editingAsset, isRegisterDeviceModalOpen]);
+  }, [isAuthenticated, loadFleetData, isCreateModalOpen, editingAsset]);
 
   // Real-time listener for database transactions, equipment, and telemetry logged by field PDAs
   useEffect(() => {
@@ -219,7 +215,7 @@ export const AdminApp: React.FC = () => {
     const unsubscribe = subscribeToCloudChanges(
       (table, eventType) => {
         // Avoid clobbering user input when an asset creation or edit modal is active
-        if (isCreateModalOpen || Boolean(editingAsset) || isRegisterDeviceModalOpen) return;
+        if (isCreateModalOpen || Boolean(editingAsset)) return;
 
         if (table === 'equipment_list') pendingTables.equipment = true;
         if (table === 'transactions') pendingTables.transactions = true;
@@ -241,7 +237,7 @@ export const AdminApp: React.FC = () => {
       },
       () => {
         // Automatically refresh if Realtime WebSocket disconnected and reconnected
-        if (isCreateModalOpen || Boolean(editingAsset) || isRegisterDeviceModalOpen) return;
+        if (isCreateModalOpen || Boolean(editingAsset)) return;
         loadFleetData(true);
       }
     );
@@ -250,7 +246,7 @@ export const AdminApp: React.FC = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       unsubscribe();
     };
-  }, [isAuthenticated, loadFleetData, isCreateModalOpen, editingAsset, isRegisterDeviceModalOpen]);
+  }, [isAuthenticated, loadFleetData, isCreateModalOpen, editingAsset]);
 
   const handleSignOut = async () => {
     try {
@@ -351,18 +347,6 @@ export const AdminApp: React.FC = () => {
   };
 
   // Device Handlers
-  const handleSaveDevice = async (device: AuthorizedDevice) => {
-    try {
-      await postRemoteAuthorizedDevice(device);
-      await loadFleetData(true, { equipment: false, transactions: false, devices: true });
-      showToast(`Device "${device.deviceId}" authorized successfully!`, 'success');
-    } catch (err: unknown) {
-      const msg = formatErrorMessage(err);
-      showToast(`Failed to save device: ${msg}`, 'error');
-      throw err;
-    }
-  };
-
   const handleUpdateDeviceStatus = async (deviceId: string, status: DeviceStatus) => {
     try {
       await updateRemoteDeviceStatus(deviceId, status);
@@ -556,10 +540,6 @@ export const AdminApp: React.FC = () => {
             {currentView === 'DEVICES' && (
               <DevicesView
                 devices={devices}
-                onOpenRegisterModal={(dev) => {
-                  setRegisteringDevice(dev || null);
-                  setIsRegisterDeviceModalOpen(true);
-                }}
                 onUpdateStatus={handleUpdateDeviceStatus}
                 onDeleteDevice={handleDeleteDevice}
                 onRefresh={() => loadFleetData()}
@@ -636,19 +616,6 @@ export const AdminApp: React.FC = () => {
               setInspectingTransaction(null);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-          />
-        )}
-
-        {/* Device Registration & QR Code Modal */}
-        {isRegisterDeviceModalOpen && (
-          <RegisterDeviceModal
-            isOpen={isRegisterDeviceModalOpen}
-            existingDevice={registeringDevice}
-            onClose={() => {
-              setIsRegisterDeviceModalOpen(false);
-              setRegisteringDevice(null);
-            }}
-            onSaveDevice={handleSaveDevice}
           />
         )}
 

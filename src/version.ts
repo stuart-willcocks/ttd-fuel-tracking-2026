@@ -1,7 +1,7 @@
 // Auto-generated build version - DO NOT EDIT MANUALLY
-export const APP_VERSION = '156';
-export const BUILD_NUMBER = 156;
-export const BUILD_TIME = '2026-10-29 20:02';
+export const APP_VERSION = '157';
+export const BUILD_NUMBER = 157;
+export const BUILD_TIME = '2026-10-29 20:18';
 export const GIT_BRANCH = 'staging';
 export const IS_STAGING = true;
 
@@ -16,4 +16,9 @@ export function getIsStaging(): boolean {
     }
   }
   return IS_STAGING;
+}
+
+export function getReportedAppVersion(versionOverride?: string | null): string {
+  const base = String(versionOverride || APP_VERSION).trim().replace(/\s*\(staging\)\s*$/i, '');
+  return getIsStaging() ? `${base} (staging)` : base;
 }

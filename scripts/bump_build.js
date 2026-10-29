@@ -72,6 +72,11 @@ export function getIsStaging(): boolean {
   }
   return IS_STAGING;
 }
+
+export function getReportedAppVersion(versionOverride?: string | null): string {
+  const base = String(versionOverride || APP_VERSION).trim().replace(/\\s*\\(staging\\)\\s*$/i, '');
+  return getIsStaging() ? \`\${base} (staging)\` : base;
+}
 `;
 fs.writeFileSync(versionTsPath, tsContent, 'utf-8');
 
