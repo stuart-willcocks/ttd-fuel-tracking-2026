@@ -1017,6 +1017,8 @@ export function getFleetSatelliteMapSrcDoc(
 
       var boundsPoints = [];
       var markersById = {};
+      var pinnedById = {};
+      var suppressedHoverById = {};
       var hasFittedOnce = hasValidSavedView;
       var isViewTrackingReady = hasValidSavedView;
 
@@ -1200,17 +1202,6 @@ export function getFleetSatelliteMapSrcDoc(
             txRowsHtml +
           '</div>';
 
-          var popupHtml = '<div>' +
-            '<div class="popup-id">' + item.equipmentId + '</div>' +
-            '<div class="popup-meta"><strong>' + item.type + '</strong> • ' + capStr + (item.type === 'GENERATOR' ? (' • ' + (item.isOn ? '<span style="color:#16A34A;font-weight:700">ON</span>' : '<span style="color:#64748B;font-weight:700">OFF</span>')) : '') + '</div>' +
-            '<div class="popup-meta">' + item.area + ' • ' + item.location + '</div>' +
-            '<div class="popup-w3w">' + item.what3words + '</div>' +
-            '<div class="popup-actions">' +
-              '<button type="button" class="popup-btn popup-btn-primary" onclick="window.parent.postMessage({type:\\'TTD_MAP_SELECT_ASSET\\',equipmentId:\\'' + item.equipmentId + '\\'}, \\'*\\')">Transactions (' + (item.txCount || 0) + ')</button>' +
-              '<button type="button" class="popup-btn" onclick="window.parent.postMessage({type:\\'TTD_MAP_EDIT_ASSET\\',equipmentId:\\'' + item.equipmentId + '\\'}, \\'*\\')">Edit</button>' +
-            '</div>' +
-          '</div>';
-
           var existing = markersById[item.equipmentId];
           if (existing) {
             var oldLatLng = existing.getLatLng();
@@ -1219,8 +1210,11 @@ export function getFleetSatelliteMapSrcDoc(
             }
             existing.setIcon(divIcon);
             existing.setTooltipContent(balloonHtml);
-            existing.setPopupContent(popupHtml);
+            if (pinnedById[item.equipmentId]) {
+              existing.openTooltip();
+            }
           } else {
+            var eqId = item.equipmentId;
             var marker = L.marker(pt, { icon: divIcon }).addTo(map);
             marker.bindTooltip(balloonHtml, {
               direction: 'top',
@@ -1228,11 +1222,34 @@ export function getFleetSatelliteMapSrcDoc(
               opacity: 1,
               className: 'eq-tx-balloon'
             });
-            marker.bindPopup(popupHtml, { offset: [0, -14] });
-            marker.on('popupopen', function() {
-              marker.closeTooltip();
+            marker.off('mouseover');
+            marker.off('mouseout');
+            marker.on('mouseover', function() {
+              if (!suppressedHoverById[eqId]) {
+                marker.openTooltip();
+              }
             });
-            markersById[item.equipmentId] = marker;
+            marker.on('mouseout', function() {
+              suppressedHoverById[eqId] = false;
+              if (!pinnedById[eqId]) {
+                marker.closeTooltip();
+              }
+            });
+            marker.on('click', function(ev) {
+              if (ev && ev.originalEvent) {
+                ev.originalEvent.stopPropagation();
+              }
+              if (pinnedById[eqId]) {
+                pinnedById[eqId] = false;
+                suppressedHoverById[eqId] = true;
+                marker.closeTooltip();
+              } else {
+                pinnedById[eqId] = true;
+                suppressedHoverById[eqId] = false;
+                marker.openTooltip();
+              }
+            });
+            markersById[eqId] = marker;
           }
         });
 
@@ -1240,6 +1257,8 @@ export function getFleetSatelliteMapSrcDoc(
           if (!seenIds[eqId]) {
             map.removeLayer(markersById[eqId]);
             delete markersById[eqId];
+            delete pinnedById[eqId];
+            delete suppressedHoverById[eqId];
           }
         });
 
