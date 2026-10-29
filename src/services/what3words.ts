@@ -612,18 +612,23 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       box-shadow: 0 5px 14px rgba(0, 0, 0, 0.6);
       z-index: 10;
     }
-    .eq-map-status-sq {
+    .eq-map-status-cluster {
       position: absolute;
       top: -3px;
-      left: -3px;
-      width: 11px;
-      height: 11px;
+      left: -4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 1px;
+      z-index: 2;
+    }
+    .eq-map-status-sq {
+      width: 9px;
+      height: 9px;
       border-radius: 2px;
       border: 1.5px solid #FFFFFF;
       box-sizing: border-box;
-      overflow: hidden;
       display: block;
-      z-index: 2;
+      flex-shrink: 0;
     }
     .eq-map-label {
       margin-top: 2px;
@@ -953,11 +958,13 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
           var chkColor = item.checkInStatus === 'checked_in' ? '#16A34A' : '#DC2626';
           var pwrColor = item.isOn ? '#16A34A' : '#DC2626';
           var statusSqHtml = item.type === 'GENERATOR'
-            ? '<svg class="eq-map-status-sq" viewBox="0 0 10 10" width="11" height="11">' +
-                '<rect x="0" y="0" width="10" height="10" fill="' + pwrColor + '"/>' +
-                '<polygon points="0,0 10,0 0,10" fill="' + chkColor + '"/>' +
-              '</svg>'
-            : '<span class="eq-map-status-sq" style="background:' + chkColor + '"></span>';
+            ? '<span class="eq-map-status-cluster">' +
+                '<span class="eq-map-status-sq" style="background:' + chkColor + '"></span>' +
+                '<span class="eq-map-status-sq" style="background:' + pwrColor + '"></span>' +
+              '</span>'
+            : '<span class="eq-map-status-cluster">' +
+                '<span class="eq-map-status-sq" style="background:' + chkColor + '"></span>' +
+              '</span>';
 
           var html = '<div class="eq-map-marker">' +
             '<div class="eq-map-icon-box" style="background:' + bgColor + '">' +
