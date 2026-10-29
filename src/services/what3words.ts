@@ -946,7 +946,7 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
           var borderColor = item.type === 'GENERATOR' ? '#2563EB' : item.type === 'TANK' ? '#EA580C' : '#0D9488';
           var iconColor = '#EC721E';
           var pwrDotHtml = item.type === 'GENERATOR'
-            ? '<span class="eq-map-pwr-dot" style="background:' + (item.isOn ? '#16A34A' : '#94A3B8') + '"></span>'
+            ? '<span class="eq-map-pwr-dot" style="background:' + (item.isOn ? '#16A34A' : '#DC2626') + '"></span>'
             : '';
 
           var html = '<div class="eq-map-marker">' +
