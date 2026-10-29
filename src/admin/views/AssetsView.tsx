@@ -25,6 +25,8 @@ import {
   isValidWhat3WordsFormat,
   normalizeWhat3Words,
   getFleetSatelliteMapSrcDoc,
+  getSavedFleetMapView,
+  saveFleetMapView,
   type FleetMapMarkerItem,
   type FleetMapTransactionItem,
 } from '../../services/what3words';
@@ -42,6 +44,8 @@ interface AssetsViewProps {
 
 type FilterType = 'ALL' | 'GENERATOR' | 'TANK' | 'PLANT' | 'RUNNING' | 'STANDBY';
 
+let rememberedAssetsViewMode: 'TABLE' | 'MAP' = 'TABLE';
+
 export const AssetsView: React.FC<AssetsViewProps> = ({
   assets,
   transactions,
@@ -53,10 +57,17 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
-  const [viewMode, setViewMode] = useState<'TABLE' | 'MAP'>('TABLE');
+  const [viewMode, setViewModeState] = useState<'TABLE' | 'MAP'>(() => rememberedAssetsViewMode);
+  const setViewMode = (nextMode: 'TABLE' | 'MAP') => {
+    rememberedAssetsViewMode = nextMode;
+    setViewModeState(nextMode);
+  };
   const [coordResolveTick, setCoordResolveTick] = useState(0);
   const mapIframeRef = useRef<HTMLIFrameElement | null>(null);
-  const staticMapSrcDoc = useMemo(() => getFleetSatelliteMapSrcDoc([]), []);
+  const staticMapSrcDoc = useMemo(
+    () => (viewMode === 'MAP' ? getFleetSatelliteMapSrcDoc([], getSavedFleetMapView()) : ''),
+    [viewMode]
+  );
 
   // Transaction counts per asset
   const txCounts = useMemo(() => {
@@ -186,6 +197,17 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       } else if (e.data.type === 'TTD_MAP_EDIT_ASSET' && typeof e.data.equipmentId === 'string') {
         const found = assets.find((a) => a.equipmentId === e.data.equipmentId);
         if (found) onOpenEditModal(found);
+      } else if (
+        e.data.type === 'TTD_MAP_VIEW_CHANGED' &&
+        typeof e.data.lat === 'number' &&
+        typeof e.data.lng === 'number' &&
+        typeof e.data.zoom === 'number'
+      ) {
+        saveFleetMapView({
+          lat: e.data.lat,
+          lng: e.data.lng,
+          zoom: e.data.zoom,
+        });
       }
     };
     window.addEventListener('message', handleMessage);

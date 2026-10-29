@@ -552,13 +552,71 @@ export interface FleetMapMarkerItem {
   lng: number;
 }
 
+export interface FleetMapViewState {
+  lat: number;
+  lng: number;
+  zoom: number;
+}
+
+const FLEET_MAP_VIEW_STORAGE_KEY = 'ttd_admin_fleet_map_view_v1';
+let lastFleetMapView: FleetMapViewState | null = null;
+
+export function getSavedFleetMapView(): FleetMapViewState | null {
+  if (lastFleetMapView) return lastFleetMapView;
+  try {
+    const raw = localStorage.getItem(FLEET_MAP_VIEW_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (
+        parsed &&
+        typeof parsed.lat === 'number' &&
+        !Number.isNaN(parsed.lat) &&
+        typeof parsed.lng === 'number' &&
+        !Number.isNaN(parsed.lng) &&
+        typeof parsed.zoom === 'number' &&
+        !Number.isNaN(parsed.zoom)
+      ) {
+        lastFleetMapView = { lat: parsed.lat, lng: parsed.lng, zoom: parsed.zoom };
+        return lastFleetMapView;
+      }
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return null;
+}
+
+export function saveFleetMapView(view: FleetMapViewState): void {
+  if (
+    typeof view?.lat !== 'number' ||
+    Number.isNaN(view.lat) ||
+    typeof view?.lng !== 'number' ||
+    Number.isNaN(view.lng) ||
+    typeof view?.zoom !== 'number' ||
+    Number.isNaN(view.zoom)
+  ) {
+    return;
+  }
+  lastFleetMapView = { lat: view.lat, lng: view.lng, zoom: view.zoom };
+  try {
+    localStorage.setItem(FLEET_MAP_VIEW_STORAGE_KEY, JSON.stringify(lastFleetMapView));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 /**
  * Generates a self-contained HTML document (`srcDoc`) for the Admin Console Fleet Satellite Map View.
  * Renders pure Google Satellite imagery (`lyrs=s`, zero POI clutter) with an Equipment Type Icon
  * at the resolved location for each equipment ID.
  */
-export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): string {
+export function getFleetSatelliteMapSrcDoc(
+  markers: FleetMapMarkerItem[],
+  initialView?: FleetMapViewState | null
+): string {
   const markersJson = JSON.stringify(markers).replace(/</g, '\\u003c');
+  const resolvedView = initialView !== undefined ? initialView : getSavedFleetMapView();
+  const savedViewJson = JSON.stringify(resolvedView || null).replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -858,10 +916,33 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
   <script>
     (function() {
       var items = ${markersJson};
+      var savedView = ${savedViewJson};
+      if (!savedView) {
+        try {
+          var rawView = window.localStorage && window.localStorage.getItem('${FLEET_MAP_VIEW_STORAGE_KEY}');
+          if (rawView) {
+            var parsedView = JSON.parse(rawView);
+            if (parsedView && typeof parsedView.lat === 'number' && typeof parsedView.lng === 'number' && typeof parsedView.zoom === 'number') {
+              savedView = parsedView;
+            }
+          }
+        } catch (e) {}
+      }
+
+      var hasValidSavedView = Boolean(
+        savedView &&
+        typeof savedView.lat === 'number' && !isNaN(savedView.lat) &&
+        typeof savedView.lng === 'number' && !isNaN(savedView.lng) &&
+        typeof savedView.zoom === 'number' && !isNaN(savedView.zoom)
+      );
+
       var defaultCenter = [52.0733, -1.0147];
+      var initialCenter = hasValidSavedView ? [savedView.lat, savedView.lng] : defaultCenter;
+      var initialZoom = hasValidSavedView ? savedView.zoom : 16;
+
       var map = L.map('map', {
-        center: defaultCenter,
-        zoom: 16,
+        center: initialCenter,
+        zoom: initialZoom,
         maxZoom: 21,
         minZoom: 3,
         zoomControl: true
@@ -936,7 +1017,38 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
 
       var boundsPoints = [];
       var markersById = {};
-      var hasFittedOnce = false;
+      var hasFittedOnce = hasValidSavedView;
+      var isViewTrackingReady = hasValidSavedView;
+
+      function emitCurrentMapView() {
+        if (!isViewTrackingReady) return;
+        var c = map.getCenter();
+        var z = map.getZoom();
+        if (!c || typeof c.lat !== 'number' || typeof c.lng !== 'number' || typeof z !== 'number') return;
+        var payload = { lat: c.lat, lng: c.lng, zoom: z };
+        try {
+          if (window.localStorage) {
+            window.localStorage.setItem('${FLEET_MAP_VIEW_STORAGE_KEY}', JSON.stringify(payload));
+          }
+        } catch (e) {}
+        try {
+          window.parent.postMessage({
+            type: 'TTD_MAP_VIEW_CHANGED',
+            lat: c.lat,
+            lng: c.lng,
+            zoom: z
+          }, '*');
+        } catch (e) {}
+      }
+
+      map.on('dragstart zoomstart', function() {
+        hasFittedOnce = true;
+        isViewTrackingReady = true;
+      });
+
+      map.on('moveend zoomend', function() {
+        emitCurrentMapView();
+      });
 
       function spreadOverlappingItems(rawList) {
         var groups = {};
@@ -1129,7 +1241,9 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
 
         if (!hasFittedOnce && boundsPoints.length > 0) {
           hasFittedOnce = true;
+          isViewTrackingReady = true;
           fitAll();
+          emitCurrentMapView();
         }
       }
 
@@ -1143,7 +1257,10 @@ export function getFleetSatelliteMapSrcDoc(markers: FleetMapMarkerItem[]): strin
       });
 
       document.getElementById('fitBoundsBtn').addEventListener('click', function() {
+        hasFittedOnce = true;
+        isViewTrackingReady = true;
         fitAll();
+        emitCurrentMapView();
       });
     })();
   </script>
