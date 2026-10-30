@@ -12,13 +12,14 @@ import {
   BatteryWarning,
   ExternalLink,
   Zap,
+  X,
 } from 'lucide-react';
 import type { AuthorizedDevice, DeviceStatus } from '../../types';
 import { TELEMETRY_SQL_MIGRATION, checkNativeTelemetryColumns } from '../../services/supabase';
 
 interface DevicesViewProps {
   devices: AuthorizedDevice[];
-  onUpdateStatus: (deviceId: string, status: DeviceStatus) => Promise<void>;
+  onUpdateStatus: (deviceId: string, status: DeviceStatus, assignedDeviceId?: string) => Promise<void>;
   onDeleteDevice: (deviceId: string) => Promise<void>;
   onRefresh: () => void;
   isRefreshing: boolean;
@@ -36,6 +37,10 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const [hasNativeTelemetryColumns, setHasNativeTelemetryColumns] = useState<boolean | null>(null);
   const [showSqlDetails, setShowSqlDetails] = useState(false);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const [approvingDevice, setApprovingDevice] = useState<AuthorizedDevice | null>(null);
+  const [persistentIdInput, setPersistentIdInput] = useState('');
+  const [approveError, setApproveError] = useState<string | null>(null);
+  const [isApproving, setIsApproving] = useState(false);
 
   React.useEffect(() => {
     setNowMs(Date.now());
@@ -240,8 +245,45 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     );
   };
 
-  const handleApprove = async (dev: AuthorizedDevice) => {
-    await onUpdateStatus(dev.deviceId, 'active');
+  const handleOpenApproveModal = (dev: AuthorizedDevice) => {
+    setApprovingDevice(dev);
+    setPersistentIdInput('');
+    setApproveError(null);
+  };
+
+  const handleConfirmApprove = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!approvingDevice) return;
+
+    const assignedId = persistentIdInput.trim().toUpperCase();
+    if (!assignedId) {
+      setApproveError('Please enter a persistent Device ID (e.g., TTD-PDA-01).');
+      return;
+    }
+
+    const collision = devices.find(
+      (d) =>
+        d.deviceId.toUpperCase() === assignedId &&
+        d.deviceId.toUpperCase() !== approvingDevice.deviceId.toUpperCase() &&
+        d.status === 'active'
+    );
+    if (collision) {
+      setApproveError(`Device ID "${assignedId}" is already assigned to an authorized device.`);
+      return;
+    }
+
+    setApproveError(null);
+    setIsApproving(true);
+    try {
+      await onUpdateStatus(approvingDevice.deviceId, 'active', assignedId);
+      setApprovingDevice(null);
+      setPersistentIdInput('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setApproveError(msg);
+    } finally {
+      setIsApproving(false);
+    }
   };
 
   const handleDelete = async (dev: AuthorizedDevice) => {
@@ -517,9 +559,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                       {isPending && (
                         <button
                           type="button"
-                          onClick={() => handleApprove(dev)}
+                          onClick={() => handleOpenApproveModal(dev)}
                           className="admin-btn admin-btn-success admin-btn-sm"
-                          title="Approve this device for live fuel tracking"
+                          title="Assign persistent Device ID and authorize this device"
                           style={{ padding: '5px 10px' }}
                         >
                           <CheckCircle2 size={14} />
@@ -577,6 +619,187 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           </table>
         )}
       </div>
+
+      {/* Authorize Device & Assign Persistent ID Modal */}
+      {approvingDevice && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+          onClick={() => {
+            if (!isApproving) setApprovingDevice(null);
+          }}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '440px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+              border: '1px solid var(--adm-border-subtle)',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--adm-border-subtle)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle2 size={18} color="#16A34A" />
+                <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--adm-text-primary)' }}>
+                  Authorize Device
+                </h2>
+              </div>
+              <button
+                type="button"
+                disabled={isApproving}
+                onClick={() => setApprovingDevice(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--adm-text-muted)',
+                  padding: '4px',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmApprove} style={{ padding: '20px' }}>
+              <div style={{ marginBottom: '14px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    color: 'var(--adm-text-secondary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Temporary Request ID
+                </label>
+                <input
+                  type="text"
+                  value={approvingDevice.deviceId}
+                  readOnly
+                  disabled
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    background: 'var(--adm-surface-2, #F8FAFC)',
+                    border: '1px solid var(--adm-border-subtle)',
+                    borderRadius: '6px',
+                    color: 'var(--adm-text-secondary)',
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    color: 'var(--adm-text-primary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Persistent Device ID *
+                </label>
+                <input
+                  type="text"
+                  value={persistentIdInput}
+                  onChange={(e) => {
+                    setPersistentIdInput(e.target.value.toUpperCase());
+                    if (approveError) setApproveError(null);
+                  }}
+                  placeholder="e.g. TTD-PDA-01"
+                  autoFocus
+                  required
+                  disabled={isApproving}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    background: '#FFFFFF',
+                    border: '1px solid var(--adm-border-medium, #CBD5E1)',
+                    borderRadius: '6px',
+                    color: 'var(--adm-text-primary)',
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.76rem', color: 'var(--adm-text-secondary)' }}>
+                  This persistent ID will be saved in the Admin Console and automatically written back to the PDA.
+                </p>
+              </div>
+
+              {approveError && (
+                <div
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    color: '#DC2626',
+                    padding: '9px 12px',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    marginBottom: '16px',
+                  }}
+                >
+                  {approveError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  disabled={isApproving}
+                  onClick={() => setApprovingDevice(null)}
+                  className="admin-btn admin-btn-outline"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isApproving || !persistentIdInput.trim()}
+                  className="admin-btn admin-btn-success"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <CheckCircle2 size={15} />
+                  <span>{isApproving ? 'Authorizing...' : 'Assign ID & Authorize'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

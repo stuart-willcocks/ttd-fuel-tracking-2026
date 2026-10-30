@@ -275,17 +275,29 @@ export async function postRemoteAuthorizedDevice(device: AuthorizedDevice): Prom
   saveMockDevices(current);
 }
 
-export async function updateRemoteDeviceStatus(deviceId: string, status: DeviceStatus): Promise<void> {
+export async function updateRemoteDeviceStatus(
+  deviceId: string,
+  status: DeviceStatus,
+  assignedDeviceId?: string
+): Promise<void> {
   const cleanId = deviceId.trim().toUpperCase();
+  const cleanAssignedId = assignedDeviceId?.trim().toUpperCase();
   // Broadcast immediately to any active tabs/listeners
-  broadcastDeviceAuthEvent({ type: 'STATUS_CHANGED', deviceId: cleanId, status });
+  broadcastDeviceAuthEvent({
+    type: 'STATUS_CHANGED',
+    deviceId: cleanAssignedId || cleanId,
+    status,
+  });
 
   if (isSupabaseConfigured()) {
-    await updateDeviceStatusInSupabase(cleanId, status);
+    await updateDeviceStatusInSupabase(cleanId, status, cleanAssignedId);
   }
   const current = getMockDevices();
   const target = current.find((d) => d.deviceId.toUpperCase() === cleanId);
   if (target) {
+    if (cleanAssignedId && cleanAssignedId !== cleanId) {
+      target.deviceId = cleanAssignedId;
+    }
     target.status = status;
     target.lastSeenAt = new Date().toISOString();
     saveMockDevices(current);
@@ -306,19 +318,23 @@ export async function deleteRemoteAuthorizedDevice(deviceId: string): Promise<vo
 
 export async function verifyRemoteDeviceToken(
   deviceId: string,
-  token: string
-): Promise<{ valid: boolean; status: DeviceStatus; authToken?: string }> {
+  token: string,
+  forceRefresh = false
+): Promise<{ valid: boolean; status: DeviceStatus; deviceId?: string; authToken?: string }> {
   const cleanId = deviceId.trim().toUpperCase();
   const cleanToken = token.trim();
 
   if (isSupabaseConfigured()) {
     // When Supabase is configured, Supabase is the authoritative source!
     // Do NOT fall back to local mock devices, which would mask revocations.
-    return await verifyDeviceTokenWithSupabase(cleanId, cleanToken);
+    return await verifyDeviceTokenWithSupabase(cleanId, cleanToken, forceRefresh);
   }
 
   const current = getMockDevices();
-  const target = current.find((d) => d.deviceId.toUpperCase() === cleanId);
+  let target = current.find((d) => d.deviceId.toUpperCase() === cleanId);
+  if (!target && cleanToken) {
+    target = current.find((d) => d.authToken === cleanToken);
+  }
   if (!target) {
     return { valid: false, status: 'revoked' };
   }
@@ -330,6 +346,7 @@ export async function verifyRemoteDeviceToken(
   return {
     valid: match && target.status === 'active',
     status: match ? target.status : 'revoked',
+    deviceId: target.deviceId,
     authToken: match && target.status === 'active' ? target.authToken : undefined,
   };
 }

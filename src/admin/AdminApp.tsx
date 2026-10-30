@@ -448,11 +448,21 @@ export const AdminApp: React.FC = () => {
   };
 
   // Device Handlers
-  const handleUpdateDeviceStatus = async (deviceId: string, status: DeviceStatus) => {
+  const handleUpdateDeviceStatus = async (
+    deviceId: string,
+    status: DeviceStatus,
+    assignedDeviceId?: string
+  ) => {
     try {
-      await updateRemoteDeviceStatus(deviceId, status);
+      await updateRemoteDeviceStatus(deviceId, status, assignedDeviceId);
       await loadFleetData(true, { equipment: false, transactions: false, devices: true });
-      showToast(`Device "${deviceId}" status updated to ${status}.`, 'success');
+      const finalId = assignedDeviceId ? assignedDeviceId.trim().toUpperCase() : deviceId;
+      showToast(
+        status === 'active'
+          ? `Device authorized as "${finalId}".`
+          : `Device "${finalId}" status updated to ${status}.`,
+        'success'
+      );
     } catch (err: unknown) {
       const msg = formatErrorMessage(err);
       showToast(`Failed to update device status: ${msg}`, 'error');

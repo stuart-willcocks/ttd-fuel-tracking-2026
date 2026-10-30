@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient, type Session, type AuthChangeEvent } from '@supabase/supabase-js';
 import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus, DeviceTelemetry } from '../types';
-import { generateSecureDeviceToken, getDeviceId, getDeviceToken } from './device';
+import { generateSecureDeviceToken, getDeviceId, getDeviceToken, saveDeviceEnrollment } from './device';
 import { getReportedAppVersion } from '../version';
 import { db } from '../db/indexedDB';
 import { postRemoteTransaction } from './api';
@@ -899,17 +899,68 @@ export async function updateDeviceTelemetryInSupabase(
 }
 
 /**
- * Update the status of a device (active, pending, revoked)
+ * Update the status of a device (active, pending, revoked) and optionally assign a persistent Device ID
  */
-export async function updateDeviceStatusInSupabase(deviceId: string, status: DeviceStatus): Promise<void> {
+export async function updateDeviceStatusInSupabase(
+  deviceId: string,
+  status: DeviceStatus,
+  assignedDeviceId?: string
+): Promise<void> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
   invalidateDeviceTokenCache();
 
+  const cleanId = deviceId.trim().toUpperCase();
+  const cleanAssignedId = assignedDeviceId?.trim().toUpperCase();
+  const nowIso = new Date().toISOString();
+
+  if (cleanAssignedId && cleanAssignedId !== cleanId) {
+    // Fetch existing row so we preserve auth_token and telemetry when assigning the persistent Device ID
+    const { data: existingRow, error: fetchError } = await client
+      .from('authorized_devices')
+      .select('*')
+      .eq('device_id', cleanId)
+      .maybeSingle();
+
+    if (fetchError) {
+      throw new Error(fetchError.message || fetchError.details || fetchError.hint || `Supabase error (${fetchError.code || 'unknown'})`);
+    }
+
+    if (!existingRow) {
+      throw new Error(`Device request '${cleanId}' was not found in Supabase.`);
+    }
+
+    const upsertRow: Record<string, unknown> = {
+      ...existingRow,
+      device_id: cleanAssignedId,
+      status,
+      last_seen_at: nowIso,
+    };
+
+    const { error: upsertError } = await client
+      .from('authorized_devices')
+      .upsert(upsertRow, { onConflict: 'device_id' });
+
+    if (upsertError) {
+      throw new Error(upsertError.message || upsertError.details || upsertError.hint || `Supabase error (${upsertError.code || 'unknown'})`);
+    }
+
+    // Delete the old temporary device ID row
+    const { error: deleteError } = await client
+      .from('authorized_devices')
+      .delete()
+      .eq('device_id', cleanId);
+
+    if (deleteError) {
+      console.warn('[Supabase] Failed to delete old temporary device ID row:', deleteError);
+    }
+    return;
+  }
+
   const { error } = await client
     .from('authorized_devices')
-    .update({ status, last_seen_at: new Date().toISOString() })
-    .eq('device_id', deviceId.trim().toUpperCase());
+    .update({ status, last_seen_at: nowIso })
+    .eq('device_id', cleanId);
 
   if (error) {
     if (error.code === 'PGRST205' || (error.message && error.message.includes('authorized_devices'))) {
@@ -955,7 +1006,7 @@ export async function verifyDeviceTokenWithSupabase(
   deviceId: string,
   token: string,
   forceRefresh = false
-): Promise<{ valid: boolean; status: DeviceStatus; authToken?: string }> {
+): Promise<{ valid: boolean; status: DeviceStatus; deviceId?: string; authToken?: string }> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
@@ -974,15 +1025,32 @@ export async function verifyDeviceTokenWithSupabase(
     return {
       valid: cachedDeviceTokenAuth.valid,
       status: cachedDeviceTokenAuth.status,
+      deviceId: cachedDeviceTokenAuth.deviceId,
       authToken: cachedDeviceTokenAuth.authToken,
     };
   }
 
-  const { data, error } = await client
+  let { data, error } = await client
     .from('authorized_devices')
     .select('device_id, auth_token, status, app_version')
     .eq('device_id', cleanId)
     .maybeSingle();
+
+  // If the temporary Device ID was replaced by an Admin-assigned persistent Device ID,
+  // look up the row by the device's cryptographic auth_token.
+  if (!error && !data && cleanToken) {
+    const tokenLookup = await client
+      .from('authorized_devices')
+      .select('device_id, auth_token, status, app_version')
+      .eq('auth_token', cleanToken)
+      .order('last_seen_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!tokenLookup.error && tokenLookup.data) {
+      data = tokenLookup.data;
+    }
+  }
 
   if (error) {
     if (error.code === 'PGRST116') {
@@ -1003,6 +1071,7 @@ export async function verifyDeviceTokenWithSupabase(
     return { valid: false, status: 'revoked' };
   }
 
+  const resolvedDeviceId = String(data.device_id || cleanId).trim().toUpperCase();
   const storedVersion = data.app_version ? String(data.app_version) : null;
 
   // Strict cryptographic token match (no hardcoded bypass strings)
@@ -1010,8 +1079,19 @@ export async function verifyDeviceTokenWithSupabase(
   const isActive = data.status === 'active' && isTokenMatch;
 
   if (isActive) {
+    // If the Admin assigned a persistent Device ID different from the PDA's temporary ID,
+    // immediately write the persistent Device ID back to the PDA's localStorage.
+    const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.includes('admin');
+    if (!isAdminRoute && resolvedDeviceId !== cleanId) {
+      saveDeviceEnrollment({
+        deviceId: resolvedDeviceId,
+        authToken: data.auth_token,
+        status: 'active',
+      });
+    }
+
     cachedDeviceTokenAuth = {
-      deviceId: cleanId,
+      deviceId: resolvedDeviceId,
       token: cleanToken,
       valid: true,
       status: 'active',
@@ -1019,14 +1099,13 @@ export async function verifyDeviceTokenWithSupabase(
       checkedAt: now,
     };
 
-    const lastWrite = lastSeenWriteByDevice.get(cleanId) || 0;
-    const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.includes('admin');
+    const lastWrite = lastSeenWriteByDevice.get(resolvedDeviceId) || 0;
     const reportedVer = getReportedAppVersion();
     const versionMismatch = !isAdminRoute && storedVersion !== reportedVer;
 
     // Only write last_seen_at if appVersion changed or if no telemetry write occurred in the last 15 minutes
     if (versionMismatch || now - lastWrite >= 900000) {
-      lastSeenWriteByDevice.set(cleanId, now);
+      lastSeenWriteByDevice.set(resolvedDeviceId, now);
       const nowIso = new Date(now).toISOString();
       const updateFields: Record<string, unknown> = {
         last_seen_at: nowIso,
@@ -1037,7 +1116,7 @@ export async function verifyDeviceTokenWithSupabase(
       client
         .from('authorized_devices')
         .update(updateFields)
-        .eq('device_id', cleanId)
+        .eq('device_id', resolvedDeviceId)
         .then(() => {}, () => {});
     }
   } else {
@@ -1046,7 +1125,8 @@ export async function verifyDeviceTokenWithSupabase(
 
   return {
     valid: isActive,
-    status: isActive ? 'active' : ((data.status as DeviceStatus) || 'revoked'),
+    status: isActive ? 'active' : data.status === 'pending' && isTokenMatch ? 'pending' : 'revoked',
+    deviceId: resolvedDeviceId,
     authToken: isActive ? data.auth_token : undefined,
   };
 }

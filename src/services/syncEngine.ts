@@ -124,13 +124,35 @@ class SyncEngine {
             (table, eventType, payload) => {
               if (table === 'authorized_devices') {
                 const myId = getDeviceId();
-                const newRow = payload?.new as { device_id?: string; status?: string } | undefined;
+                const myToken = getDeviceToken();
+                const newRow = payload?.new as { device_id?: string; auth_token?: string; status?: string } | undefined;
                 const oldRow = payload?.old as { device_id?: string; status?: string } | undefined;
                 const affectedId = (newRow?.device_id || oldRow?.device_id || '').toUpperCase();
 
+                // If the Admin assigned a new persistent Device ID to our token, persist it immediately
+                if (
+                  newRow?.auth_token &&
+                  myToken &&
+                  newRow.auth_token === myToken &&
+                  newRow.status === 'active' &&
+                  newRow.device_id
+                ) {
+                  saveDeviceEnrollment({
+                    deviceId: String(newRow.device_id).trim().toUpperCase(),
+                    authToken: newRow.auth_token,
+                    status: 'active',
+                  });
+                  return;
+                }
+
                 if (affectedId && myId && affectedId === myId.toUpperCase()) {
-                  if (newRow?.status !== 'active' || eventType === 'DELETE') {
-                    console.warn(`[SyncEngine Realtime] PDA ${myId} status changed to ${newRow?.status || 'deleted'}. Locking down.`);
+                  if (eventType === 'DELETE') {
+                    // Verify with Supabase first (in case this temporary ID was just replaced by a persistent ID)
+                    this.verifyDeviceAuthorization(true);
+                    return;
+                  }
+                  if (newRow?.status !== 'active') {
+                    console.warn(`[SyncEngine Realtime] PDA ${myId} status changed to ${newRow?.status || 'revoked'}. Locking down.`);
                     this.lockdownRevokedDevice();
                     return;
                   }
@@ -649,17 +671,18 @@ class SyncEngine {
     }
 
     try {
-      const check = await verifyRemoteDeviceToken(currentDevId, currentToken);
+      const check = await verifyRemoteDeviceToken(currentDevId, currentToken, force);
       if (!check.valid || check.status !== 'active') {
         console.warn(`[SyncEngine] Device ${currentDevId} validation failed (valid=${check.valid}, status=${check.status}). Locking down.`);
         this.lastAuthCheckResult = false;
         await this.lockdownRevokedDevice();
         return false;
       }
-      if (check.authToken && check.authToken !== currentToken) {
+      const finalDeviceId = check.deviceId ? check.deviceId.trim().toUpperCase() : currentDevId;
+      if (finalDeviceId !== currentDevId || (check.authToken && check.authToken !== currentToken)) {
         saveDeviceEnrollment({
-          deviceId: currentDevId,
-          authToken: check.authToken,
+          deviceId: finalDeviceId,
+          authToken: check.authToken || currentToken,
           status: 'active',
         });
       }

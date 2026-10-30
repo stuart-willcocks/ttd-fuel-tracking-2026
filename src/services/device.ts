@@ -77,19 +77,24 @@ export function isDeviceEnrolled(): boolean {
   );
 }
 
+export function generateTemporaryDeviceId(): string {
+  const isZebra =
+    typeof navigator !== 'undefined' && /TC26|Zebra|Android/i.test(navigator.userAgent);
+  const prefix = isZebra ? 'TC26' : 'PDA';
+  return `${prefix}-${generateRandomHex(4)}`;
+}
+
 /**
- * Returns the permanent device identifier for this PDA installation.
- * Generated once per installation and persisted in localStorage.
+ * Returns the device identifier for this PDA installation.
+ * Before authorization, a temporary ID is generated; upon Admin Console approval,
+ * the persistent Device ID assigned by the administrator is written back and stored here.
  */
 export function getDeviceId(): string {
   if (typeof window === 'undefined') return 'PDA-SERVER';
 
   let id = (localStorage.getItem(STORAGE_KEY_DEVICE_ID) || '').trim();
   if (!id) {
-    const isZebra =
-      typeof navigator !== 'undefined' && /TC26|Zebra|Android/i.test(navigator.userAgent);
-    const prefix = isZebra ? 'TC26' : 'PDA';
-    id = `${prefix}-${generateRandomHex(4)}`;
+    id = generateTemporaryDeviceId();
     localStorage.setItem(STORAGE_KEY_DEVICE_ID, id);
   }
   return id;
@@ -146,6 +151,8 @@ export function saveDeviceEnrollment(info: {
 export function markDeviceRevoked(): void {
   if (typeof window === 'undefined') return;
   const currentDevId = getDeviceId();
+  const tempId = generateTemporaryDeviceId();
+  localStorage.setItem(STORAGE_KEY_DEVICE_ID, tempId);
   localStorage.removeItem(STORAGE_KEY_DEVICE_TOKEN);
   localStorage.setItem(STORAGE_KEY_DEVICE_STATUS, 'revoked');
 

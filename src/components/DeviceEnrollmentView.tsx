@@ -23,7 +23,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
   onEnrolled,
 }) => {
   const initialStatus = getDeviceStatus();
-  const deviceId = getDeviceId();
+  const [deviceId, setDeviceId] = useState(getDeviceId());
   const initialToken = getDeviceToken();
 
   const [pendingToken, setPendingToken] = useState(initialToken || '');
@@ -57,8 +57,8 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
   }, []);
 
   // Submit registration request to Admin Console
-  const handleRequestSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRequestSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const cleanId = deviceId.trim().toUpperCase();
 
     if (!cleanId) {
@@ -78,7 +78,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
         status: 'pending',
       });
       setPendingApprovalDeviceId(cleanId);
-      setSuccessMsg(`Registration request submitted for ${cleanId}.`);
+      setSuccessMsg(`Authorization request submitted (${cleanId}).`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMsg(msg);
@@ -96,14 +96,16 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
     let cancelled = false;
     const checkStoredDevice = async () => {
       try {
-        const check = await verifyRemoteDeviceToken(storedId, storedTok);
+        const check = await verifyRemoteDeviceToken(storedId, storedTok, true);
         if (!cancelled && check.valid && check.status === 'active' && check.authToken) {
+          const finalId = (check.deviceId || storedId).trim().toUpperCase();
+          setDeviceId(finalId);
           saveDeviceEnrollment({
-            deviceId: storedId,
+            deviceId: finalId,
             authToken: check.authToken,
             status: 'active',
           });
-          setSuccessMsg(`Device ${storedId} is authorized!`);
+          setSuccessMsg(`Device authorized as ${finalId}!`);
           setTimeout(() => {
             if (!cancelled) onEnrolled();
           }, 500);
@@ -126,26 +128,31 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
     if (!pendingApprovalDeviceId) return;
 
     let cancelled = false;
-    let ensuredRemoteRow = false;
+    let lastReRegisterTime = 0;
     const poll = async () => {
       try {
         const tokenToCheck = pendingToken || getDeviceToken();
         if (!tokenToCheck) return;
-        const check = await verifyRemoteDeviceToken(pendingApprovalDeviceId, tokenToCheck);
+        const check = await verifyRemoteDeviceToken(pendingApprovalDeviceId, tokenToCheck, true);
         if (!cancelled && (check.valid || check.status === 'active')) {
+          const finalId = (check.deviceId || pendingApprovalDeviceId).trim().toUpperCase();
+          setDeviceId(finalId);
           saveDeviceEnrollment({
-            deviceId: pendingApprovalDeviceId,
+            deviceId: finalId,
             authToken: check.authToken || tokenToCheck,
             status: 'active',
           });
-          setSuccessMsg(`Device ${pendingApprovalDeviceId} has been approved!`);
+          setSuccessMsg(`Device authorized as ${finalId}!`);
           setTimeout(() => {
             if (!cancelled) onEnrolled();
           }, 800);
-        } else if (!cancelled && !ensuredRemoteRow && check.status === 'revoked') {
-          // If the pending request was not in Supabase yet (e.g. submitted while offline or before schema reload), re-register it automatically
-          ensuredRemoteRow = true;
-          await registerRemoteDeviceRequest(pendingApprovalDeviceId, tokenToCheck).catch(() => {});
+        } else if (!cancelled && check.status === 'revoked') {
+          // If no pending row exists in Supabase (or token didn't match), re-register automatically so the request appears in Admin Console
+          const now = Date.now();
+          if (now - lastReRegisterTime > 15000) {
+            lastReRegisterTime = now;
+            await registerRemoteDeviceRequest(pendingApprovalDeviceId, tokenToCheck).catch(() => {});
+          }
         }
       } catch {
         // Silently retry
@@ -314,7 +321,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Device ID
+                Temporary Device ID
               </label>
               <input
                 type="text"
@@ -339,24 +346,49 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
             </div>
 
             {pendingApprovalDeviceId ? (
-              <div
-                style={{
-                  background: 'rgba(234, 179, 8, 0.15)',
-                  border: '1px solid #EAB308',
-                  padding: '12px',
-                  borderRadius: '6px',
-                  color: '#FDE047',
-                  fontSize: '0.82rem',
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 700 }}>
-                  <RefreshCw size={14} className="admin-spin" />
-                  <span>Awaiting Admin Approval...</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div
+                  style={{
+                    background: 'rgba(234, 179, 8, 0.15)',
+                    border: '1px solid #EAB308',
+                    padding: '12px',
+                    borderRadius: '6px',
+                    color: '#FDE047',
+                    fontSize: '0.82rem',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 700 }}>
+                    <RefreshCw size={14} className="admin-spin" />
+                    <span>Awaiting Admin Approval...</span>
+                  </div>
+                  <div style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.85 }}>
+                    Open Admin Console &rarr; PDAs tab and click &ldquo;Approve&rdquo; for <strong>{pendingApprovalDeviceId}</strong> to assign its persistent Device ID.
+                  </div>
                 </div>
-                <div style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.85 }}>
-                  Open Admin Console &rarr; Devices tab and click &ldquo;Approve&rdquo; for <strong>{pendingApprovalDeviceId}</strong>.
-                </div>
+                <button
+                  type="button"
+                  disabled={isProcessing}
+                  onClick={() => handleRequestSubmit()}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    background: '#1E293B',
+                    color: '#E2E8F0',
+                    border: '1px solid #334155',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <RefreshCw size={13} className={isProcessing ? 'admin-spin' : undefined} />
+                  <span>{isProcessing ? 'Resending Request...' : 'Resend Authorization Request'}</span>
+                </button>
               </div>
             ) : (
               <button
