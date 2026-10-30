@@ -4,6 +4,7 @@ import {
   Smartphone,
   ExternalLink,
   LogOut,
+  Zap,
 } from 'lucide-react';
 import { APP_VERSION, getIsStaging } from '../../version';
 import { checkRemoteAppVersion, performAppUpdate } from '../../services/appUpdate';
@@ -157,6 +158,21 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
         >
           <RefreshCw size={15} className={isRefreshing ? 'admin-spin' : ''} />
         </button>
+
+        {/* Link to Stress Test App (visible only to design@stuartwillcocks.co.uk) */}
+        {adminEmail?.trim().toLowerCase() === 'design@stuartwillcocks.co.uk' && (
+          <a
+            href="/stress-test"
+            target="_blank"
+            rel="noreferrer"
+            className="admin-top-tool-btn"
+            title="Open Stress Test Simulator in new tab"
+          >
+            <Zap size={14} />
+            <span>STRESS TEST APP</span>
+            <ExternalLink size={12} />
+          </a>
+        )}
 
         {/* Link to Zebra Handheld Field Web App */}
         <a

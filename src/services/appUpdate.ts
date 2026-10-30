@@ -97,7 +97,9 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
     } catch {}
 
     const isAdminPage =
-      typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+      typeof window !== 'undefined' &&
+      (window.location.pathname.startsWith('/admin') ||
+        window.location.pathname.startsWith('/stress-test'));
 
     // Immediately report the newly updated app version to the database if this is an enrolled PDA
     if (typeof window !== 'undefined' && !isAdminPage && targetVersion) {

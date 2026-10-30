@@ -74,6 +74,24 @@
       ]
     },
     {
+      "source": "/stress-test",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/stress-test.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate, max-age=0"
+        }
+      ]
+    },
+    {
       "source": "/sw.js",
       "headers": [
         {
@@ -126,6 +144,14 @@
     {
       "source": "/admin/(.*)",
       "destination": "/admin.html"
+    },
+    {
+      "source": "/stress-test",
+      "destination": "/stress-test.html"
+    },
+    {
+      "source": "/stress-test/(.*)",
+      "destination": "/stress-test.html"
     },
     {
       "source": "/((?!api/|.*\\..*).*)",

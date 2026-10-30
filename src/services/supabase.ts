@@ -66,8 +66,9 @@ export function invalidateDeviceTokenCache(): void {
 
 async function ensureFieldDeviceAuthorized(): Promise<void> {
   if (hasActiveAdminSession) return;
-  const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.includes('admin');
-  if (isAdminRoute) {
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const isAdminOrTestRoute = pathname.includes('admin') || pathname.includes('stress-test');
+  if (isAdminOrTestRoute) {
     const session = await getAdminSession();
     if (session) return;
   }

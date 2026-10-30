@@ -89,9 +89,9 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        navigateFallbackDenylist: [/^\/api/, /^\/version\.json$/, /^\/admin/],
+        navigateFallbackDenylist: [/^\/api/, /^\/version\.json$/, /^\/admin/, /^\/stress-test/],
         globPatterns: ['**/*.{html,ico,png,svg,woff,woff2}'],
-        globIgnores: ['**/admin.html'],
+        globIgnores: ['**/admin.html', '**/stress-test.html'],
         runtimeCaching: [
           {
             urlPattern: /\/assets\/.*\.(?:js|css)$/i,
@@ -144,9 +144,11 @@ export default defineConfig({
         server.middlewares.use((req, _res, next) => {
           const rawUrl = req.url || '';
           const url = rawUrl.split('?')[0];
+          const query = rawUrl.includes('?') ? '?' + rawUrl.split('?')[1] : '';
           if (url === '/admin' || url === '/admin/') {
-            const query = rawUrl.includes('?') ? '?' + rawUrl.split('?')[1] : '';
             req.url = '/admin.html' + query;
+          } else if (url === '/stress-test' || url === '/stress-test/') {
+            req.url = '/stress-test.html' + query;
           }
           next();
         });
@@ -155,9 +157,11 @@ export default defineConfig({
         server.middlewares.use((req, _res, next) => {
           const rawUrl = req.url || '';
           const url = rawUrl.split('?')[0];
+          const query = rawUrl.includes('?') ? '?' + rawUrl.split('?')[1] : '';
           if (url === '/admin' || url === '/admin/') {
-            const query = rawUrl.includes('?') ? '?' + rawUrl.split('?')[1] : '';
             req.url = '/admin.html' + query;
+          } else if (url === '/stress-test' || url === '/stress-test/') {
+            req.url = '/stress-test.html' + query;
           }
           next();
         });
@@ -178,6 +182,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         admin: path.resolve(__dirname, 'admin.html'),
+        stressTest: path.resolve(__dirname, 'stress-test.html'),
       },
       output: {
         manualChunks(id) {
