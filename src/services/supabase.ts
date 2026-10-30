@@ -763,17 +763,77 @@ export async function uploadTransactionToCloud(
   }
 }
 
+function extractLegacyMetadata(raw: unknown): {
+  appVersion: string | null;
+  telemetry: Partial<DeviceTelemetry> | null;
+} {
+  if (!raw || typeof raw !== 'string') {
+    return { appVersion: null, telemetry: null };
+  }
+  let working = raw;
+  let appVersion: string | null = null;
+  let telemetry: Partial<DeviceTelemetry> | null = null;
+
+  if (working.includes('__TEL__')) {
+    const parts = working.split('__TEL__');
+    working = parts[0] || '';
+    try {
+      const parsed = JSON.parse(parts[1]);
+      if (parsed && typeof parsed === 'object') {
+        telemetry = parsed;
+        if (parsed.appVersion) {
+          appVersion = String(parsed.appVersion);
+        }
+      }
+    } catch {}
+  }
+
+  if (working.includes('__VER__')) {
+    const vParts = working.split('__VER__');
+    if (vParts[1] && vParts[1].trim()) {
+      appVersion = vParts[1].trim();
+    }
+  }
+
+  return { appVersion, telemetry };
+}
+
 /**
  * Map a raw Supabase `authorized_devices` row to an `AuthorizedDevice` domain object
  */
 export function mapSupabaseRowToAuthorizedDevice(row: any): AuthorizedDevice {
-  const batteryLevel = typeof row.battery_level === 'number' ? row.battery_level : null;
-  const isCharging = typeof row.is_charging === 'boolean' ? row.is_charging : null;
-  const latitude = typeof row.latitude === 'number' ? row.latitude : null;
-  const longitude = typeof row.longitude === 'number' ? row.longitude : null;
-  const locationAccuracy = typeof row.location_accuracy === 'number' ? row.location_accuracy : null;
-  const lastTelemetryAt = row.last_telemetry_at || null;
-  const appVersion: string | null = row.app_version ? String(row.app_version) : null;
+  const legacy = extractLegacyMetadata(row.device_name);
+
+  let batteryLevel = typeof row.battery_level === 'number' ? row.battery_level : null;
+  let isCharging = typeof row.is_charging === 'boolean' ? row.is_charging : null;
+  let latitude = typeof row.latitude === 'number' ? row.latitude : null;
+  let longitude = typeof row.longitude === 'number' ? row.longitude : null;
+  let locationAccuracy = typeof row.location_accuracy === 'number' ? row.location_accuracy : null;
+  let lastTelemetryAt = row.last_telemetry_at || null;
+  const appVersion: string | null = row.app_version
+    ? String(row.app_version)
+    : legacy.appVersion;
+
+  if (legacy.telemetry) {
+    if (batteryLevel === null && typeof legacy.telemetry.batteryLevel === 'number') {
+      batteryLevel = legacy.telemetry.batteryLevel;
+    }
+    if (isCharging === null && typeof legacy.telemetry.isCharging === 'boolean') {
+      isCharging = legacy.telemetry.isCharging;
+    }
+    if (latitude === null && typeof legacy.telemetry.latitude === 'number') {
+      latitude = legacy.telemetry.latitude;
+    }
+    if (longitude === null && typeof legacy.telemetry.longitude === 'number') {
+      longitude = legacy.telemetry.longitude;
+    }
+    if (locationAccuracy === null && typeof legacy.telemetry.locationAccuracy === 'number') {
+      locationAccuracy = legacy.telemetry.locationAccuracy;
+    }
+    if (!lastTelemetryAt && legacy.telemetry.lastTelemetryAt) {
+      lastTelemetryAt = legacy.telemetry.lastTelemetryAt;
+    }
+  }
 
   return {
     deviceId: row.device_id,
@@ -822,12 +882,13 @@ export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): 
   if (!client) throw new Error('Supabase not configured');
 
   const cleanId = device.deviceId.trim().toUpperCase();
+  const ver = device.appVersion || getReportedAppVersion();
 
   const payload: Record<string, unknown> = {
     device_id: cleanId,
     auth_token: device.authToken.trim(),
     status: device.status,
-    app_version: device.appVersion || getReportedAppVersion(),
+    app_version: ver,
     registered_at: device.registeredAt || new Date().toISOString(),
     last_seen_at: device.lastSeenAt || new Date().toISOString(),
   };
@@ -843,16 +904,29 @@ export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): 
     .from('authorized_devices')
     .upsert(payload, { onConflict: 'device_id' });
 
-  // If telemetry columns do not exist yet on remote table, retry with standard core columns
-  if (error && (error.code === 'PGRST204' || (error.message && (error.message.includes('column') || error.message.includes('battery') || error.message.includes('app_version'))))) {
-    const basicPayload = {
+  // If app_version column does not exist yet on remote table, retry with telemetry columns + legacy version tag
+  if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('app_version'))) {
+    const withoutAppVer: Record<string, unknown> = { ...payload, device_name: `${cleanId}__VER__${ver}` };
+    delete withoutAppVer.app_version;
+    const retryRes = await client.from('authorized_devices').upsert(withoutAppVer, { onConflict: 'device_id' });
+    error = retryRes.error;
+  }
+
+  // If telemetry columns do not exist yet on remote table, retry with core columns
+  if (error && (error.code === 'PGRST204' || error.code === '42703' || (error.message && (error.message.includes('column') || error.message.includes('battery'))))) {
+    const basicPayload: Record<string, unknown> = {
       device_id: payload.device_id,
+      device_name: `${cleanId}__VER__${ver}`,
       auth_token: payload.auth_token,
       status: payload.status,
       registered_at: payload.registered_at,
       last_seen_at: payload.last_seen_at,
     };
-    const retryRes = await client.from('authorized_devices').upsert(basicPayload, { onConflict: 'device_id' });
+    let retryRes = await client.from('authorized_devices').upsert(basicPayload, { onConflict: 'device_id' });
+    if (retryRes.error && retryRes.error.message?.includes('device_name')) {
+      delete basicPayload.device_name;
+      retryRes = await client.from('authorized_devices').upsert(basicPayload, { onConflict: 'device_id' });
+    }
     error = retryRes.error;
   }
 
@@ -883,35 +957,77 @@ export async function updateDeviceTelemetryInSupabase(
 
   const runningVersion = getReportedAppVersion(telemetry.appVersion);
 
-  const payload: Record<string, unknown> = {
-    app_version: runningVersion,
+  const telemetryPayload: Record<string, unknown> = {
     last_seen_at: nowIso,
     last_telemetry_at: telemetry.lastTelemetryAt || nowIso,
   };
 
-  if (typeof telemetry.batteryLevel === 'number') payload.battery_level = telemetry.batteryLevel;
-  if (typeof telemetry.isCharging === 'boolean') payload.is_charging = telemetry.isCharging;
-  if (typeof telemetry.latitude === 'number') payload.latitude = telemetry.latitude;
-  if (typeof telemetry.longitude === 'number') payload.longitude = telemetry.longitude;
-  if (typeof telemetry.locationAccuracy === 'number') payload.location_accuracy = telemetry.locationAccuracy;
+  if (typeof telemetry.batteryLevel === 'number') telemetryPayload.battery_level = telemetry.batteryLevel;
+  if (typeof telemetry.isCharging === 'boolean') telemetryPayload.is_charging = telemetry.isCharging;
+  if (typeof telemetry.latitude === 'number') telemetryPayload.latitude = telemetry.latitude;
+  if (typeof telemetry.longitude === 'number') telemetryPayload.longitude = telemetry.longitude;
+  if (typeof telemetry.locationAccuracy === 'number') telemetryPayload.location_accuracy = telemetry.locationAccuracy;
 
+  // 1. Try full update with native app_version + native telemetry columns
   let { error } = await client
     .from('authorized_devices')
-    .update(payload)
+    .update({
+      ...telemetryPayload,
+      app_version: runningVersion,
+    })
     .eq('device_id', cleanId);
 
   if (!error) {
     return;
   }
 
-  // If telemetry columns do not exist yet on Supabase table (PGRST204 / 42703), update last_seen_at
-  if (error && (error.code === 'PGRST204' || error.code === '42703' || (error.message && (error.message.includes('column') || error.message.includes('battery') || error.message.includes('app_version'))))) {
+  // 2. If app_version column does not exist yet on Supabase table, keep all native telemetry columns (battery + GPS) and store version tag in device_name
+  if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('app_version'))) {
+    const withLegacyVer = await client
+      .from('authorized_devices')
+      .update({
+        ...telemetryPayload,
+        device_name: `${cleanId}__VER__${runningVersion}`,
+      })
+      .eq('device_id', cleanId);
+
+    if (!withLegacyVer.error) {
+      return;
+    }
+
+    // If device_name column was dropped, write native telemetry columns alone
+    if (withLegacyVer.error.message?.includes('device_name')) {
+      const telOnly = await client
+        .from('authorized_devices')
+        .update(telemetryPayload)
+        .eq('device_id', cleanId);
+      if (!telOnly.error) {
+        return;
+      }
+      error = telOnly.error;
+    } else {
+      error = withLegacyVer.error;
+    }
+  }
+
+  // 3. If native telemetry columns (battery_level, latitude, etc.) also do not exist yet, encode telemetry + version in device_name fallback
+  if (error && (error.code === 'PGRST204' || error.code === '42703' || (error.message && (error.message.includes('column') || error.message.includes('battery'))))) {
     try {
       const fallbackRes = await client
         .from('authorized_devices')
+        .update({
+          device_name: `${cleanId}__VER__${runningVersion}__TEL__${JSON.stringify({ ...telemetry, appVersion: runningVersion })}`,
+          last_seen_at: nowIso,
+        })
+        .eq('device_id', cleanId);
+      if (!fallbackRes.error) {
+        return;
+      }
+      await client
+        .from('authorized_devices')
         .update({ last_seen_at: nowIso })
         .eq('device_id', cleanId);
-      error = fallbackRes.error;
+      return;
     } catch {
       // Ignore fallback lookup errors
     }
@@ -1005,19 +1121,9 @@ export async function verifyDeviceTokenWithSupabase(
 
   let { data, error } = await client
     .from('authorized_devices')
-    .select('device_id, auth_token, status, app_version')
+    .select('*')
     .eq('device_id', cleanId)
     .maybeSingle();
-
-  if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('app_version'))) {
-    const fallbackQuery = await client
-      .from('authorized_devices')
-      .select('device_id, auth_token, status')
-      .eq('device_id', cleanId)
-      .maybeSingle();
-    data = fallbackQuery.data ? { ...fallbackQuery.data, app_version: null } : null;
-    error = fallbackQuery.error;
-  }
 
   if (error) {
     if (error.code === 'PGRST116') {
@@ -1038,7 +1144,8 @@ export async function verifyDeviceTokenWithSupabase(
     return { valid: false, status: 'revoked' };
   }
 
-  const storedVersion = data.app_version ? String(data.app_version) : null;
+  const legacy = extractLegacyMetadata(data.device_name);
+  const storedVersion = data.app_version ? String(data.app_version) : legacy.appVersion;
 
   // Strict cryptographic token match (no hardcoded bypass strings)
   const isTokenMatch = Boolean(cleanToken) && data.auth_token === cleanToken;
@@ -1062,17 +1169,28 @@ export async function verifyDeviceTokenWithSupabase(
     // Only write last_seen_at if appVersion changed or if no telemetry write occurred in the last 15 minutes
     if (versionMismatch || now - lastWrite >= 900000) {
       lastSeenWriteByDevice.set(cleanId, now);
-      const updateFields: Record<string, unknown> = {
-        last_seen_at: new Date(now).toISOString(),
-      };
+      const nowIso = new Date(now).toISOString();
       if (!isAdminRoute) {
-        updateFields.app_version = reportedVer;
+        client
+          .from('authorized_devices')
+          .update({ last_seen_at: nowIso, app_version: reportedVer })
+          .eq('device_id', cleanId)
+          .then(({ error: upErr }) => {
+            if (upErr && (upErr.code === 'PGRST204' || upErr.code === '42703' || upErr.message?.includes('app_version'))) {
+              client
+                .from('authorized_devices')
+                .update({ last_seen_at: nowIso, device_name: `${cleanId}__VER__${reportedVer}` })
+                .eq('device_id', cleanId)
+                .then(() => {}, () => {});
+            }
+          }, () => {});
+      } else {
+        client
+          .from('authorized_devices')
+          .update({ last_seen_at: nowIso })
+          .eq('device_id', cleanId)
+          .then(() => {}, () => {});
       }
-      client
-        .from('authorized_devices')
-        .update(updateFields)
-        .eq('device_id', cleanId)
-        .then(() => {}, () => {});
     }
   } else {
     invalidateDeviceTokenCache();
@@ -1099,13 +1217,14 @@ export async function registerDeviceRequestToSupabase(
   const cleanId = deviceId.trim().toUpperCase();
   const token = authToken || generateSecureDeviceToken();
   const now = new Date().toISOString();
+  const reportedVer = getReportedAppVersion();
 
   let { error } = await client.from('authorized_devices').upsert(
     {
       device_id: cleanId,
       auth_token: token,
       status: 'pending',
-      app_version: getReportedAppVersion(),
+      app_version: reportedVer,
       registered_at: now,
       last_seen_at: now,
     },
@@ -1113,9 +1232,10 @@ export async function registerDeviceRequestToSupabase(
   );
 
   if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('app_version'))) {
-    const retryRes = await client.from('authorized_devices').upsert(
+    let retryRes = await client.from('authorized_devices').upsert(
       {
         device_id: cleanId,
+        device_name: `${cleanId}__VER__${reportedVer}`,
         auth_token: token,
         status: 'pending',
         registered_at: now,
@@ -1123,6 +1243,18 @@ export async function registerDeviceRequestToSupabase(
       },
       { onConflict: 'device_id' }
     );
+    if (retryRes.error && retryRes.error.message?.includes('device_name')) {
+      retryRes = await client.from('authorized_devices').upsert(
+        {
+          device_id: cleanId,
+          auth_token: token,
+          status: 'pending',
+          registered_at: now,
+          last_seen_at: now,
+        },
+        { onConflict: 'device_id' }
+      );
+    }
     error = retryRes.error;
   }
 

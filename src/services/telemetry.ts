@@ -127,8 +127,8 @@ export async function getCurrentLocation(): Promise<{
   locationAccuracy: number;
 } | null> {
   const now = Date.now();
-  // When watchPosition is actively running, return cachedLocation immediately to avoid concurrent hardware GPS contention
-  if (isWatchingPosition || (cachedLocation && now - lastLocationTime < 180000)) {
+  // When watchPosition has already populated cachedLocation or cachedLocation is fresh (< 3 min), return it immediately
+  if (cachedLocation && (isWatchingPosition || now - lastLocationTime < 180000)) {
     return cachedLocation;
   }
 
@@ -139,7 +139,7 @@ export async function getCurrentLocation(): Promise<{
   // 1. Try high accuracy (hardware GPS on Zebra TC26)
   let fix = await fetchPositionOnce(true, 7000);
 
-  // 2. If high accuracy timed out or unavailable, try low accuracy (cell/Wi-Fi)
+  // 2. If high accuracy timed out or unavailable (e.g. indoors), try low accuracy (cell/Wi-Fi)
   if (!fix) {
     fix = await fetchPositionOnce(false, 3000);
   }
@@ -251,7 +251,9 @@ export async function reportDeviceAppVersionImmediately(versionOverride?: string
       appVersion: targetVer,
     };
     await updateRemoteDeviceTelemetry(deviceId, snapshot);
-    lastSentTelemetry = snapshot;
+    if (!lastSentTelemetry || lastSentTelemetry.latitude === null) {
+      lastSentTelemetry = snapshot;
+    }
     lastSentTime = Date.now();
     try {
       localStorage.setItem('ttd_last_reported_app_version', targetVer);
@@ -351,16 +353,10 @@ export async function pushDeviceTelemetry(force: boolean = false): Promise<void>
 export function startTelemetryMonitoring(): () => void {
   if (typeof window === 'undefined') return () => {};
 
-  // If the app version changed (e.g. after an app update), report the new version immediately without waiting on GPS
-  try {
-    const reportedVer = getReportedAppVersion(APP_VERSION);
-    const lastVer = localStorage.getItem('ttd_last_reported_app_version');
-    if (lastVer !== reportedVer) {
-      reportDeviceAppVersionImmediately(reportedVer);
-    }
-  } catch {}
+  // Always report the running app version + battery + cached location immediately on startup (<100ms, without waiting on GPS)
+  reportDeviceAppVersionImmediately(getReportedAppVersion(APP_VERSION));
 
-  // Continuous background GPS watch (started before initial push to avoid concurrent getCurrentPosition contention)
+  // Continuous background GPS watch
   let watchId: number | null = null;
   if (typeof navigator !== 'undefined' && navigator.geolocation) {
     try {
@@ -391,6 +387,20 @@ export function startTelemetryMonitoring(): () => void {
         (err) => {
           lastLocationError = `Code ${err.code}: ${err.message}`;
           console.warn('[Telemetry] Geolocation watch warning:', lastLocationError);
+          // If high-accuracy watch timed out indoors and we still have no location, acquire a network/Wi-Fi fix
+          if (!cachedLocation) {
+            fetchPositionOnce(false, 4000).then((fallbackFix) => {
+              if (fallbackFix) {
+                cachedLocation = fallbackFix;
+                lastLocationTime = Date.now();
+                try {
+                  sessionStorage.setItem('ttd_cached_location', JSON.stringify(fallbackFix));
+                  localStorage.setItem('ttd_cached_location', JSON.stringify(fallbackFix));
+                } catch {}
+                pushDeviceTelemetry(true);
+              }
+            });
+          }
         },
         {
           enableHighAccuracy: true,
@@ -404,7 +414,7 @@ export function startTelemetryMonitoring(): () => void {
     }
   }
 
-  // Initial immediate collection on boot (sends battery + cached location + appVersion without blocking on GPS)
+  // Full collection on boot (acquires GPS fix if uncached and transmits complete telemetry)
   pushDeviceTelemetry(true);
 
   // Periodic heartbeat every 5 minutes (low-frequency to protect free tier quotas)
