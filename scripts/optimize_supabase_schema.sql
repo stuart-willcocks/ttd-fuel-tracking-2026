@@ -12,20 +12,11 @@ ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS longitude double 
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS location_accuracy real;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS last_telemetry_at timestamp with time zone;
 
--- 2. Backfill app_version from legacy device_name (if device_name still exists), then drop device_name
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'authorized_devices' AND column_name = 'device_name'
-  ) THEN
-    UPDATE public.authorized_devices
-    SET app_version = split_part(split_part(device_name, '__VER__', 2), '__TEL__', 1)
-    WHERE app_version IS NULL AND device_name LIKE '%__VER__%';
-
-    ALTER TABLE public.authorized_devices DROP COLUMN device_name;
-  END IF;
-END $$;
+-- 2. Keep nullable device_name column for backward compatibility with older cached PDA builds, and backfill app_version
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS device_name text;
+UPDATE public.authorized_devices
+SET app_version = split_part(split_part(device_name, '__VER__', 2), '__TEL__', 1)
+WHERE app_version IS NULL AND device_name LIKE '%__VER__%';
 
 -- 3. Add native coordinate columns to public.equipment_list
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS latitude double precision;

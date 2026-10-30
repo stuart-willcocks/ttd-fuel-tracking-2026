@@ -12,6 +12,8 @@ import {
   getDeviceToken,
 } from '../services/device';
 import { verifyRemoteDeviceToken, registerRemoteDeviceRequest } from '../services/api';
+import { checkRemoteAppVersion, performAppUpdate } from '../services/appUpdate';
+import { BUILD_NUMBER } from '../version';
 
 interface DeviceEnrollmentViewProps {
   onEnrolled: () => void;
@@ -31,6 +33,28 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
   const [pendingApprovalDeviceId, setPendingApprovalDeviceId] = useState<string | null>(
     initialStatus === 'pending' && deviceId ? deviceId : null
   );
+
+  // Automatically check for and apply app updates even while locked on the authorization screen
+  useEffect(() => {
+    let cancelled = false;
+    const checkUpdate = async () => {
+      try {
+        const res = await checkRemoteAppVersion();
+        if (!cancelled && res.hasUpdate) {
+          const targetVer = res.remoteVersion || String(BUILD_NUMBER + 1);
+          await performAppUpdate(targetVer);
+        }
+      } catch {
+        // Ignore offline errors
+      }
+    };
+    checkUpdate();
+    const timer = setInterval(checkUpdate, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
 
   // Submit registration request to Admin Console
   const handleRequestSubmit = async (e: React.FormEvent) => {
@@ -102,6 +126,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
     if (!pendingApprovalDeviceId) return;
 
     let cancelled = false;
+    let ensuredRemoteRow = false;
     const poll = async () => {
       try {
         const tokenToCheck = pendingToken || getDeviceToken();
@@ -117,6 +142,10 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
           setTimeout(() => {
             if (!cancelled) onEnrolled();
           }, 800);
+        } else if (!cancelled && !ensuredRemoteRow && check.status === 'revoked') {
+          // If the pending request was not in Supabase yet (e.g. submitted while offline or before schema reload), re-register it automatically
+          ensuredRemoteRow = true;
+          await registerRemoteDeviceRequest(pendingApprovalDeviceId, tokenToCheck).catch(() => {});
         }
       } catch {
         // Silently retry

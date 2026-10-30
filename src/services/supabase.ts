@@ -773,7 +773,11 @@ export function mapSupabaseRowToAuthorizedDevice(row: any): AuthorizedDevice {
   const longitude = typeof row.longitude === 'number' ? row.longitude : null;
   const locationAccuracy = typeof row.location_accuracy === 'number' ? row.location_accuracy : null;
   const lastTelemetryAt = row.last_telemetry_at || null;
-  const appVersion: string | null = row.app_version ? String(row.app_version) : null;
+  let appVersion: string | null = row.app_version ? String(row.app_version) : null;
+  if (!appVersion && typeof row.device_name === 'string' && row.device_name.includes('__VER__')) {
+    const vPart = row.device_name.split('__VER__')[1]?.split('__TEL__')[0]?.trim();
+    if (vPart) appVersion = vPart;
+  }
 
   return {
     deviceId: row.device_id,

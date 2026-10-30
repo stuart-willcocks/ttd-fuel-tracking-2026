@@ -339,11 +339,7 @@ export async function registerRemoteDeviceRequest(
   token?: string
 ): Promise<{ status: DeviceStatus; token: string }> {
   if (isSupabaseConfigured()) {
-    try {
-      return await registerDeviceRequestToSupabase(deviceId, token);
-    } catch (err) {
-      console.warn('Supabase register device request failed:', err);
-    }
+    return await registerDeviceRequestToSupabase(deviceId, token);
   }
   const current = getMockDevices();
   const cleanId = deviceId.trim().toUpperCase();
