@@ -71,9 +71,14 @@ class SyncEngine {
 
       window.addEventListener('online', () => this.handleNetworkChange());
       window.addEventListener('offline', () => this.handleNetworkChange());
+      window.addEventListener('ttd:device-missing', () => {
+        if (this.isEffectivelyOnline() && isDeviceEnrolled()) {
+          this.verifyDeviceAuthorization(true);
+        }
+      });
       window.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && this.isEffectivelyOnline()) {
-          this.verifyDeviceAuthorization();
+          this.verifyDeviceAuthorization(true);
           this.syncWithRemote();
         }
       });
@@ -98,13 +103,13 @@ class SyncEngine {
         }
       }, 3600000);
 
-      // Periodic 5-minute safety check for device status (Supabase Realtime handles instant revocations)
+      // Periodic 15-second safety check for device authorization status (ensures immediate lockdown if Realtime WebSocket is blocked or delayed)
       this.authTimer = setInterval(() => {
         if (typeof document !== 'undefined' && document.hidden) return;
         if (this.isEffectivelyOnline() && isDeviceEnrolled()) {
-          this.verifyDeviceAuthorization();
+          this.verifyDeviceAuthorization(true);
         }
-      }, 300000);
+      }, 15000);
 
       // Listen to cross-tab / cross-window instant authorization events
       onDeviceAuthBroadcast((event) => {
@@ -156,8 +161,8 @@ class SyncEngine {
                     this.lockdownRevokedDevice();
                     return;
                   }
-                } else if (eventType === 'DELETE' && !affectedId) {
-                  // Only hit Supabase if a DELETE event lacked the old row's device_id
+                } else if (eventType === 'DELETE') {
+                  // Always verify on any DELETE from authorized_devices (in case old.device_id was omitted or our persistent ID was reassigned)
                   this.verifyDeviceAuthorization(true);
                 }
                 return;

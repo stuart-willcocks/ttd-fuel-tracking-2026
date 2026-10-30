@@ -384,13 +384,13 @@ export async function registerRemoteDeviceRequest(
 export async function updateRemoteDeviceTelemetry(
   deviceId: string,
   telemetry: DeviceTelemetry
-): Promise<void> {
+): Promise<{ updated: boolean }> {
   if (isSupabaseConfigured()) {
     try {
-      await updateDeviceTelemetryInSupabase(deviceId, telemetry);
-      return;
+      return await updateDeviceTelemetryInSupabase(deviceId, telemetry);
     } catch (err) {
       console.warn('Supabase update telemetry failed, saving locally:', err);
+      return { updated: true };
     }
   }
 
@@ -407,6 +407,8 @@ export async function updateRemoteDeviceTelemetry(
     target.lastTelemetryAt = telemetry.lastTelemetryAt || new Date().toISOString();
     target.lastSeenAt = new Date().toISOString();
     saveMockDevices(current);
+    return { updated: target.status === 'active' };
   }
+  return { updated: false };
 }
 

@@ -864,7 +864,7 @@ export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): 
 export async function updateDeviceTelemetryInSupabase(
   deviceId: string,
   telemetry: DeviceTelemetry
-): Promise<void> {
+): Promise<{ updated: boolean }> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
@@ -887,15 +887,20 @@ export async function updateDeviceTelemetryInSupabase(
   if (typeof telemetry.longitude === 'number') telemetryPayload.longitude = telemetry.longitude;
   if (typeof telemetry.locationAccuracy === 'number') telemetryPayload.location_accuracy = telemetry.locationAccuracy;
 
-  const { error } = await client
+  const { data, error } = await client
     .from('authorized_devices')
     .update(telemetryPayload)
-    .eq('device_id', cleanId);
+    .eq('device_id', cleanId)
+    .select('device_id, status');
 
   if (error) {
-    if (error.code === 'PGRST205') return; // Table not created yet, skip silently
+    if (error.code === 'PGRST205') return { updated: true }; // Table not created yet, skip silently
     console.debug('[Supabase] Telemetry update warning:', error);
+    return { updated: true };
   }
+
+  const matchedActive = Array.isArray(data) && data.length > 0 && data[0]?.status === 'active';
+  return { updated: matchedActive };
 }
 
 /**
@@ -1187,19 +1192,18 @@ export function subscribeToCloudChanges(
   const useDeviceFilter = Boolean(cleanFilterId && !options?.includeAllDevices);
   const channelName = useDeviceFilter ? `ttd-cloud-realtime-${cleanFilterId}` : 'ttd-cloud-realtime-admin';
 
+  // Do NOT apply a column filter (device_id=eq.X) on authorized_devices because:
+  // 1) Under PostgreSQL REPLICA IDENTITY DEFAULT, verify/ check filters on DELETE events may drop or omit events
+  // 2) When an Admin assigns a new persistent Device ID to a PDA, the new row has a different device_id than the PDA's temporary ID
   const authDeviceFilterConfig: {
     event: '*';
     schema: 'public';
     table: 'authorized_devices';
-    filter?: string;
   } = {
     event: '*',
     schema: 'public',
     table: 'authorized_devices',
   };
-  if (useDeviceFilter && cleanFilterId) {
-    authDeviceFilterConfig.filter = `device_id=eq.${cleanFilterId}`;
-  }
 
   const channel = client
     .channel(channelName)

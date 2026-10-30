@@ -444,7 +444,7 @@ export const App: React.FC = () => {
       setIsEnrolled(false);
       return;
     }
-    syncEngine.verifyDeviceAuthorization().then((ok) => {
+    syncEngine.verifyDeviceAuthorization(true).then((ok) => {
       if (!ok) setIsEnrolled(false);
     });
     setActiveAssetId(equipmentId);
@@ -466,7 +466,7 @@ export const App: React.FC = () => {
       setIsEnrolled(false);
       return;
     }
-    syncEngine.verifyDeviceAuthorization().then((ok) => {
+    syncEngine.verifyDeviceAuthorization(true).then((ok) => {
       if (!ok) setIsEnrolled(false);
     });
     setPendingTxData(data);

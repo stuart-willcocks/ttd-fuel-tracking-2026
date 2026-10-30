@@ -250,7 +250,10 @@ export async function reportDeviceAppVersionImmediately(versionOverride?: string
       lastTelemetryAt: new Date().toISOString(),
       appVersion: targetVer,
     };
-    await updateRemoteDeviceTelemetry(deviceId, snapshot);
+    const res = await updateRemoteDeviceTelemetry(deviceId, snapshot);
+    if (res && !res.updated && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ttd:device-missing'));
+    }
     if (!lastSentTelemetry || lastSentTelemetry.latitude === null) {
       lastSentTelemetry = snapshot;
     }
@@ -328,7 +331,10 @@ export async function pushDeviceTelemetry(force: boolean = false): Promise<void>
     const telemetry = await collectDeviceTelemetry();
 
     if (shouldSendTelemetry(telemetry, force)) {
-      await updateRemoteDeviceTelemetry(deviceId, telemetry);
+      const res = await updateRemoteDeviceTelemetry(deviceId, telemetry);
+      if (res && !res.updated && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ttd:device-missing'));
+      }
       lastSentTelemetry = telemetry;
       lastSentTime = Date.now();
       try {
