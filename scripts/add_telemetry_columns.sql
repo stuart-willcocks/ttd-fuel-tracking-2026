@@ -3,7 +3,9 @@
 -- Run this script in the Supabase Dashboard -> SQL Editor
 -- ==============================================================================
 
--- 1. Add telemetry columns to public.authorized_devices
+-- 1. Drop legacy device_name column and add telemetry columns to public.authorized_devices
+ALTER TABLE public.authorized_devices DROP COLUMN IF EXISTS device_name;
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS app_version text;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS battery_level smallint;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS is_charging boolean;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS latitude double precision;

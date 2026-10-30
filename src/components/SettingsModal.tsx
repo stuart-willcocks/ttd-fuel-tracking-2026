@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, RefreshCw, Battery, BatteryCharging } from 'lucide-react';
 import { APP_VERSION } from '../version';
-import { getDeviceId, getDeviceName } from '../services/device';
+import { getDeviceId } from '../services/device';
 import {
   getBatteryStatus,
   getCachedTelemetryStatus,
@@ -30,7 +30,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [batteryInfo, setBatteryInfo] = useState<{ batteryLevel: number; isCharging: boolean } | null>(null);
 
   const currentDeviceId = getDeviceId();
-  const currentDeviceName = getDeviceName();
 
   useEffect(() => {
     if (isOpen) {
@@ -80,13 +79,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {currentDeviceId || 'UNREGISTERED'}
               </span>
             </div>
-
-            {currentDeviceName && currentDeviceName !== currentDeviceId && (
-              <div className="settings-info-row">
-                <span className="settings-row-label">Device Label</span>
-                <span className="settings-row-value">{currentDeviceName}</span>
-              </div>
-            )}
 
             {!currentDeviceId && onOpenEnrollment ? (
               <button

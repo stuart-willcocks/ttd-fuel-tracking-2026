@@ -659,7 +659,6 @@ class SyncEngine {
       if (check.authToken && check.authToken !== currentToken) {
         saveDeviceEnrollment({
           deviceId: currentDevId,
-          deviceName: check.deviceName || currentDevId,
           authToken: check.authToken,
           status: 'active',
         });

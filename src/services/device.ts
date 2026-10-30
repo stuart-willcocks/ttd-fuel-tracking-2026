@@ -1,7 +1,6 @@
 import type { DeviceStatus } from '../types';
 
 const STORAGE_KEY_DEVICE_ID = 'ttd_pda_device_id';
-const STORAGE_KEY_DEVICE_NAME = 'ttd_pda_device_name';
 const STORAGE_KEY_DEVICE_TOKEN = 'ttd_pda_device_token';
 const STORAGE_KEY_DEVICE_STATUS = 'ttd_pda_device_status';
 
@@ -49,6 +48,15 @@ export function generateSecureDeviceToken(): string {
   return token;
 }
 
+function generateRandomHex(length: number = 4): string {
+  const chars = '0123456789ABCDEF';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 /**
  * Checks whether this physical PDA device has an active, valid enrollment token.
  * If there is no active token (revoked, pending, or missing), returns false.
@@ -70,12 +78,21 @@ export function isDeviceEnrolled(): boolean {
 }
 
 /**
- * Returns the permanent user-defined device identifier for this PDA.
- * Returns empty string if not yet enrolled.
+ * Returns the permanent device identifier for this PDA installation.
+ * Generated once per installation and persisted in localStorage.
  */
 export function getDeviceId(): string {
   if (typeof window === 'undefined') return 'PDA-SERVER';
-  return (localStorage.getItem(STORAGE_KEY_DEVICE_ID) || '').trim();
+
+  let id = (localStorage.getItem(STORAGE_KEY_DEVICE_ID) || '').trim();
+  if (!id) {
+    const isZebra =
+      typeof navigator !== 'undefined' && /TC26|Zebra|Android/i.test(navigator.userAgent);
+    const prefix = isZebra ? 'TC26' : 'PDA';
+    id = `${prefix}-${generateRandomHex(4)}`;
+    localStorage.setItem(STORAGE_KEY_DEVICE_ID, id);
+  }
+  return id;
 }
 
 /**
@@ -101,7 +118,6 @@ export function getDeviceStatus(): DeviceStatus | 'unregistered' {
  */
 export function saveDeviceEnrollment(info: {
   deviceId: string;
-  deviceName?: string;
   authToken: string;
   status?: DeviceStatus;
 }): void {
@@ -110,14 +126,11 @@ export function saveDeviceEnrollment(info: {
   const cleanId = info.deviceId.trim().toUpperCase();
   const cleanToken = info.authToken.trim();
   const status = info.status || 'active';
-  const cleanName = info.deviceName && info.deviceName.trim().length > 0
-    ? info.deviceName.trim()
-    : cleanId;
 
   localStorage.setItem(STORAGE_KEY_DEVICE_ID, cleanId);
   localStorage.setItem(STORAGE_KEY_DEVICE_TOKEN, cleanToken);
   localStorage.setItem(STORAGE_KEY_DEVICE_STATUS, status);
-  localStorage.setItem(STORAGE_KEY_DEVICE_NAME, cleanName);
+  localStorage.removeItem('ttd_pda_device_name');
 
   broadcastDeviceAuthEvent({
     type: 'ENROLLED',
@@ -127,8 +140,8 @@ export function saveDeviceEnrollment(info: {
 }
 
 /**
- * Marks this physical device as revoked, removes the active authentication token,
- * and sets status to 'revoked' so the lockdown screen displays the decommissioned state.
+ * Marks this physical device as not authorized, removes the active authentication token,
+ * and sets status to 'revoked' so the lockdown screen displays the not-authorized state.
  */
 export function markDeviceRevoked(): void {
   if (typeof window === 'undefined') return;
@@ -144,13 +157,12 @@ export function markDeviceRevoked(): void {
 }
 
 /**
- * Wipes all device authorization data from this client.
+ * Wipes device authorization token & status from this client while preserving the permanent Device ID.
  */
 export function clearDeviceEnrollment(): void {
   if (typeof window === 'undefined') return;
   const currentDevId = getDeviceId();
-  localStorage.removeItem(STORAGE_KEY_DEVICE_ID);
-  localStorage.removeItem(STORAGE_KEY_DEVICE_NAME);
+  localStorage.removeItem('ttd_pda_device_name');
   localStorage.removeItem(STORAGE_KEY_DEVICE_TOKEN);
   localStorage.removeItem(STORAGE_KEY_DEVICE_STATUS);
 
@@ -162,8 +174,7 @@ export function clearDeviceEnrollment(): void {
 }
 
 /**
- * Sets a custom permanent device identifier for this PDA installation.
- * Also synchronizes the display device name.
+ * Sets a permanent device identifier for this PDA installation.
  */
 export function setDeviceId(id: string): void {
   if (typeof window === 'undefined') return;
@@ -171,37 +182,5 @@ export function setDeviceId(id: string): void {
   const trimmed = id.trim().toUpperCase();
   if (trimmed) {
     localStorage.setItem(STORAGE_KEY_DEVICE_ID, trimmed);
-    const existingName = localStorage.getItem(STORAGE_KEY_DEVICE_NAME);
-    if (!existingName) {
-      localStorage.setItem(STORAGE_KEY_DEVICE_NAME, trimmed);
-    }
-  }
-}
-
-/**
- * Returns the friendly display label for this PDA (e.g. "Fuel Truck 1" or deviceId).
- */
-export function getDeviceName(): string {
-  if (typeof window === 'undefined') return 'PDA-SERVER';
-
-  const customName = localStorage.getItem(STORAGE_KEY_DEVICE_NAME);
-  if (customName && customName.trim().length > 0) {
-    return customName.trim();
-  }
-  const id = getDeviceId();
-  return id || 'Unregistered PDA';
-}
-
-/**
- * Sets a custom friendly label for this device (e.g. "Fuel Truck 1", "North Yard PDA").
- */
-export function setDeviceName(name: string): void {
-  if (typeof window === 'undefined') return;
-
-  const trimmed = name.trim();
-  if (trimmed) {
-    localStorage.setItem(STORAGE_KEY_DEVICE_NAME, trimmed);
-  } else {
-    localStorage.removeItem(STORAGE_KEY_DEVICE_NAME);
   }
 }

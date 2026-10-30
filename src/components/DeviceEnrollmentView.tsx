@@ -3,15 +3,12 @@ import {
   ShieldAlert,
   CheckCircle2,
   RefreshCw,
-  KeyRound,
-  Smartphone,
   AlertTriangle,
 } from 'lucide-react';
 import {
   saveDeviceEnrollment,
   getDeviceStatus,
   getDeviceId,
-  getDeviceName,
   getDeviceToken,
 } from '../services/device';
 import { verifyRemoteDeviceToken, registerRemoteDeviceRequest } from '../services/api';
@@ -24,32 +21,24 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
   onEnrolled,
 }) => {
   const initialStatus = getDeviceStatus();
-  const initialId = getDeviceId();
+  const deviceId = getDeviceId();
   const initialToken = getDeviceToken();
-  const initialName = getDeviceName();
 
-  const [deviceIdInput, setDeviceIdInput] = useState(initialId || '');
-  const [deviceNameInput, setDeviceNameInput] = useState(
-    initialName && initialName !== 'Unregistered PDA' && initialName !== initialId ? initialName : ''
-  );
   const [pendingToken, setPendingToken] = useState(initialToken || '');
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [pendingApprovalDeviceId, setPendingApprovalDeviceId] = useState<string | null>(
-    initialStatus === 'pending' && initialId ? initialId : null
+    initialStatus === 'pending' && deviceId ? deviceId : null
   );
-
-  const isRevoked = initialStatus === 'revoked';
 
   // Submit registration request to Admin Console
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanId = deviceIdInput.trim().toUpperCase();
-    const cleanName = deviceNameInput.trim() || cleanId;
+    const cleanId = deviceId.trim().toUpperCase();
 
     if (!cleanId) {
-      setErrorMsg('Please enter a valid Device ID (e.g. TC26-01).');
+      setErrorMsg('Device ID is unavailable.');
       return;
     }
 
@@ -57,11 +46,10 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
     setIsProcessing(true);
 
     try {
-      const reg = await registerRemoteDeviceRequest(cleanId, cleanName);
+      const reg = await registerRemoteDeviceRequest(cleanId);
       setPendingToken(reg.token);
       saveDeviceEnrollment({
         deviceId: cleanId,
-        deviceName: cleanName,
         authToken: reg.token,
         status: 'pending',
       });
@@ -75,7 +63,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
     }
   };
 
-  // Auto-recover if this browser already has a stored Device ID + Token that is re-activated in the Admin Console
+  // Auto-recover if this browser already has a stored Device ID + Token that is active in the Admin Console
   useEffect(() => {
     const storedId = getDeviceId();
     const storedTok = getDeviceToken();
@@ -88,11 +76,10 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
         if (!cancelled && check.valid && check.status === 'active' && check.authToken) {
           saveDeviceEnrollment({
             deviceId: storedId,
-            deviceName: check.deviceName || storedId,
             authToken: check.authToken,
             status: 'active',
           });
-          setSuccessMsg(`Device ${storedId} is active and authorized!`);
+          setSuccessMsg(`Device ${storedId} is authorized!`);
           setTimeout(() => {
             if (!cancelled) onEnrolled();
           }, 500);
@@ -117,12 +104,12 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
     let cancelled = false;
     const poll = async () => {
       try {
-        const tokenToCheck = pendingToken || getDeviceToken() || 'approved_by_admin';
+        const tokenToCheck = pendingToken || getDeviceToken();
+        if (!tokenToCheck) return;
         const check = await verifyRemoteDeviceToken(pendingApprovalDeviceId, tokenToCheck);
         if (!cancelled && (check.valid || check.status === 'active')) {
           saveDeviceEnrollment({
             deviceId: pendingApprovalDeviceId,
-            deviceName: check.deviceName || deviceNameInput.trim() || pendingApprovalDeviceId,
             authToken: check.authToken || tokenToCheck,
             status: 'active',
           });
@@ -142,7 +129,7 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [pendingApprovalDeviceId, pendingToken, deviceNameInput, onEnrolled]);
+  }, [pendingApprovalDeviceId, pendingToken, onEnrolled]);
 
   return (
     <div
@@ -183,17 +170,17 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
-              background: isRevoked ? 'rgba(239, 68, 68, 0.25)' : 'rgba(0,0,0,0.25)',
-              color: isRevoked ? '#EF4444' : '#FFFFFF',
-              border: isRevoked ? '1px solid #EF4444' : 'none',
+              background: 'rgba(239, 68, 68, 0.25)',
+              color: '#EF4444',
+              border: '1px solid #EF4444',
               padding: '4px 8px',
               borderRadius: '4px',
               fontSize: '0.72rem',
               fontWeight: 800,
             }}
           >
-            {isRevoked ? <ShieldAlert size={13} color="#EF4444" /> : <Smartphone size={13} />}
-            <span>{isRevoked ? 'LOCKED (REVOKED)' : 'LOCKED (UNREGISTERED)'}</span>
+            <ShieldAlert size={13} color="#EF4444" />
+            <span>NOT AUTHORIZED</span>
           </div>
         </div>
       </div>
@@ -212,32 +199,27 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
       >
         <div>
           {/* Header Icon & Title */}
-          <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '18px' }}>
             <div
               style={{
                 width: '46px',
                 height: '46px',
-                margin: '0 auto 8px auto',
+                margin: '0 auto 10px auto',
                 borderRadius: '10px',
-                background: isRevoked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(236, 114, 30, 0.15)',
-                border: `1px solid ${isRevoked ? '#EF4444' : '#EC721E'}`,
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid #EF4444',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: isRevoked ? '#EF4444' : '#EC721E',
+                color: '#EF4444',
               }}
             >
-              {isRevoked ? <ShieldAlert size={24} /> : <KeyRound size={24} />}
+              <ShieldAlert size={24} />
             </div>
 
-            <h1 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0 0 4px 0', color: '#FFFFFF' }}>
-              {isRevoked ? 'Device Decommissioned' : 'PDA Registration Required'}
+            <h1 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>
+              Device not authorized
             </h1>
-            <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: 0, lineHeight: 1.4 }}>
-              {isRevoked
-                ? 'Authorization for this scanner has been revoked by an administrator. Submit a registration request below or re-activate this device in the Admin Console.'
-                : 'This handheld is locked down. Submit a registration request below and approve it in the Admin Console.'}
-            </p>
           </div>
 
           {/* Feedback Banners */}
@@ -303,14 +285,13 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
                   marginBottom: '6px',
                 }}
               >
-                Device ID (e.g. TC26-01) *
+                Device ID
               </label>
               <input
                 type="text"
-                value={deviceIdInput}
-                onChange={(e) => setDeviceIdInput(e.target.value.toUpperCase())}
-                placeholder="e.g. TC26-01"
-                disabled={isProcessing || Boolean(pendingApprovalDeviceId)}
+                value={deviceId}
+                readOnly
+                disabled
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -323,86 +304,30 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
                   fontWeight: 700,
                   boxSizing: 'border-box',
                   outline: 'none',
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '14px' }}>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
-                  color: '#94A3B8',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                  marginBottom: '6px',
-                }}
-              >
-                Device Label / Description (Optional)
-              </label>
-              <input
-                type="text"
-                value={deviceNameInput}
-                onChange={(e) => setDeviceNameInput(e.target.value)}
-                placeholder="e.g. North Yard Scanner 1"
-                disabled={isProcessing || Boolean(pendingApprovalDeviceId)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  background: '#030712',
-                  border: '1px solid #334155',
-                  borderRadius: '6px',
-                  color: '#FFFFFF',
-                  fontSize: '0.9rem',
-                  boxSizing: 'border-box',
-                  outline: 'none',
+                  cursor: 'not-allowed',
                 }}
               />
             </div>
 
             {pendingApprovalDeviceId ? (
-              <div>
-                <div
-                  style={{
-                    background: 'rgba(234, 179, 8, 0.15)',
-                    border: '1px solid #EAB308',
-                    padding: '12px',
-                    borderRadius: '6px',
-                    color: '#FDE047',
-                    fontSize: '0.82rem',
-                    textAlign: 'center',
-                    marginBottom: '10px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 700 }}>
-                    <RefreshCw size={14} className="admin-spin" />
-                    <span>Awaiting Admin Approval...</span>
-                  </div>
-                  <div style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.85 }}>
-                    Open Admin Console &rarr; PDAs tab and click &ldquo;Approve&rdquo; for <strong>{pendingApprovalDeviceId}</strong>.
-                  </div>
+              <div
+                style={{
+                  background: 'rgba(234, 179, 8, 0.15)',
+                  border: '1px solid #EAB308',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  color: '#FDE047',
+                  fontSize: '0.82rem',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 700 }}>
+                  <RefreshCw size={14} className="admin-spin" />
+                  <span>Awaiting Admin Approval...</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPendingApprovalDeviceId(null);
-                    setSuccessMsg(null);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '9px',
-                    background: 'transparent',
-                    color: '#94A3B8',
-                    border: '1px solid #334155',
-                    borderRadius: '6px',
-                    fontWeight: 600,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Change Device ID
-                </button>
+                <div style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.85 }}>
+                  Open Admin Console &rarr; Devices tab and click &ldquo;Approve&rdquo; for <strong>{pendingApprovalDeviceId}</strong>.
+                </div>
               </div>
             ) : (
               <button

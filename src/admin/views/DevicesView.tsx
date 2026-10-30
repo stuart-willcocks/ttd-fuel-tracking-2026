@@ -1,9 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
   Smartphone,
-  ShieldCheck,
-  ShieldAlert,
-  Clock,
   Trash2,
   CheckCircle2,
   RefreshCw,
@@ -13,7 +10,6 @@ import {
   BatteryCharging,
   BatteryMedium,
   BatteryWarning,
-  MapPin,
   ExternalLink,
   Zap,
 } from 'lucide-react';
@@ -65,7 +61,6 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
       total: devices.length,
       active: devices.filter((d) => d.status === 'active').length,
       pending: devices.filter((d) => d.status === 'pending').length,
-      revoked: devices.filter((d) => d.status === 'revoked').length,
     };
   }, [devices]);
 
@@ -234,7 +229,6 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           transition: 'all 0.15s ease',
         }}
       >
-        <MapPin size={13} style={{ flexShrink: 0, color: '#2563EB' }} />
         <span>{lat}, {lon}</span>
         {typeof dev.locationAccuracy === 'number' && (
           <span style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 500 }}>
@@ -244,14 +238,6 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         <ExternalLink size={10} style={{ opacity: 0.65, flexShrink: 0 }} />
       </a>
     );
-  };
-
-  const handleToggleRevoke = async (dev: AuthorizedDevice) => {
-    const newStatus: DeviceStatus = dev.status === 'active' ? 'revoked' : 'active';
-    const actionLabel = newStatus === 'revoked' ? 'revoke access for' : 're-activate';
-    if (window.confirm(`Are you sure you want to ${actionLabel} PDA "${dev.deviceId}"?`)) {
-      await onUpdateStatus(dev.deviceId, newStatus);
-    }
   };
 
   const handleApprove = async (dev: AuthorizedDevice) => {
@@ -336,7 +322,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 </strong>
               </div>
               <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--adm-text-secondary)', maxWidth: '720px' }}>
-                Add dedicated columns (<code>battery_level</code>, <code>is_charging</code>, <code>latitude</code>, <code>longitude</code>, <code>location_accuracy</code>, <code>last_telemetry_at</code>) to <code>public.authorized_devices</code>. This removes all workarounds and enables full native telemetry streaming.
+                Add dedicated columns (<code>app_version</code>, <code>battery_level</code>, <code>is_charging</code>, <code>latitude</code>, <code>longitude</code>, <code>location_accuracy</code>, <code>last_telemetry_at</code>) to <code>public.authorized_devices</code>.
               </p>
             </div>
 
@@ -367,7 +353,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 }}
               >
                 {copiedTelemetrySql ? <Check size={14} /> : <Copy size={14} />}
-                <span>{copiedTelemetrySql ? 'Copied 6-Line SQL!' : 'Copy Telemetry SQL'}</span>
+                <span>{copiedTelemetrySql ? 'Copied SQL!' : 'Copy Telemetry SQL'}</span>
               </button>
             </div>
           </div>
@@ -411,9 +397,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {[
             { key: 'ALL', label: 'All Devices', count: counts.total },
-            { key: 'active', label: 'Active', count: counts.active },
+            { key: 'active', label: 'Authorized', count: counts.active },
             { key: 'pending', label: 'Pending', count: counts.pending },
-            { key: 'revoked', label: 'Revoked', count: counts.revoked },
           ].map((tab) => {
             const isSelected = statusFilter === tab.key;
             return (
@@ -467,7 +452,6 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             <thead>
               <tr>
                 <th>Device ID</th>
-                <th>Device Label / Description</th>
                 <th>APP VERSION</th>
                 <th>Status</th>
                 <th>Last Active / Synced</th>
@@ -482,29 +466,19 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               {filteredDevices.map((dev) => {
                 const isActive = dev.status === 'active';
                 const isPending = dev.status === 'pending';
-                const isRevoked = dev.status === 'revoked';
 
                 return (
                   <tr key={dev.deviceId}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Smartphone size={16} color="#64748B" />
-                        <span
-                          style={{
-                            fontWeight: 800,
-                            fontFamily: 'monospace',
-                            fontSize: '0.94rem',
-                            color: 'var(--adm-text-primary)',
-                          }}
-                        >
-                          {dev.deviceId}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td>
-                      <span style={{ fontWeight: 500, color: 'var(--adm-text-primary)' }}>
-                        {dev.deviceName || '—'}
+                      <span
+                        style={{
+                          fontWeight: 800,
+                          fontFamily: 'monospace',
+                          fontSize: '0.94rem',
+                          color: 'var(--adm-text-primary)',
+                        }}
+                      >
+                        {dev.deviceId}
                       </span>
                     </td>
 
@@ -537,34 +511,25 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                           style={{ cursor: 'default', background: 'rgba(34, 197, 94, 0.12)', color: '#16A34A', border: '1px solid rgba(34, 197, 94, 0.25)' }}
                         >
                           <span className="pulse-dot green" />
-                          <span>Active</span>
+                          <span>Authorized</span>
                         </span>
                       )}
                       {isPending && (
-                        <span
-                          className="admin-sync-pill offline"
-                          style={{ cursor: 'default', background: 'rgba(234, 179, 8, 0.12)', color: '#D97706', border: '1px solid rgba(234, 179, 8, 0.25)' }}
+                        <button
+                          type="button"
+                          onClick={() => handleApprove(dev)}
+                          className="admin-btn admin-btn-success admin-btn-sm"
+                          title="Approve this device for live fuel tracking"
+                          style={{ padding: '5px 10px' }}
                         >
-                          <span className="pulse-dot amber" />
-                          <span>Pending Approval</span>
-                        </span>
-                      )}
-                      {isRevoked && (
-                        <span
-                          className="admin-sync-pill offline"
-                          style={{ cursor: 'default', background: 'rgba(239, 68, 68, 0.12)', color: '#DC2626', border: '1px solid rgba(239, 68, 68, 0.25)' }}
-                        >
-                          <span className="pulse-dot" style={{ background: '#DC2626' }} />
-                          <span>Revoked</span>
-                        </span>
+                          <CheckCircle2 size={14} />
+                          <span style={{ fontSize: '0.76rem' }}>Approve</span>
+                        </button>
                       )}
                     </td>
 
                     <td style={{ fontSize: '0.82rem', color: 'var(--adm-text-secondary)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <Clock size={13} style={{ opacity: 0.6 }} />
-                        <span>{formatDate(dev.lastSeenAt)}</span>
-                      </div>
+                      <span>{formatDate(dev.lastSeenAt)}</span>
                     </td>
 
                     <td
@@ -593,38 +558,6 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
-                        {/* Approve Button (if pending) */}
-                        {isPending && (
-                          <button
-                            type="button"
-                            onClick={() => handleApprove(dev)}
-                            className="admin-btn admin-btn-success admin-btn-sm"
-                            title="Approve this device for live fuel tracking"
-                            style={{ padding: '5px 8px' }}
-                          >
-                            <CheckCircle2 size={14} />
-                            <span style={{ fontSize: '0.76rem' }}>Approve</span>
-                          </button>
-                        )}
-
-                        {/* Revoke / Restore Toggle */}
-                        {!isPending && (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleRevoke(dev)}
-                            className={`admin-btn ${isActive ? 'admin-btn-outline' : 'admin-btn-secondary'} admin-btn-sm`}
-                            title={isActive ? 'Revoke scanner access' : 'Re-activate scanner'}
-                            style={{
-                              padding: '5px 8px',
-                              color: isActive ? '#EF4444' : '#16A34A',
-                              borderColor: isActive ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)',
-                            }}
-                          >
-                            {isActive ? <ShieldAlert size={14} /> : <ShieldCheck size={14} />}
-                            <span style={{ fontSize: '0.76rem' }}>{isActive ? 'Revoke' : 'Activate'}</span>
-                          </button>
-                        )}
-
                         {/* Delete Device */}
                         <button
                           type="button"

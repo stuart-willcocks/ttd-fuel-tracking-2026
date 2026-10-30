@@ -3,9 +3,10 @@
 -- Run this script in the Supabase Dashboard -> SQL Editor
 -- ==============================================================================
 
--- 1. Add native coordinate & version columns to avoid overloaded string/JSON columns
+-- 1. Add native coordinate & version columns and drop legacy device_name column
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS latitude double precision;
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS longitude double precision;
+ALTER TABLE public.authorized_devices DROP COLUMN IF EXISTS device_name;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS app_version text;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS battery_level smallint;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS is_charging boolean;
@@ -39,3 +40,4 @@ DROP POLICY IF EXISTS "Allow delete authorized_devices for anon" ON public.autho
 DROP POLICY IF EXISTS "Allow delete authorized_devices for authenticated admins" ON public.authorized_devices;
 CREATE POLICY "Allow delete authorized_devices for authenticated admins"
   ON public.authorized_devices FOR DELETE TO authenticated USING (true);
+

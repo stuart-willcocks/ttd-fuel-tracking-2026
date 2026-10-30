@@ -265,7 +265,6 @@ export async function postRemoteAuthorizedDevice(device: AuthorizedDevice): Prom
     ...device,
     deviceId: device.deviceId.trim().toUpperCase(),
     authToken: device.authToken.trim(),
-    deviceName: device.deviceName ? device.deviceName.trim() : device.deviceId.trim().toUpperCase(),
   };
 
   if (isSupabaseConfigured()) {
@@ -308,7 +307,7 @@ export async function deleteRemoteAuthorizedDevice(deviceId: string): Promise<vo
 export async function verifyRemoteDeviceToken(
   deviceId: string,
   token: string
-): Promise<{ valid: boolean; status: DeviceStatus; deviceName?: string; authToken?: string }> {
+): Promise<{ valid: boolean; status: DeviceStatus; authToken?: string }> {
   const cleanId = deviceId.trim().toUpperCase();
   const cleanToken = token.trim();
 
@@ -331,19 +330,17 @@ export async function verifyRemoteDeviceToken(
   return {
     valid: match && target.status === 'active',
     status: match ? target.status : 'revoked',
-    deviceName: target.deviceName || target.deviceId,
     authToken: match && target.status === 'active' ? target.authToken : undefined,
   };
 }
 
 export async function registerRemoteDeviceRequest(
   deviceId: string,
-  deviceName?: string,
   token?: string
 ): Promise<{ status: DeviceStatus; token: string }> {
   if (isSupabaseConfigured()) {
     try {
-      return await registerDeviceRequestToSupabase(deviceId, deviceName, token);
+      return await registerDeviceRequestToSupabase(deviceId, token);
     } catch (err) {
       console.warn('Supabase register device request failed:', err);
     }
@@ -354,7 +351,6 @@ export async function registerRemoteDeviceRequest(
   const now = new Date().toISOString();
   const existing = current.find((d) => d.deviceId === cleanId);
   if (existing) {
-    existing.deviceName = deviceName || cleanId;
     existing.authToken = finalToken;
     existing.status = 'pending';
     existing.lastSeenAt = now;
@@ -363,7 +359,6 @@ export async function registerRemoteDeviceRequest(
   }
   current.unshift({
     deviceId: cleanId,
-    deviceName: deviceName || cleanId,
     authToken: finalToken,
     status: 'pending',
     registeredAt: now,

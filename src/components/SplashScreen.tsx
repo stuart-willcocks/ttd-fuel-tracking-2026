@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { getDeviceName } from '../services/device';
+import { getDeviceId } from '../services/device';
 import { APP_VERSION, BUILD_NUMBER, getIsStaging } from '../version';
 import { checkRemoteAppVersion, performAppUpdate } from '../services/appUpdate';
 import { reportDeviceAppVersionImmediately } from '../services/telemetry';
@@ -9,7 +9,7 @@ interface SplashScreenProps {
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
-  const deviceName = getDeviceName();
+  const deviceId = getDeviceId();
   const isStaging = getIsStaging();
   const [versionText, setVersionText] = useState<string>('Checking for updates...');
   const [isContinueEnabled, setIsContinueEnabled] = useState<boolean>(false);
@@ -115,7 +115,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
             {versionText}
           </div>
           <div className="splash-device-line">
-            Device ID: <strong>{deviceName}</strong>
+            Device ID: <strong>{deviceId}</strong>
           </div>
         </div>
 

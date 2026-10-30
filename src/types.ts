@@ -71,7 +71,6 @@ export interface DeviceTelemetry {
 
 export interface AuthorizedDevice extends DeviceTelemetry {
   deviceId: string;
-  deviceName?: string;
   authToken: string;
   status: DeviceStatus;
   registeredAt: string;

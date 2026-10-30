@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient, type Session, type AuthChangeEvent } from '@supabase/supabase-js';
 import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus, DeviceTelemetry } from '../types';
-import { generateSecureDeviceToken, getDeviceId, getDeviceName, getDeviceToken } from './device';
+import { generateSecureDeviceToken, getDeviceId, getDeviceToken } from './device';
 import { getReportedAppVersion } from '../version';
 import { db } from '../db/indexedDB';
 import { postRemoteTransaction } from './api';
@@ -54,7 +54,6 @@ interface CachedDeviceTokenVerification {
   token: string;
   valid: boolean;
   status: DeviceStatus;
-  deviceName?: string;
   authToken?: string;
   checkedAt: number;
 }
@@ -764,80 +763,20 @@ export async function uploadTransactionToCloud(
   }
 }
 
-// Cache of clean device labels by device_id so telemetry updates never need an extra SELECT query
-const knownDeviceNamesById = new Map<string, string>();
-
-function parseDeviceNameAndVersion(
-  rawName: string | null | undefined,
-  fallbackId: string
-): { cleanName: string; appVersion: string | null } {
-  if (!rawName || typeof rawName !== 'string') {
-    return { cleanName: fallbackId, appVersion: null };
-  }
-  let working = rawName;
-  let appVersion: string | null = null;
-
-  if (working.includes('__TEL__')) {
-    const parts = working.split('__TEL__');
-    working = parts[0] || fallbackId;
-    try {
-      const parsed = JSON.parse(parts[1]);
-      if (parsed && parsed.appVersion) {
-        appVersion = String(parsed.appVersion);
-      }
-    } catch {}
-  }
-
-  if (working.includes('__VER__')) {
-    const vParts = working.split('__VER__');
-    working = vParts[0] || fallbackId;
-    if (vParts[1] && vParts[1].trim()) {
-      appVersion = vParts[1].trim();
-    }
-  }
-
-  return {
-    cleanName: working.trim() || fallbackId,
-    appVersion,
-  };
-}
-
 /**
  * Map a raw Supabase `authorized_devices` row to an `AuthorizedDevice` domain object
  */
 export function mapSupabaseRowToAuthorizedDevice(row: any): AuthorizedDevice {
-  const rawName: string = row.device_name || row.device_id;
-  const { cleanName, appVersion: encodedVer } = parseDeviceNameAndVersion(rawName, row.device_id);
-  if (row.device_id) {
-    knownDeviceNamesById.set(String(row.device_id).toUpperCase(), cleanName);
-  }
-
-  let batteryLevel = typeof row.battery_level === 'number' ? row.battery_level : null;
-  let isCharging = typeof row.is_charging === 'boolean' ? row.is_charging : null;
-  let latitude = typeof row.latitude === 'number' ? row.latitude : null;
-  let longitude = typeof row.longitude === 'number' ? row.longitude : null;
-  let locationAccuracy = typeof row.location_accuracy === 'number' ? row.location_accuracy : null;
-  let lastTelemetryAt = row.last_telemetry_at || null;
-  let appVersion: string | null = row.app_version ? String(row.app_version) : encodedVer;
-
-  // Decode telemetry from device_name fallback if dedicated columns are not yet in Supabase
-  if (rawName && typeof rawName === 'string' && rawName.includes('__TEL__')) {
-    const parts = rawName.split('__TEL__');
-    try {
-      const parsed = JSON.parse(parts[1]);
-      if (batteryLevel === null && typeof parsed.batteryLevel === 'number') batteryLevel = parsed.batteryLevel;
-      if (isCharging === null && typeof parsed.isCharging === 'boolean') isCharging = parsed.isCharging;
-      if (latitude === null && typeof parsed.latitude === 'number') latitude = parsed.latitude;
-      if (longitude === null && typeof parsed.longitude === 'number') longitude = parsed.longitude;
-      if (locationAccuracy === null && typeof parsed.locationAccuracy === 'number') locationAccuracy = parsed.locationAccuracy;
-      if (!lastTelemetryAt && parsed.lastTelemetryAt) lastTelemetryAt = parsed.lastTelemetryAt;
-      if (!appVersion && parsed.appVersion) appVersion = String(parsed.appVersion);
-    } catch {}
-  }
+  const batteryLevel = typeof row.battery_level === 'number' ? row.battery_level : null;
+  const isCharging = typeof row.is_charging === 'boolean' ? row.is_charging : null;
+  const latitude = typeof row.latitude === 'number' ? row.latitude : null;
+  const longitude = typeof row.longitude === 'number' ? row.longitude : null;
+  const locationAccuracy = typeof row.location_accuracy === 'number' ? row.location_accuracy : null;
+  const lastTelemetryAt = row.last_telemetry_at || null;
+  const appVersion: string | null = row.app_version ? String(row.app_version) : null;
 
   return {
     deviceId: row.device_id,
-    deviceName: cleanName,
     authToken: row.auth_token,
     status: row.status as DeviceStatus,
     registeredAt: row.registered_at,
@@ -883,18 +822,12 @@ export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): 
   if (!client) throw new Error('Supabase not configured');
 
   const cleanId = device.deviceId.trim().toUpperCase();
-  const rawName = device.deviceName || cleanId;
-  const { cleanName, appVersion: existingVer } = parseDeviceNameAndVersion(rawName, cleanId);
-  knownDeviceNamesById.set(cleanId, cleanName);
-
-  const versionToStore = device.appVersion || existingVer || null;
-  const storedName = versionToStore ? `${cleanName}__VER__${versionToStore}` : cleanName;
 
   const payload: Record<string, unknown> = {
     device_id: cleanId,
-    device_name: storedName,
     auth_token: device.authToken.trim(),
     status: device.status,
+    app_version: device.appVersion || getReportedAppVersion(),
     registered_at: device.registeredAt || new Date().toISOString(),
     last_seen_at: device.lastSeenAt || new Date().toISOString(),
   };
@@ -911,10 +844,9 @@ export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): 
     .upsert(payload, { onConflict: 'device_id' });
 
   // If telemetry columns do not exist yet on remote table, retry with standard core columns
-  if (error && (error.code === 'PGRST204' || (error.message && (error.message.includes('column') || error.message.includes('battery'))))) {
+  if (error && (error.code === 'PGRST204' || (error.message && (error.message.includes('column') || error.message.includes('battery') || error.message.includes('app_version'))))) {
     const basicPayload = {
       device_id: payload.device_id,
-      device_name: payload.device_name,
       auth_token: payload.auth_token,
       status: payload.status,
       registered_at: payload.registered_at,
@@ -950,23 +882,12 @@ export async function updateDeviceTelemetryInSupabase(
   lastSeenWriteByDevice.set(cleanId, now);
 
   const runningVersion = getReportedAppVersion(telemetry.appVersion);
-  const confirmedName = knownDeviceNamesById.get(cleanId);
-  const localLabel = getDeviceName();
-  const fallbackBaseName =
-    confirmedName ||
-    (localLabel && localLabel !== 'Unregistered PDA' && localLabel !== 'PDA-SERVER'
-      ? parseDeviceNameAndVersion(localLabel, cleanId).cleanName
-      : cleanId);
 
   const payload: Record<string, unknown> = {
+    app_version: runningVersion,
     last_seen_at: nowIso,
     last_telemetry_at: telemetry.lastTelemetryAt || nowIso,
   };
-
-  // Only update device_name when we have the verified cleanName from Supabase so cold-start pings never overwrite an Admin's custom label
-  if (confirmedName) {
-    payload.device_name = `${confirmedName}__VER__${runningVersion}`;
-  }
 
   if (typeof telemetry.batteryLevel === 'number') payload.battery_level = telemetry.batteryLevel;
   if (typeof telemetry.isCharging === 'boolean') payload.is_charging = telemetry.isCharging;
@@ -983,16 +904,12 @@ export async function updateDeviceTelemetryInSupabase(
     return;
   }
 
-  // If telemetry columns do not exist yet on Supabase table (PGRST204 / 42703), store telemetry metadata in device_name fallback
-  if (error && (error.code === 'PGRST204' || error.code === '42703' || (error.message && (error.message.includes('column') || error.message.includes('battery'))))) {
+  // If telemetry columns do not exist yet on Supabase table (PGRST204 / 42703), update last_seen_at
+  if (error && (error.code === 'PGRST204' || error.code === '42703' || (error.message && (error.message.includes('column') || error.message.includes('battery') || error.message.includes('app_version'))))) {
     try {
-      const fallbackPayload = {
-        device_name: `${fallbackBaseName}__VER__${runningVersion}__TEL__${JSON.stringify({ ...telemetry, appVersion: runningVersion })}`,
-        last_seen_at: nowIso,
-      };
       const fallbackRes = await client
         .from('authorized_devices')
-        .update(fallbackPayload)
+        .update({ last_seen_at: nowIso })
         .eq('device_id', cleanId);
       error = fallbackRes.error;
     } catch {
@@ -1063,7 +980,7 @@ export async function verifyDeviceTokenWithSupabase(
   deviceId: string,
   token: string,
   forceRefresh = false
-): Promise<{ valid: boolean; status: DeviceStatus; deviceName?: string; authToken?: string }> {
+): Promise<{ valid: boolean; status: DeviceStatus; authToken?: string }> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
@@ -1082,16 +999,25 @@ export async function verifyDeviceTokenWithSupabase(
     return {
       valid: cachedDeviceTokenAuth.valid,
       status: cachedDeviceTokenAuth.status,
-      deviceName: cachedDeviceTokenAuth.deviceName,
       authToken: cachedDeviceTokenAuth.authToken,
     };
   }
 
-  const { data, error } = await client
+  let { data, error } = await client
     .from('authorized_devices')
-    .select('device_id, device_name, auth_token, status')
+    .select('device_id, auth_token, status, app_version')
     .eq('device_id', cleanId)
     .maybeSingle();
+
+  if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('app_version'))) {
+    const fallbackQuery = await client
+      .from('authorized_devices')
+      .select('device_id, auth_token, status')
+      .eq('device_id', cleanId)
+      .maybeSingle();
+    data = fallbackQuery.data ? { ...fallbackQuery.data, app_version: null } : null;
+    error = fallbackQuery.error;
+  }
 
   if (error) {
     if (error.code === 'PGRST116') {
@@ -1112,8 +1038,7 @@ export async function verifyDeviceTokenWithSupabase(
     return { valid: false, status: 'revoked' };
   }
 
-  const { cleanName, appVersion: storedVersion } = parseDeviceNameAndVersion(data.device_name, data.device_id);
-  knownDeviceNamesById.set(cleanId, cleanName);
+  const storedVersion = data.app_version ? String(data.app_version) : null;
 
   // Strict cryptographic token match (no hardcoded bypass strings)
   const isTokenMatch = Boolean(cleanToken) && data.auth_token === cleanToken;
@@ -1125,7 +1050,6 @@ export async function verifyDeviceTokenWithSupabase(
       token: cleanToken,
       valid: true,
       status: 'active',
-      deviceName: cleanName,
       authToken: data.auth_token,
       checkedAt: now,
     };
@@ -1142,7 +1066,7 @@ export async function verifyDeviceTokenWithSupabase(
         last_seen_at: new Date(now).toISOString(),
       };
       if (!isAdminRoute) {
-        updateFields.device_name = `${cleanName}__VER__${reportedVer}`;
+        updateFields.app_version = reportedVer;
       }
       client
         .from('authorized_devices')
@@ -1157,7 +1081,6 @@ export async function verifyDeviceTokenWithSupabase(
   return {
     valid: isActive,
     status: isActive ? 'active' : ((data.status as DeviceStatus) || 'revoked'),
-    deviceName: cleanName,
     authToken: isActive ? data.auth_token : undefined,
   };
 }
@@ -1168,7 +1091,6 @@ export async function verifyDeviceTokenWithSupabase(
  */
 export async function registerDeviceRequestToSupabase(
   deviceId: string,
-  deviceName?: string,
   authToken?: string
 ): Promise<{ status: DeviceStatus; token: string }> {
   const client = getSupabaseClient();
@@ -1177,22 +1099,32 @@ export async function registerDeviceRequestToSupabase(
   const cleanId = deviceId.trim().toUpperCase();
   const token = authToken || generateSecureDeviceToken();
   const now = new Date().toISOString();
-  const rawName = (deviceName || cleanId).trim();
-  const { cleanName } = parseDeviceNameAndVersion(rawName, cleanId);
-  knownDeviceNamesById.set(cleanId, cleanName);
-  const storedName = `${cleanName}__VER__${getReportedAppVersion()}`;
 
-  const { error } = await client.from('authorized_devices').upsert(
+  let { error } = await client.from('authorized_devices').upsert(
     {
       device_id: cleanId,
-      device_name: storedName,
       auth_token: token,
       status: 'pending',
+      app_version: getReportedAppVersion(),
       registered_at: now,
       last_seen_at: now,
     },
     { onConflict: 'device_id' }
   );
+
+  if (error && (error.code === 'PGRST204' || error.code === '42703' || error.message?.includes('app_version'))) {
+    const retryRes = await client.from('authorized_devices').upsert(
+      {
+        device_id: cleanId,
+        auth_token: token,
+        status: 'pending',
+        registered_at: now,
+        last_seen_at: now,
+      },
+      { onConflict: 'device_id' }
+    );
+    error = retryRes.error;
+  }
 
   if (error) throw error;
   return { status: 'pending', token };
@@ -1294,9 +1226,8 @@ ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS longitude double prec
 -- Create Authorized Devices Table (PDA Whitelist)
 CREATE TABLE IF NOT EXISTS public.authorized_devices (
   device_id text PRIMARY KEY,
-  device_name text,
   auth_token text NOT NULL,
-  status text NOT NULL CHECK (status IN ('active', 'pending', 'revoked')),
+  status text NOT NULL CHECK (status IN ('active', 'pending')),
   app_version text,
   battery_level smallint,
   is_charging boolean,
@@ -1308,7 +1239,8 @@ CREATE TABLE IF NOT EXISTS public.authorized_devices (
   last_seen_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Add telemetry columns to existing table if already created
+-- Drop legacy device_name column & add telemetry columns to existing table if already created
+ALTER TABLE public.authorized_devices DROP COLUMN IF EXISTS device_name;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS app_version text;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS battery_level smallint;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS is_charging boolean;
@@ -1405,9 +1337,8 @@ create table if not exists public.transactions (
 -- 3. Create Authorized Devices Table (Zebra TC26 PDA Whitelist & Enrollment)
 create table if not exists public.authorized_devices (
   device_id text primary key,
-  device_name text,
   auth_token text not null,
-  status text not null check (status in ('active', 'pending', 'revoked')),
+  status text not null check (status in ('active', 'pending')),
   app_version text,
   battery_level smallint,
   is_charging boolean,
@@ -1452,6 +1383,7 @@ alter publication supabase_realtime add table public.authorized_devices;
 
 export const TELEMETRY_SQL_MIGRATION = `-- TTD Fuel Tracking: Add Native Telemetry & Optimization Columns
 -- Paste and run in Supabase Dashboard -> SQL Editor
+ALTER TABLE public.authorized_devices DROP COLUMN IF EXISTS device_name;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS app_version text;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS battery_level smallint;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS is_charging boolean;

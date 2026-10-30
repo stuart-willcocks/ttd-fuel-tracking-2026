@@ -13,7 +13,7 @@ import { EditAssetModal } from './components/EditAssetModal';
 import { OutboxModal } from './components/OutboxModal';
 import { SettingsModal } from './components/SettingsModal';
 import { PowerEventModal } from './components/PowerEventModal';
-import { getDeviceName, isDeviceEnrolled, getDeviceId, onDeviceAuthBroadcast } from './services/device';
+import { isDeviceEnrolled, getDeviceId, onDeviceAuthBroadcast } from './services/device';
 import { startTelemetryMonitoring } from './services/telemetry';
 import { DeviceEnrollmentView } from './components/DeviceEnrollmentView';
 import { Smartphone, ExternalLink } from 'lucide-react';
@@ -500,7 +500,7 @@ export const App: React.FC = () => {
       checkInKWH: pendingTxData.checkInKWH,
       checkOutKWH: pendingTxData.checkOutKWH,
       syncStatus: 'pending',
-      deviceId: getDeviceName(),
+      deviceId: getDeviceId(),
       createdAt: nowIso,
     };
 
@@ -549,7 +549,7 @@ export const App: React.FC = () => {
       transactionTimestamp: timestamp,
       transactionType: powerModalType,
       syncStatus: 'pending',
-      deviceId: getDeviceName(),
+      deviceId: getDeviceId(),
       createdAt: nowIso,
     };
 
