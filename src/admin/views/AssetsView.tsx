@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import type { Equipment, Transaction } from '../../types';
 import { EquipmentTypeIcon } from '../../components/EquipmentTypeIcon';
-import { getGeneratorPowerState } from '../../utils/powerState';
 import { formatPdaTimestamp } from '../../utils/dateFormat';
 import {
   getGoogleMapsExternalUrl,
@@ -66,11 +65,14 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     [viewMode]
   );
 
-  // Transaction counts and latest check-in/check-out status per asset
-  const { txCounts, checkInStatusByAsset } = useMemo(() => {
+  // Single O(T + E) pass for transaction counts, check-in/check-out status, and generator power state per asset
+  const { txCounts, checkInStatusByAsset, powerStateByAsset } = useMemo(() => {
     const countMap: Record<string, number> = {};
     const latestCheckTxTime: Record<string, number> = {};
     const statusMap: Record<string, 'checked_in' | 'checked_out' | 'none'> = {};
+    const latestPowerTxTime: Record<string, number> = {};
+    const latestPowerTxType: Record<string, 'PoweredUp' | 'PoweredDown'> = {};
+    const powerMap: Record<string, boolean> = {};
 
     for (const a of assets) {
       statusMap[a.equipmentId] = 'none';
@@ -85,10 +87,31 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           latestCheckTxTime[t.equipmentId] = ts;
           statusMap[t.equipmentId] = typeStr.includes('CheckIn') ? 'checked_in' : 'checked_out';
         }
+      } else if (typeStr === 'PoweredUp' || typeStr === 'PoweredDown') {
+        const ts = new Date(t.transactionTimestamp).getTime() || 0;
+        if (latestPowerTxTime[t.equipmentId] === undefined || ts >= latestPowerTxTime[t.equipmentId]) {
+          latestPowerTxTime[t.equipmentId] = ts;
+          latestPowerTxType[t.equipmentId] = typeStr;
+        }
       }
     }
 
-    return { txCounts: countMap, checkInStatusByAsset: statusMap };
+    for (const a of assets) {
+      if (a.type !== 'GENERATOR') {
+        powerMap[a.equipmentId] = false;
+        continue;
+      }
+      const pType = latestPowerTxType[a.equipmentId];
+      if (pType) {
+        powerMap[a.equipmentId] = pType === 'PoweredUp';
+      } else {
+        const upTime = a.poweredUpTimestamp ? new Date(a.poweredUpTimestamp).getTime() || 0 : 0;
+        const downTime = a.poweredDownTimestamp ? new Date(a.poweredDownTimestamp).getTime() || 0 : 0;
+        powerMap[a.equipmentId] = Boolean(a.poweredUpTimestamp && upTime >= downTime);
+      }
+    }
+
+    return { txCounts: countMap, checkInStatusByAsset: statusMap, powerStateByAsset: powerMap };
   }, [assets, transactions]);
 
   // Filtered Assets
@@ -118,14 +141,14 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       // 3. Generator Power status filter (generators only)
       if (powerFilter !== 'ALL') {
         if (asset.type !== 'GENERATOR') return false;
-        const isRunning = getGeneratorPowerState(asset.equipmentId, transactions).isOn;
+        const isRunning = Boolean(powerStateByAsset[asset.equipmentId]);
         if (powerFilter === 'POWERED_UP' && !isRunning) return false;
         if (powerFilter === 'POWERED_DOWN' && isRunning) return false;
       }
 
       return true;
     });
-  }, [assets, transactions, searchQuery, typeFilter, checkInFilter, powerFilter, checkInStatusByAsset]);
+  }, [assets, searchQuery, typeFilter, checkInFilter, powerFilter, checkInStatusByAsset, powerStateByAsset]);
 
   // Counts for pills
   const counts = useMemo(() => {
@@ -137,10 +160,10 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       noCheckInOut: assets.filter((a) => (checkInStatusByAsset[a.equipmentId] || 'none') === 'none').length,
       checkedIn: assets.filter((a) => checkInStatusByAsset[a.equipmentId] === 'checked_in').length,
       checkedOut: assets.filter((a) => checkInStatusByAsset[a.equipmentId] === 'checked_out').length,
-      poweredUp: assets.filter((a) => a.type === 'GENERATOR' && getGeneratorPowerState(a.equipmentId, transactions).isOn).length,
-      poweredDown: assets.filter((a) => a.type === 'GENERATOR' && !getGeneratorPowerState(a.equipmentId, transactions).isOn).length,
+      poweredUp: assets.filter((a) => a.type === 'GENERATOR' && Boolean(powerStateByAsset[a.equipmentId])).length,
+      poweredDown: assets.filter((a) => a.type === 'GENERATOR' && !powerStateByAsset[a.equipmentId]).length,
     };
-  }, [assets, transactions, checkInStatusByAsset]);
+  }, [assets, checkInStatusByAsset, powerStateByAsset]);
 
   // Sorting State
   type AssetSortField = 'equipmentId' | 'type' | 'capacity' | 'location' | 'what3words' | 'rentalSerialNumber' | 'powerState' | 'transactions';
@@ -185,8 +208,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           comparison = (a.rentalSerialNumber || '').localeCompare(b.rentalSerialNumber || '');
           break;
         case 'powerState': {
-          const aOn = a.type === 'GENERATOR' && getGeneratorPowerState(a.equipmentId, transactions).isOn ? 1 : 0;
-          const bOn = b.type === 'GENERATOR' && getGeneratorPowerState(b.equipmentId, transactions).isOn ? 1 : 0;
+          const aOn = a.type === 'GENERATOR' && powerStateByAsset[a.equipmentId] ? 1 : 0;
+          const bOn = b.type === 'GENERATOR' && powerStateByAsset[b.equipmentId] ? 1 : 0;
           comparison = aOn - bOn;
           break;
         }
@@ -199,7 +222,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       }
       return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [filteredAssets, sortField, sortDirection, transactions, txCounts]);
+  }, [filteredAssets, sortField, sortDirection, powerStateByAsset, txCounts]);
 
   const renderSortIndicator = (field: AssetSortField) => {
     if (sortField !== field) {
@@ -324,21 +347,14 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       if (!coords) continue;
 
       const isOn =
-        asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
+        asset.type === 'GENERATOR' && Boolean(powerStateByAsset[asset.equipmentId]);
 
       const assetTxs = (txByAsset.get(asset.equipmentId) || [])
         .slice()
         .sort((a, b) => new Date(b.transactionTimestamp).getTime() - new Date(a.transactionTimestamp).getTime());
 
-      const latestCheckInOutTx = assetTxs.find((tx) => {
-        const t = (tx.transactionType || '').toString();
-        return t.includes('CheckIn') || t.includes('CheckOut');
-      });
-      const checkInStatus: 'checked_in' | 'checked_out' | 'none' = !latestCheckInOutTx
-        ? 'none'
-        : (latestCheckInOutTx.transactionType || '').toString().includes('CheckIn')
-          ? 'checked_in'
-          : 'checked_out';
+      const checkInStatus: 'checked_in' | 'checked_out' | 'none' =
+        checkInStatusByAsset[asset.equipmentId] || 'none';
 
       const recentTransactions: FleetMapTransactionItem[] = assetTxs.slice(0, 10).map((tx) => ({
         id: tx.id,
@@ -364,7 +380,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       });
     }
     return items;
-  }, [sortedAssets, transactions, txCounts, coordResolveTick]);
+  }, [sortedAssets, transactions, txCounts, checkInStatusByAsset, powerStateByAsset, coordResolveTick]);
 
   // Push live marker/transaction updates into the map iframe without reloading or resetting center/zoom
   useEffect(() => {
@@ -777,7 +793,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             </thead>
             <tbody>
               {sortedAssets.map((asset) => {
-                const isRunning = asset.type === 'GENERATOR' && getGeneratorPowerState(asset.equipmentId, transactions).isOn;
+                const isRunning = asset.type === 'GENERATOR' && Boolean(powerStateByAsset[asset.equipmentId]);
                 return (
                   <tr key={asset.equipmentId}>
                     {/* Equipment ID */}

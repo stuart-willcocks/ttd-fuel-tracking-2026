@@ -47,6 +47,42 @@ export function getInitialAuthUrlInfo(): InitialAuthUrlInfo {
 }
 
 let cachedClient: SupabaseClient | null = null;
+let hasActiveAdminSession = false;
+
+interface CachedDeviceTokenVerification {
+  deviceId: string;
+  token: string;
+  valid: boolean;
+  status: DeviceStatus;
+  deviceName?: string;
+  authToken?: string;
+  checkedAt: number;
+}
+
+let cachedDeviceTokenAuth: CachedDeviceTokenVerification | null = null;
+
+export function invalidateDeviceTokenCache(): void {
+  cachedDeviceTokenAuth = null;
+}
+
+async function ensureFieldDeviceAuthorized(): Promise<void> {
+  if (hasActiveAdminSession) return;
+  const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.includes('admin');
+  if (isAdminRoute) {
+    const session = await getAdminSession();
+    if (session) return;
+  }
+
+  const currentDevId = getDeviceId();
+  const currentToken = getDeviceToken();
+  if (!currentDevId || !currentToken) {
+    throw new Error('DEVICE_UNAUTHORIZED: Device has no active enrollment token');
+  }
+  const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
+  if (!authCheck.valid || authCheck.status !== 'active') {
+    throw new Error('DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator');
+  }
+}
 
 export function getSupabaseConfig(): { url: string; anonKey: string } {
   const url =
@@ -86,6 +122,52 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 /**
+ * Map a raw Supabase `equipment_list` row to an `Equipment` domain object
+ */
+export function mapSupabaseRowToEquipment(row: any): Equipment {
+  let latitude: number | undefined =
+    typeof row.latitude === 'number' && !Number.isNaN(row.latitude) ? row.latitude : undefined;
+  let longitude: number | undefined =
+    typeof row.longitude === 'number' && !Number.isNaN(row.longitude) ? row.longitude : undefined;
+
+  if ((latitude === undefined || longitude === undefined) && typeof row.device_id === 'string' && row.device_id.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(row.device_id);
+      const cleanRowW3w = normalizeWhat3Words(row.what3words);
+      if (
+        typeof parsed.lat === 'number' &&
+        typeof parsed.lng === 'number' &&
+        (!parsed.w3w || normalizeWhat3Words(parsed.w3w) === cleanRowW3w)
+      ) {
+        latitude = parsed.lat;
+        longitude = parsed.lng;
+      }
+    } catch {
+      // Ignore non-JSON device_id values
+    }
+  }
+
+  if (latitude !== undefined && longitude !== undefined) {
+    primeWhat3WordsCache(row.what3words, latitude, longitude);
+  }
+
+  return {
+    equipmentId: row.equipment_id,
+    area: row.area,
+    location: row.location,
+    what3words: row.what3words,
+    latitude,
+    longitude,
+    type: row.type,
+    capacity: row.capacity ?? undefined,
+    rentalSerialNumber: row.rental_serial_number,
+    poweredUpTimestamp: row.powered_up_timestamp ?? undefined,
+    poweredDownTimestamp: row.powered_down_timestamp ?? undefined,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
  * Fetch equipment list from Supabase
  */
 export async function fetchEquipmentFromSupabase(): Promise<Equipment[]> {
@@ -99,84 +181,29 @@ export async function fetchEquipmentFromSupabase(): Promise<Equipment[]> {
 
   if (error) throw error;
 
-  return (data || []).map((row: any) => {
-    let latitude: number | undefined =
-      typeof row.latitude === 'number' && !Number.isNaN(row.latitude) ? row.latitude : undefined;
-    let longitude: number | undefined =
-      typeof row.longitude === 'number' && !Number.isNaN(row.longitude) ? row.longitude : undefined;
-
-    if ((latitude === undefined || longitude === undefined) && typeof row.device_id === 'string' && row.device_id.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(row.device_id);
-        const cleanRowW3w = normalizeWhat3Words(row.what3words);
-        if (
-          typeof parsed.lat === 'number' &&
-          typeof parsed.lng === 'number' &&
-          (!parsed.w3w || normalizeWhat3Words(parsed.w3w) === cleanRowW3w)
-        ) {
-          latitude = parsed.lat;
-          longitude = parsed.lng;
-        }
-      } catch {
-        // Ignore non-JSON device_id values
-      }
-    }
-
-    if (latitude !== undefined && longitude !== undefined) {
-      primeWhat3WordsCache(row.what3words, latitude, longitude);
-    }
-
-    return {
-      equipmentId: row.equipment_id,
-      area: row.area,
-      location: row.location,
-      what3words: row.what3words,
-      latitude,
-      longitude,
-      type: row.type,
-      capacity: row.capacity ?? undefined,
-      rentalSerialNumber: row.rental_serial_number,
-      poweredUpTimestamp: row.powered_up_timestamp ?? undefined,
-      poweredDownTimestamp: row.powered_down_timestamp ?? undefined,
-      updatedAt: row.updated_at,
-    };
-  });
+  return (data || []).map(mapSupabaseRowToEquipment);
 }
 
 /**
  * Save/update equipment in Supabase (converts what3words once on save or update)
  */
-export async function saveEquipmentToSupabase(equipment: Equipment): Promise<void> {
+export async function saveEquipmentToSupabase(equipment: Equipment, previousW3wHint?: string): Promise<void> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
-  // Verify device authorization for field handheld client modifications
-  const isAdminPortal = typeof window !== 'undefined' && window.location.pathname.includes('admin');
-  if (!isAdminPortal) {
-    const currentDevId = getDeviceId();
-    const currentToken = getDeviceToken();
-    if (!currentDevId || !currentToken) {
-      throw new Error('DEVICE_UNAUTHORIZED: Device has no active enrollment token');
-    }
-    const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
-    if (!authCheck.valid || authCheck.status !== 'active') {
-      throw new Error('DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator');
-    }
-  }
+  await ensureFieldDeviceAuthorized();
 
-  // Check existing what3words in Supabase to detect changes on update
-  let previousW3w: string | undefined;
-  try {
-    const { data: existingRow } = await client
-      .from('equipment_list')
-      .select('what3words')
-      .eq('equipment_id', equipment.equipmentId)
-      .maybeSingle();
-    if (existingRow?.what3words) {
-      previousW3w = existingRow.what3words;
+  // Check local IndexedDB first before querying Supabase to detect what3words changes without an extra network round-trip
+  let previousW3w: string | undefined = previousW3wHint;
+  if (!previousW3w) {
+    try {
+      const localExisting = await db.equipments.get(equipment.equipmentId);
+      if (localExisting?.what3words) {
+        previousW3w = localExisting.what3words;
+      }
+    } catch {
+      // Ignore local db lookup error
     }
-  } catch {
-    // Ignore lookup error
   }
 
   const resolvedEq = await resolveEquipmentCoordinates(equipment, previousW3w);
@@ -211,18 +238,7 @@ export async function deleteEquipmentFromSupabase(equipmentId: string): Promise<
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
-  const isAdminPortal = typeof window !== 'undefined' && window.location.pathname.includes('admin');
-  if (!isAdminPortal) {
-    const currentDevId = getDeviceId();
-    const currentToken = getDeviceToken();
-    if (!currentDevId || !currentToken) {
-      throw new Error('DEVICE_UNAUTHORIZED: Device has no active enrollment token');
-    }
-    const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
-    if (!authCheck.valid || authCheck.status !== 'active') {
-      throw new Error('DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator');
-    }
-  }
+  await ensureFieldDeviceAuthorized();
 
   const { error } = await client.from('equipment_list').delete().eq('equipment_id', equipmentId);
   if (error) throw error;
@@ -235,18 +251,7 @@ export async function deleteTransactionFromSupabase(transactionId: string): Prom
   const client = getSupabaseClient();
   if (!client) return;
 
-  const isAdminPortal = typeof window !== 'undefined' && window.location.pathname.includes('admin');
-  if (!isAdminPortal) {
-    const currentDevId = getDeviceId();
-    const currentToken = getDeviceToken();
-    if (!currentDevId || !currentToken) {
-      throw new Error('DEVICE_UNAUTHORIZED: Device has no active enrollment token');
-    }
-    const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
-    if (!authCheck.valid || authCheck.status !== 'active') {
-      throw new Error('DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator');
-    }
-  }
+  await ensureFieldDeviceAuthorized();
 
   // 1. Fetch transaction record prior to deletion to check if it impacts generator power state
   const { data: targetTx } = await client
@@ -315,20 +320,9 @@ export async function updateTransactionInSupabase(tx: Transaction): Promise<void
   const client = getSupabaseClient();
   if (!client) return;
 
-  const isAdminPortal = typeof window !== 'undefined' && window.location.pathname.includes('admin');
-  if (!isAdminPortal) {
-    const currentDevId = getDeviceId();
-    const currentToken = getDeviceToken();
-    if (!currentDevId || !currentToken) {
-      throw new Error('DEVICE_UNAUTHORIZED: Device has no active enrollment token');
-    }
-    const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
-    if (!authCheck.valid || authCheck.status !== 'active') {
-      throw new Error('DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator');
-    }
-  }
+  await ensureFieldDeviceAuthorized();
 
-  const uploadTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const uploadTimestamp = new Date().toISOString();
   const payload: Record<string, unknown> = {
     id: tx.id,
     equipment_id: tx.equipmentId,
@@ -534,20 +528,10 @@ export async function bulkImportTransactionsToSupabase(transactions: Transaction
 }
 
 /**
- * Fetch transactions from Supabase
+ * Map a raw Supabase `transactions` row to a `Transaction` domain object
  */
-export async function fetchTransactionsFromSupabase(): Promise<Transaction[]> {
-  const client = getSupabaseClient();
-  if (!client) throw new Error('Supabase not configured');
-
-  const { data, error } = await client
-    .from('transactions')
-    .select('*')
-    .order('transaction_timestamp', { ascending: false });
-
-  if (error) throw error;
-
-  return (data || []).map((row: any) => ({
+export function mapSupabaseRowToTransaction(row: any): Transaction {
+  return {
     id: row.id,
     equipmentId: row.equipment_id,
     transactionTimestamp: row.transaction_timestamp,
@@ -566,7 +550,24 @@ export async function fetchTransactionsFromSupabase(): Promise<Transaction[]> {
     syncStatus: 'synced' as const,
     deviceId: row.device_id ?? undefined,
     createdAt: row.created_at,
-  }));
+  };
+}
+
+/**
+ * Fetch transactions from Supabase
+ */
+export async function fetchTransactionsFromSupabase(): Promise<Transaction[]> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const { data, error } = await client
+    .from('transactions')
+    .select('*')
+    .order('transaction_timestamp', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map(mapSupabaseRowToTransaction);
 }
 
 /**
@@ -576,7 +577,7 @@ export async function fetchTransactionsFromSupabase(): Promise<Transaction[]> {
 export async function uploadTransactionToCloud(
   tx: Transaction
 ): Promise<{ success: boolean; uploadTimestamp: string; error?: string }> {
-  const uploadTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const uploadTimestamp = new Date().toISOString();
   const client = getSupabaseClient();
 
   if (!client) {
@@ -597,33 +598,8 @@ export async function uploadTransactionToCloud(
 
   // Supabase cloud path (wrapped in try/catch so transient network/DNS errors during Airplane mode transitions never throw unhandled exceptions)
   try {
-    // 1. FAIL-CLOSED DEVICE AUTHORIZATION GUARD
-    const isAdminPortal = typeof window !== 'undefined' && (
-      window.location.pathname.includes('admin') ||
-      tx.deviceId === 'Admin-Workstation'
-    );
-
-    if (!isAdminPortal) {
-      const currentDevId = getDeviceId();
-      const currentToken = getDeviceToken();
-      if (!currentDevId || !currentToken) {
-        return {
-          success: false,
-          uploadTimestamp,
-          error: 'DEVICE_UNAUTHORIZED: Device has no active enrollment token',
-        };
-      }
-
-      const authCheck = await verifyDeviceTokenWithSupabase(currentDevId, currentToken);
-      if (!authCheck.valid || authCheck.status !== 'active') {
-        console.warn(`[Supabase Upload Blocked] Device ${currentDevId} is not active (status: ${authCheck.status}).`);
-        return {
-          success: false,
-          uploadTimestamp,
-          error: 'DEVICE_UNAUTHORIZED: Device registration has been deleted or revoked by an administrator',
-        };
-      }
-    }
+    // 1. FAIL-CLOSED DEVICE AUTHORIZATION GUARD (uses 60s cached token verification to prevent redundant SELECT queries during batch flushes)
+    await ensureFieldDeviceAuthorized();
 
     // Step 1: Build transaction payload
     const payload: Record<string, any> = {
@@ -827,6 +803,56 @@ function parseDeviceNameAndVersion(
 }
 
 /**
+ * Map a raw Supabase `authorized_devices` row to an `AuthorizedDevice` domain object
+ */
+export function mapSupabaseRowToAuthorizedDevice(row: any): AuthorizedDevice {
+  const rawName: string = row.device_name || row.device_id;
+  const { cleanName, appVersion: encodedVer } = parseDeviceNameAndVersion(rawName, row.device_id);
+  if (row.device_id) {
+    knownDeviceNamesById.set(String(row.device_id).toUpperCase(), cleanName);
+  }
+
+  let batteryLevel = typeof row.battery_level === 'number' ? row.battery_level : null;
+  let isCharging = typeof row.is_charging === 'boolean' ? row.is_charging : null;
+  let latitude = typeof row.latitude === 'number' ? row.latitude : null;
+  let longitude = typeof row.longitude === 'number' ? row.longitude : null;
+  let locationAccuracy = typeof row.location_accuracy === 'number' ? row.location_accuracy : null;
+  let lastTelemetryAt = row.last_telemetry_at || null;
+  let appVersion: string | null = row.app_version ? String(row.app_version) : encodedVer;
+
+  // Decode telemetry from device_name fallback if dedicated columns are not yet in Supabase
+  if (rawName && typeof rawName === 'string' && rawName.includes('__TEL__')) {
+    const parts = rawName.split('__TEL__');
+    try {
+      const parsed = JSON.parse(parts[1]);
+      if (batteryLevel === null && typeof parsed.batteryLevel === 'number') batteryLevel = parsed.batteryLevel;
+      if (isCharging === null && typeof parsed.isCharging === 'boolean') isCharging = parsed.isCharging;
+      if (latitude === null && typeof parsed.latitude === 'number') latitude = parsed.latitude;
+      if (longitude === null && typeof parsed.longitude === 'number') longitude = parsed.longitude;
+      if (locationAccuracy === null && typeof parsed.locationAccuracy === 'number') locationAccuracy = parsed.locationAccuracy;
+      if (!lastTelemetryAt && parsed.lastTelemetryAt) lastTelemetryAt = parsed.lastTelemetryAt;
+      if (!appVersion && parsed.appVersion) appVersion = String(parsed.appVersion);
+    } catch {}
+  }
+
+  return {
+    deviceId: row.device_id,
+    deviceName: cleanName,
+    authToken: row.auth_token,
+    status: row.status as DeviceStatus,
+    registeredAt: row.registered_at,
+    lastSeenAt: row.last_seen_at,
+    batteryLevel,
+    isCharging,
+    latitude,
+    longitude,
+    locationAccuracy,
+    lastTelemetryAt,
+    appVersion,
+  };
+}
+
+/**
  * Fetch all authorized devices from Supabase
  */
 export async function fetchAuthorizedDevicesFromSupabase(): Promise<AuthorizedDevice[]> {
@@ -846,52 +872,7 @@ export async function fetchAuthorizedDevicesFromSupabase(): Promise<AuthorizedDe
     throw new Error(error.message || error.details || error.hint || `Supabase error (${error.code || 'unknown'})`);
   }
 
-  return (data || []).map((row: any) => {
-    const rawName: string = row.device_name || row.device_id;
-    const { cleanName, appVersion: encodedVer } = parseDeviceNameAndVersion(rawName, row.device_id);
-    if (row.device_id) {
-      knownDeviceNamesById.set(String(row.device_id).toUpperCase(), cleanName);
-    }
-
-    let batteryLevel = typeof row.battery_level === 'number' ? row.battery_level : null;
-    let isCharging = typeof row.is_charging === 'boolean' ? row.is_charging : null;
-    let latitude = typeof row.latitude === 'number' ? row.latitude : null;
-    let longitude = typeof row.longitude === 'number' ? row.longitude : null;
-    let locationAccuracy = typeof row.location_accuracy === 'number' ? row.location_accuracy : null;
-    let lastTelemetryAt = row.last_telemetry_at || null;
-    let appVersion: string | null = row.app_version ? String(row.app_version) : encodedVer;
-
-    // Decode telemetry from device_name fallback if dedicated columns are not yet in Supabase
-    if (rawName && typeof rawName === 'string' && rawName.includes('__TEL__')) {
-      const parts = rawName.split('__TEL__');
-      try {
-        const parsed = JSON.parse(parts[1]);
-        if (batteryLevel === null && typeof parsed.batteryLevel === 'number') batteryLevel = parsed.batteryLevel;
-        if (isCharging === null && typeof parsed.isCharging === 'boolean') isCharging = parsed.isCharging;
-        if (latitude === null && typeof parsed.latitude === 'number') latitude = parsed.latitude;
-        if (longitude === null && typeof parsed.longitude === 'number') longitude = parsed.longitude;
-        if (locationAccuracy === null && typeof parsed.locationAccuracy === 'number') locationAccuracy = parsed.locationAccuracy;
-        if (!lastTelemetryAt && parsed.lastTelemetryAt) lastTelemetryAt = parsed.lastTelemetryAt;
-        if (!appVersion && parsed.appVersion) appVersion = String(parsed.appVersion);
-      } catch {}
-    }
-
-    return {
-      deviceId: row.device_id,
-      deviceName: cleanName,
-      authToken: row.auth_token,
-      status: row.status as DeviceStatus,
-      registeredAt: row.registered_at,
-      lastSeenAt: row.last_seen_at,
-      batteryLevel,
-      isCharging,
-      latitude,
-      longitude,
-      locationAccuracy,
-      lastTelemetryAt,
-      appVersion,
-    };
-  });
+  return (data || []).map(mapSupabaseRowToAuthorizedDevice);
 }
 
 /**
@@ -964,19 +945,28 @@ export async function updateDeviceTelemetryInSupabase(
   if (!client) throw new Error('Supabase not configured');
 
   const cleanId = deviceId.trim().toUpperCase();
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  lastSeenWriteByDevice.set(cleanId, now);
+
+  const runningVersion = getReportedAppVersion(telemetry.appVersion);
+  const confirmedName = knownDeviceNamesById.get(cleanId);
   const localLabel = getDeviceName();
-  const baseName =
-    knownDeviceNamesById.get(cleanId) ||
+  const fallbackBaseName =
+    confirmedName ||
     (localLabel && localLabel !== 'Unregistered PDA' && localLabel !== 'PDA-SERVER'
       ? parseDeviceNameAndVersion(localLabel, cleanId).cleanName
       : cleanId);
 
-  const runningVersion = getReportedAppVersion(telemetry.appVersion);
   const payload: Record<string, unknown> = {
-    device_name: `${baseName}__VER__${runningVersion}`,
-    last_seen_at: new Date().toISOString(),
-    last_telemetry_at: telemetry.lastTelemetryAt || new Date().toISOString(),
+    last_seen_at: nowIso,
+    last_telemetry_at: telemetry.lastTelemetryAt || nowIso,
   };
+
+  // Only update device_name when we have the verified cleanName from Supabase so cold-start pings never overwrite an Admin's custom label
+  if (confirmedName) {
+    payload.device_name = `${confirmedName}__VER__${runningVersion}`;
+  }
 
   if (typeof telemetry.batteryLevel === 'number') payload.battery_level = telemetry.batteryLevel;
   if (typeof telemetry.isCharging === 'boolean') payload.is_charging = telemetry.isCharging;
@@ -997,8 +987,8 @@ export async function updateDeviceTelemetryInSupabase(
   if (error && (error.code === 'PGRST204' || error.code === '42703' || (error.message && (error.message.includes('column') || error.message.includes('battery'))))) {
     try {
       const fallbackPayload = {
-        device_name: `${baseName}__VER__${runningVersion}__TEL__${JSON.stringify({ ...telemetry, appVersion: runningVersion })}`,
-        last_seen_at: new Date().toISOString(),
+        device_name: `${fallbackBaseName}__VER__${runningVersion}__TEL__${JSON.stringify({ ...telemetry, appVersion: runningVersion })}`,
+        last_seen_at: nowIso,
       };
       const fallbackRes = await client
         .from('authorized_devices')
@@ -1022,6 +1012,7 @@ export async function updateDeviceTelemetryInSupabase(
 export async function updateDeviceStatusInSupabase(deviceId: string, status: DeviceStatus): Promise<void> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
+  invalidateDeviceTokenCache();
 
   const { error } = await client
     .from('authorized_devices')
@@ -1044,6 +1035,7 @@ export async function updateDeviceStatusInSupabase(deviceId: string, status: Dev
 export async function deleteAuthorizedDeviceFromSupabase(deviceId: string): Promise<void> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
+  invalidateDeviceTokenCache();
 
   const cleanId = deviceId.trim().toUpperCase();
   const { error } = await client
@@ -1061,21 +1053,39 @@ export async function deleteAuthorizedDeviceFromSupabase(deviceId: string): Prom
   }
 }
 
-// Throttle last_seen_at database writes to once every 5 minutes per device to prevent Realtime broadcast storms
+// Throttle last_seen_at database writes to once every 15 minutes per device (since telemetry already updates last_seen_at every 5 min)
 const lastSeenWriteByDevice = new Map<string, number>();
 
 /**
- * Verify device credentials against Supabase
+ * Verify device credentials against Supabase (with 60s in-memory cache for active tokens to eliminate redundant SELECTs during batch operations)
  */
 export async function verifyDeviceTokenWithSupabase(
   deviceId: string,
-  token: string
+  token: string,
+  forceRefresh = false
 ): Promise<{ valid: boolean; status: DeviceStatus; deviceName?: string; authToken?: string }> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
   const cleanId = deviceId.trim().toUpperCase();
   const cleanToken = token.trim();
+  const now = Date.now();
+
+  if (
+    !forceRefresh &&
+    cachedDeviceTokenAuth &&
+    cachedDeviceTokenAuth.deviceId === cleanId &&
+    cachedDeviceTokenAuth.token === cleanToken &&
+    cachedDeviceTokenAuth.valid &&
+    now - cachedDeviceTokenAuth.checkedAt < 60000
+  ) {
+    return {
+      valid: cachedDeviceTokenAuth.valid,
+      status: cachedDeviceTokenAuth.status,
+      deviceName: cachedDeviceTokenAuth.deviceName,
+      authToken: cachedDeviceTokenAuth.authToken,
+    };
+  }
 
   const { data, error } = await client
     .from('authorized_devices')
@@ -1085,10 +1095,12 @@ export async function verifyDeviceTokenWithSupabase(
 
   if (error) {
     if (error.code === 'PGRST116') {
+      invalidateDeviceTokenCache();
       return { valid: false, status: 'revoked' };
     }
     if (error.code === 'PGRST205' || (error.message && error.message.includes('authorized_devices'))) {
       console.warn("[Supabase] Table 'public.authorized_devices' does not exist in Supabase yet.");
+      invalidateDeviceTokenCache();
       return { valid: false, status: 'revoked' };
     }
     console.warn('[Supabase] verifyDeviceToken query error:', error);
@@ -1096,30 +1108,40 @@ export async function verifyDeviceTokenWithSupabase(
   }
 
   if (!data) {
+    invalidateDeviceTokenCache();
     return { valid: false, status: 'revoked' };
   }
 
   const { cleanName, appVersion: storedVersion } = parseDeviceNameAndVersion(data.device_name, data.device_id);
   knownDeviceNamesById.set(cleanId, cleanName);
 
-  const isTokenMatch =
-    Boolean(cleanToken) &&
-    (data.auth_token === cleanToken || cleanToken === 'approved_by_admin');
+  // Strict cryptographic token match (no hardcoded bypass strings)
+  const isTokenMatch = Boolean(cleanToken) && data.auth_token === cleanToken;
   const isActive = data.status === 'active' && isTokenMatch;
 
   if (isActive) {
-    const now = Date.now();
-    const lastWrite = lastSeenWriteByDevice.get(cleanId) || 0;
-    const isAdminPortal = typeof window !== 'undefined' && window.location.pathname.includes('admin');
-    const reportedVer = getReportedAppVersion();
-    const versionMismatch = !isAdminPortal && storedVersion !== reportedVer;
+    cachedDeviceTokenAuth = {
+      deviceId: cleanId,
+      token: cleanToken,
+      valid: true,
+      status: 'active',
+      deviceName: cleanName,
+      authToken: data.auth_token,
+      checkedAt: now,
+    };
 
-    if (versionMismatch || now - lastWrite >= 300000) {
+    const lastWrite = lastSeenWriteByDevice.get(cleanId) || 0;
+    const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.includes('admin');
+    const reportedVer = getReportedAppVersion();
+    const versionMismatch = !isAdminRoute && storedVersion !== reportedVer;
+
+    // Only write last_seen_at if appVersion changed or if no telemetry write occurred in the last 15 minutes
+    if (versionMismatch || now - lastWrite >= 900000) {
       lastSeenWriteByDevice.set(cleanId, now);
       const updateFields: Record<string, unknown> = {
         last_seen_at: new Date(now).toISOString(),
       };
-      if (!isAdminPortal) {
+      if (!isAdminRoute) {
         updateFields.device_name = `${cleanName}__VER__${reportedVer}`;
       }
       client
@@ -1128,6 +1150,8 @@ export async function verifyDeviceTokenWithSupabase(
         .eq('device_id', cleanId)
         .then(() => {}, () => {});
     }
+  } else {
+    invalidateDeviceTokenCache();
   }
 
   return {
@@ -1185,7 +1209,8 @@ export function subscribeToCloudChanges(
     eventType: string,
     payload?: { new?: Record<string, unknown>; old?: Record<string, unknown> }
   ) => void,
-  onReconnect?: () => void
+  onReconnect?: () => void,
+  options?: { deviceIdFilter?: string; includeAllDevices?: boolean }
 ): () => void {
   const client = getSupabaseClient();
   if (!client) return () => {};
@@ -1193,8 +1218,26 @@ export function subscribeToCloudChanges(
   let hasConnectedOnce = false;
   let wasDisconnected = false;
 
+  const cleanFilterId = options?.deviceIdFilter?.trim().toUpperCase();
+  const useDeviceFilter = Boolean(cleanFilterId && !options?.includeAllDevices);
+  const channelName = useDeviceFilter ? `ttd-cloud-realtime-${cleanFilterId}` : 'ttd-cloud-realtime-admin';
+
+  const authDeviceFilterConfig: {
+    event: '*';
+    schema: 'public';
+    table: 'authorized_devices';
+    filter?: string;
+  } = {
+    event: '*',
+    schema: 'public',
+    table: 'authorized_devices',
+  };
+  if (useDeviceFilter && cleanFilterId) {
+    authDeviceFilterConfig.filter = `device_id=eq.${cleanFilterId}`;
+  }
+
   const channel = client
-    .channel('ttd-cloud-realtime')
+    .channel(channelName)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'transactions' },
@@ -1211,7 +1254,7 @@ export function subscribeToCloudChanges(
     )
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'authorized_devices' },
+      authDeviceFilterConfig,
       (payload) => {
         onDataChange('authorized_devices', payload.eventType, payload as { new?: Record<string, unknown>; old?: Record<string, unknown> });
       }
@@ -1245,6 +1288,8 @@ export function subscribeToCloudChanges(
 export const SUPABASE_SQL_MIGRATION = `-- TTD Fuel Tracking: Migration to enable transaction deletion, device tracking, authorized devices & Realtime
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS device_id text;
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS device_id text;
+ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS latitude double precision;
+ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS longitude double precision;
 
 -- Create Authorized Devices Table (PDA Whitelist)
 CREATE TABLE IF NOT EXISTS public.authorized_devices (
@@ -1252,6 +1297,7 @@ CREATE TABLE IF NOT EXISTS public.authorized_devices (
   device_name text,
   auth_token text NOT NULL,
   status text NOT NULL CHECK (status IN ('active', 'pending', 'revoked')),
+  app_version text,
   battery_level smallint,
   is_charging boolean,
   latitude double precision,
@@ -1263,6 +1309,7 @@ CREATE TABLE IF NOT EXISTS public.authorized_devices (
 );
 
 -- Add telemetry columns to existing table if already created
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS app_version text;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS battery_level smallint;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS is_charging boolean;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS latitude double precision;
@@ -1270,8 +1317,11 @@ ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS longitude double 
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS location_accuracy real;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS last_telemetry_at timestamp with time zone;
 
+-- Composite index for fast per-equipment transaction lookups & power state reconciliation
+CREATE INDEX IF NOT EXISTS idx_tx_eq_timestamp ON public.transactions(equipment_id, transaction_timestamp DESC);
+
 ALTER TABLE public.authorized_devices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.authorized_devices REPLICA IDENTITY FULL;
+ALTER TABLE public.authorized_devices REPLICA IDENTITY DEFAULT;
 DROP POLICY IF EXISTS "Allow read authorized_devices for anon" ON public.authorized_devices;
 CREATE POLICY "Allow read authorized_devices for anon" ON public.authorized_devices FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow upsert authorized_devices for anon" ON public.authorized_devices;
@@ -1313,12 +1363,14 @@ END $$;
 `;
 
 export const SUPABASE_SQL_SCHEMA = `-- TTD Fuel Tracking 2026 - Supabase PostgreSQL Schema
--- 1. Create Equipment List Table (with device_id tracking)
+-- 1. Create Equipment List Table (with device_id & coordinate tracking)
 create table if not exists public.equipment_list (
   equipment_id text primary key,
   area text not null,
   location text not null,
   what3words text not null,
+  latitude double precision,
+  longitude double precision,
   type text not null check (type in ('GENERATOR', 'TANK', 'PLANT')),
   capacity integer,
   rental_serial_number text not null,
@@ -1356,6 +1408,7 @@ create table if not exists public.authorized_devices (
   device_name text,
   auth_token text not null,
   status text not null check (status in ('active', 'pending', 'revoked')),
+  app_version text,
   battery_level smallint,
   is_charging boolean,
   latitude double precision,
@@ -1369,13 +1422,14 @@ create table if not exists public.authorized_devices (
 -- 4. Indexes for fast query performance across multiple PDAs
 create index if not exists idx_tx_equipment_id on public.transactions(equipment_id);
 create index if not exists idx_tx_timestamp on public.transactions(transaction_timestamp desc);
+create index if not exists idx_tx_eq_timestamp on public.transactions(equipment_id, transaction_timestamp desc);
 create index if not exists idx_dev_status on public.authorized_devices(status);
 
 -- 5. Enable Row Level Security (RLS)
 alter table public.equipment_list enable row level security;
 alter table public.transactions enable row level security;
 alter table public.authorized_devices enable row level security;
-alter table public.authorized_devices replica identity full;
+alter table public.authorized_devices replica identity default;
 
 -- 6. Policies: Devices can read, write, and delete records
 create policy "Allow read equipment for anon" on public.equipment_list for select using (true);
@@ -1396,14 +1450,17 @@ alter publication supabase_realtime add table public.equipment_list;
 alter publication supabase_realtime add table public.authorized_devices;
 `;
 
-export const TELEMETRY_SQL_MIGRATION = `-- TTD Fuel Tracking: Add Native Telemetry Columns to public.authorized_devices
+export const TELEMETRY_SQL_MIGRATION = `-- TTD Fuel Tracking: Add Native Telemetry & Optimization Columns
 -- Paste and run in Supabase Dashboard -> SQL Editor
+ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS app_version text;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS battery_level smallint;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS is_charging boolean;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS latitude double precision;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS longitude double precision;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS location_accuracy real;
 ALTER TABLE public.authorized_devices ADD COLUMN IF NOT EXISTS last_telemetry_at timestamp with time zone;
+ALTER TABLE public.authorized_devices REPLICA IDENTITY DEFAULT;
+CREATE INDEX IF NOT EXISTS idx_tx_eq_timestamp ON public.transactions(equipment_id, transaction_timestamp DESC);
 `;
 
 /**
@@ -1433,8 +1490,10 @@ export async function getAdminSession(): Promise<Session | null> {
     const sessionPromise = client.auth.getSession().then(({ data, error }) => {
       if (error) {
         console.warn('[Supabase Auth] getSession error:', error.message);
+        hasActiveAdminSession = false;
         return null;
       }
+      hasActiveAdminSession = Boolean(data.session);
       return data.session;
     });
     const timeoutPromise = new Promise<Session | null>((resolve) =>
@@ -1455,6 +1514,7 @@ export function onAdminAuthStateChange(
   const client = getSupabaseClient();
   if (!client) return () => {};
   const { data } = client.auth.onAuthStateChange((event, session) => {
+    hasActiveAdminSession = Boolean(session);
     callback(event, session);
   });
   return () => {
@@ -1480,6 +1540,7 @@ export async function signInAdminWithPassword(email: string, password: string): 
   if (!data.session) {
     throw new Error('Authentication failed: no active session returned');
   }
+  hasActiveAdminSession = true;
   return data.session;
 }
 
@@ -1489,6 +1550,7 @@ export async function signInAdminWithPassword(email: string, password: string): 
 export async function signOutAdmin(): Promise<void> {
   const client = getSupabaseClient();
   if (!client) return;
+  hasActiveAdminSession = false;
   const { error } = await client.auth.signOut();
   if (error) {
     throw new Error(error.message || 'Failed to sign out');
@@ -1528,7 +1590,7 @@ export async function updateAdminPassword(newPassword: string): Promise<void> {
   }
 }
 
-export const ADMIN_AUTH_RLS_SQL_MIGRATION = `-- TTD Fuel Tracking: Lock down Admin-only destructive operations to authenticated Admin users
+export const ADMIN_AUTH_RLS_SQL_MIGRATION = `-- TTD Fuel Tracking: Lock down Admin-only destructive operations & optimize schema
 -- Paste and run in Supabase Dashboard -> SQL Editor
 
 -- 1. Equipment List: Allow read/upsert for enrolled PDAs & Admins, but restrict DELETE to authenticated Admins only
@@ -1545,6 +1607,10 @@ CREATE POLICY "Allow delete equipment for authenticated admins" ON public.equipm
 DROP POLICY IF EXISTS "Allow delete authorized_devices for anon" ON public.authorized_devices;
 DROP POLICY IF EXISTS "Allow delete authorized_devices for authenticated admins" ON public.authorized_devices;
 CREATE POLICY "Allow delete authorized_devices for authenticated admins" ON public.authorized_devices FOR DELETE TO authenticated USING (true);
+
+-- 3. Reduce WAL / Realtime Egress on authorized_devices & add composite index on transactions
+ALTER TABLE public.authorized_devices REPLICA IDENTITY DEFAULT;
+CREATE INDEX IF NOT EXISTS idx_tx_eq_timestamp ON public.transactions(equipment_id, transaction_timestamp DESC);
 `;
 
 

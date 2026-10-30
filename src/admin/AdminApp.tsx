@@ -40,6 +40,9 @@ import {
   onAdminAuthStateChange,
   signOutAdmin,
   getInitialAuthUrlInfo,
+  mapSupabaseRowToEquipment,
+  mapSupabaseRowToTransaction,
+  mapSupabaseRowToAuthorizedDevice,
 } from '../services/supabase';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
 import { formatErrorMessage } from '../utils/errorMessage';
@@ -214,34 +217,117 @@ export const AdminApp: React.FC = () => {
       devices: false,
     };
 
+    const scheduleFallbackRefresh = (table: string) => {
+      if (table === 'equipment_list') pendingTables.equipment = true;
+      if (table === 'transactions') pendingTables.transactions = true;
+      if (table === 'authorized_devices') pendingTables.devices = true;
+
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const scope = {
+          equipment: pendingTables.equipment,
+          transactions: pendingTables.transactions,
+          devices: pendingTables.devices,
+        };
+        pendingTables.equipment = false;
+        pendingTables.transactions = false;
+        pendingTables.devices = false;
+        loadFleetData(true, scope);
+      }, 300);
+    };
+
     const unsubscribe = subscribeToCloudChanges(
-      (table, eventType) => {
+      (table, eventType, payload) => {
         // Avoid clobbering user input when an asset creation or edit modal is active
         if (isCreateModalOpen || Boolean(editingAsset)) return;
 
-        if (table === 'equipment_list') pendingTables.equipment = true;
-        if (table === 'transactions') pendingTables.transactions = true;
-        if (table === 'authorized_devices') pendingTables.devices = true;
+        const newRec = payload?.new as Record<string, unknown> | undefined;
+        const oldRec = payload?.old as Record<string, unknown> | undefined;
 
-        console.log(`[Realtime Sync] ${table} event (${eventType}) from field PDA - refreshing changed table(s)`);
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          const scope = {
-            equipment: pendingTables.equipment,
-            transactions: pendingTables.transactions,
-            devices: pendingTables.devices,
-          };
-          pendingTables.equipment = false;
-          pendingTables.transactions = false;
-          pendingTables.devices = false;
-          loadFleetData(true, scope);
-        }, 300);
+        if (table === 'transactions') {
+          if ((eventType === 'INSERT' || eventType === 'UPDATE') && newRec && newRec.id) {
+            const mappedTx = mapSupabaseRowToTransaction(newRec);
+            setTransactions((prevTxs) => {
+              const exists = prevTxs.some((t) => t.id === mappedTx.id);
+              const nextTxs = exists
+                ? prevTxs.map((t) => (t.id === mappedTx.id ? mappedTx : t))
+                : [mappedTx, ...prevTxs];
+              nextTxs.sort(
+                (a, b) =>
+                  new Date(b.transactionTimestamp).getTime() -
+                  new Date(a.transactionTimestamp).getTime()
+              );
+              setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, nextTxs));
+              return nextTxs;
+            });
+            return;
+          }
+          if (eventType === 'DELETE' && oldRec && oldRec.id) {
+            const delId = String(oldRec.id);
+            setTransactions((prevTxs) => {
+              const nextTxs = prevTxs.filter((t) => t.id !== delId);
+              setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, nextTxs));
+              return nextTxs;
+            });
+            return;
+          }
+        }
+
+        if (table === 'equipment_list') {
+          if ((eventType === 'INSERT' || eventType === 'UPDATE') && newRec && newRec.equipment_id) {
+            const mappedEq = mapSupabaseRowToEquipment(newRec);
+            setAssets((prevAssets) => {
+              const exists = prevAssets.some((a) => a.equipmentId === mappedEq.equipmentId);
+              const nextAssets = exists
+                ? prevAssets.map((a) => (a.equipmentId === mappedEq.equipmentId ? mappedEq : a))
+                : [...prevAssets, mappedEq];
+              return reconcileEquipmentPowerStates(nextAssets, transactionsRef.current);
+            });
+            return;
+          }
+          if (eventType === 'DELETE' && oldRec && oldRec.equipment_id) {
+            const delId = String(oldRec.equipment_id);
+            setAssets((prevAssets) => prevAssets.filter((a) => a.equipmentId !== delId));
+            return;
+          }
+        }
+
+        if (table === 'authorized_devices') {
+          if ((eventType === 'INSERT' || eventType === 'UPDATE') && newRec && newRec.device_id) {
+            const mappedDev = mapSupabaseRowToAuthorizedDevice(newRec);
+            setDevices((prevDevs) => {
+              const exists = prevDevs.some(
+                (d) => d.deviceId.toUpperCase() === mappedDev.deviceId.toUpperCase()
+              );
+              const nextDevs = exists
+                ? prevDevs.map((d) =>
+                    d.deviceId.toUpperCase() === mappedDev.deviceId.toUpperCase() ? mappedDev : d
+                  )
+                : [mappedDev, ...prevDevs];
+              return nextDevs.sort(
+                (a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime()
+              );
+            });
+            return;
+          }
+          if (eventType === 'DELETE' && oldRec && oldRec.device_id) {
+            const delId = String(oldRec.device_id).toUpperCase();
+            setDevices((prevDevs) =>
+              prevDevs.filter((d) => d.deviceId.toUpperCase() !== delId)
+            );
+            return;
+          }
+        }
+
+        // Fallback if payload primary key was omitted
+        scheduleFallbackRefresh(table);
       },
       () => {
         // Automatically refresh if Realtime WebSocket disconnected and reconnected
         if (isCreateModalOpen || Boolean(editingAsset)) return;
         loadFleetData(true);
-      }
+      },
+      { includeAllDevices: true }
     );
 
     return () => {
@@ -326,7 +412,7 @@ export const AdminApp: React.FC = () => {
     const powerState = getGeneratorPowerState(asset.equipmentId, transactions);
     const isRunning = powerState.isOn;
     const newAction = isRunning ? 'PoweredDown' : 'PoweredUp';
-    const nowIso = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const nowIso = new Date().toISOString();
 
     const updated: Equipment = {
       ...asset,

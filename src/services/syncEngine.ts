@@ -1,5 +1,12 @@
 import { db } from '../db/indexedDB';
-import { uploadTransactionToCloud, isSupabaseConfigured, subscribeToCloudChanges } from './supabase';
+import {
+  uploadTransactionToCloud,
+  isSupabaseConfigured,
+  subscribeToCloudChanges,
+  mapSupabaseRowToEquipment,
+  mapSupabaseRowToTransaction,
+  invalidateDeviceTokenCache,
+} from './supabase';
 import { fetchRemoteEquipment, fetchRemoteTransactions, deleteRemoteTransaction } from './api';
 import type { Transaction } from '../types';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
@@ -110,7 +117,7 @@ class SyncEngine {
         }
       });
 
-      // Subscribe to real-time cloud changes so PDAs update immediately without polling
+      // Subscribe to real-time cloud changes so PDAs update immediately without polling or full-table refetches
       if (isSupabaseConfigured()) {
         try {
           subscribeToCloudChanges(
@@ -136,29 +143,20 @@ class SyncEngine {
 
               if (!this.isEffectivelyOnline()) return;
 
-              if (table === 'equipment_list') {
-                this.pendingRealtimeTables.equipment = true;
-              } else if (table === 'transactions') {
-                this.pendingRealtimeTables.transactions = true;
-              }
-
-              if (this.realtimeDebounceTimer) {
-                clearTimeout(this.realtimeDebounceTimer);
-              }
-              this.realtimeDebounceTimer = setTimeout(() => {
-                const opts = {
-                  equipment: this.pendingRealtimeTables.equipment,
-                  transactions: this.pendingRealtimeTables.transactions,
-                };
-                this.pendingRealtimeTables = { equipment: false, transactions: false };
-                this.syncWithRemote(opts);
-              }, 300);
+              // Apply Realtime INSERT/UPDATE/DELETE payloads directly to IndexedDB (0 network egress!)
+              this.applyRealtimePayload(table, eventType, payload).catch((err) => {
+                console.warn('[SyncEngine Realtime] Direct payload apply fallback:', err);
+              });
             },
             () => {
               // Automatically catch up if Realtime WebSocket disconnected and reconnected
               if (this.isEffectivelyOnline() && !this.isSyncing) {
                 this.syncWithRemote();
               }
+            },
+            {
+              deviceIdFilter: getDeviceId() || undefined,
+              includeAllDevices: false,
             }
           );
         } catch (e) {
@@ -455,12 +453,162 @@ class SyncEngine {
   }
 
   /**
+   * Applies a Supabase Realtime `postgres_changes` payload directly to local IndexedDB
+   * without issuing a full-table `SELECT *` network query.
+   */
+  private async applyRealtimePayload(
+    table: 'transactions' | 'equipment_list',
+    eventType: string,
+    payload?: { new?: Record<string, unknown>; old?: Record<string, unknown> }
+  ): Promise<void> {
+    if (table === 'transactions') {
+      if ((eventType === 'INSERT' || eventType === 'UPDATE') && payload?.new && payload.new.id) {
+        const incomingTx = mapSupabaseRowToTransaction(payload.new);
+        if (this.deletedTxIds.has(incomingTx.id)) return;
+
+        // Do not overwrite a transaction that is currently pending local upload unless identical
+        const pendingOutbox = await db.outbox.get(incomingTx.id);
+        if (pendingOutbox) {
+          const localTx = await db.transactions.get(incomingTx.id);
+          const isSame = Boolean(
+            localTx &&
+            localTx.transactionType === incomingTx.transactionType &&
+            (localTx.checkInFuelPercentage ?? null) === (incomingTx.checkInFuelPercentage ?? null) &&
+            (localTx.checkOutFuelPercentage ?? null) === (incomingTx.checkOutFuelPercentage ?? null) &&
+            (localTx.checkInDefPercentage ?? null) === (incomingTx.checkInDefPercentage ?? null) &&
+            (localTx.checkOutDefPercentage ?? null) === (incomingTx.checkOutDefPercentage ?? null) &&
+            (localTx.checkInKWH ?? null) === (incomingTx.checkInKWH ?? null) &&
+            (localTx.checkOutKWH ?? null) === (incomingTx.checkOutKWH ?? null) &&
+            (localTx.checkInFuelEighths ?? null) === (incomingTx.checkInFuelEighths ?? null) &&
+            (localTx.checkOutFuelEighths ?? null) === (incomingTx.checkOutFuelEighths ?? null) &&
+            (localTx.fuelTransferLitres ?? null) === (incomingTx.fuelTransferLitres ?? null) &&
+            (localTx.defTransferLitres ?? null) === (incomingTx.defTransferLitres ?? null)
+          );
+          if (!isSame) return;
+          await db.outbox.delete(incomingTx.id);
+        }
+
+        await db.transactions.put(incomingTx);
+
+        if (incomingTx.transactionType === 'PoweredUp' || incomingTx.transactionType === 'PoweredDown') {
+          const eq = await db.equipments.get(incomingTx.equipmentId);
+          if (eq && eq.type === 'GENERATOR') {
+            const allTxForEq = await db.transactions.where('equipmentId').equals(incomingTx.equipmentId).toArray();
+            const powerState = getGeneratorPowerState(incomingTx.equipmentId, allTxForEq);
+            if (powerState.isOn) {
+              eq.poweredUpTimestamp = powerState.poweredUpTimestamp;
+              delete eq.poweredDownTimestamp;
+            } else {
+              eq.poweredDownTimestamp = powerState.poweredDownTimestamp;
+              delete eq.poweredUpTimestamp;
+            }
+            await db.equipments.put(eq);
+          }
+        }
+
+        this.lastSyncTime = new Date().toLocaleTimeString();
+        await this.notify();
+        this.notifyDataChange();
+        return;
+      }
+
+      if (eventType === 'DELETE') {
+        const delId = payload?.old?.id ? String(payload.old.id) : null;
+        if (delId) {
+          const existingTx = await db.transactions.get(delId);
+          await db.transactions.delete(delId);
+          await db.outbox.delete(delId);
+          if (this.deletedTxIds.has(delId)) {
+            this.deletedTxIds.delete(delId);
+            this.saveDeletedTxIds();
+          }
+
+          if (existingTx && (existingTx.transactionType === 'PoweredUp' || existingTx.transactionType === 'PoweredDown')) {
+            const eq = await db.equipments.get(existingTx.equipmentId);
+            if (eq && eq.type === 'GENERATOR') {
+              const allTxForEq = await db.transactions.where('equipmentId').equals(existingTx.equipmentId).toArray();
+              const powerState = getGeneratorPowerState(existingTx.equipmentId, allTxForEq);
+              if (powerState.isOn) {
+                eq.poweredUpTimestamp = powerState.poweredUpTimestamp;
+                delete eq.poweredDownTimestamp;
+              } else {
+                eq.poweredDownTimestamp = powerState.poweredDownTimestamp;
+                delete eq.poweredUpTimestamp;
+              }
+              await db.equipments.put(eq);
+            }
+          }
+
+          this.lastSyncTime = new Date().toLocaleTimeString();
+          await this.notify();
+          this.notifyDataChange();
+          return;
+        }
+        // Fallback if DELETE event had no old.id (e.g. bulk clear)
+        this.scheduleDebouncedTableSync({ equipment: false, transactions: true });
+      }
+      return;
+    }
+
+    if (table === 'equipment_list') {
+      if ((eventType === 'INSERT' || eventType === 'UPDATE') && payload?.new && payload.new.equipment_id) {
+        const incomingEq = mapSupabaseRowToEquipment(payload.new);
+        if (incomingEq.type === 'GENERATOR') {
+          const allTxForEq = await db.transactions.where('equipmentId').equals(incomingEq.equipmentId).toArray();
+          const powerState = getGeneratorPowerState(incomingEq.equipmentId, allTxForEq);
+          if (powerState.isOn) {
+            incomingEq.poweredUpTimestamp = powerState.poweredUpTimestamp;
+            delete incomingEq.poweredDownTimestamp;
+          } else {
+            incomingEq.poweredDownTimestamp = powerState.poweredDownTimestamp;
+            delete incomingEq.poweredUpTimestamp;
+          }
+        }
+        await db.equipments.put(incomingEq);
+        this.lastSyncTime = new Date().toLocaleTimeString();
+        await this.notify();
+        this.notifyDataChange();
+        return;
+      }
+
+      if (eventType === 'DELETE') {
+        const delEqId = payload?.old?.equipment_id ? String(payload.old.equipment_id) : null;
+        if (delEqId) {
+          await db.equipments.delete(delEqId);
+          this.lastSyncTime = new Date().toLocaleTimeString();
+          await this.notify();
+          this.notifyDataChange();
+          return;
+        }
+        this.scheduleDebouncedTableSync({ equipment: true, transactions: false });
+      }
+    }
+  }
+
+  private scheduleDebouncedTableSync(opts: { equipment: boolean; transactions: boolean }) {
+    if (opts.equipment) this.pendingRealtimeTables.equipment = true;
+    if (opts.transactions) this.pendingRealtimeTables.transactions = true;
+    if (this.realtimeDebounceTimer) {
+      clearTimeout(this.realtimeDebounceTimer);
+    }
+    this.realtimeDebounceTimer = setTimeout(() => {
+      const nextOpts = {
+        equipment: this.pendingRealtimeTables.equipment,
+        transactions: this.pendingRealtimeTables.transactions,
+      };
+      this.pendingRealtimeTables = { equipment: false, transactions: false };
+      this.syncWithRemote(nextOpts);
+    }, 300);
+  }
+
+  /**
    * Immediately clears local cached fleet data, marks device status as revoked,
    * and notifies all listeners to lock down the UI.
    */
   public async lockdownRevokedDevice(): Promise<void> {
     this.lastAuthCheckResult = false;
     this.lastAuthCheckTime = 0;
+    invalidateDeviceTokenCache();
     const currentDevId = getDeviceId();
     console.warn(`[SyncEngine] Locking down device "${currentDevId}". Active token revoked.`);
     markDeviceRevoked();
@@ -652,8 +800,30 @@ class SyncEngine {
         const transactionsToApply = filteredRemote.filter((t) => !pendingOutboxIdSet.has(t.id));
 
         if (transactionsToApply.length > 0) {
-          await db.transactions.bulkPut(transactionsToApply);
-          hadUpdates = true;
+          const localTxById = new Map(allLocal.map((l) => [l.id, l]));
+          const changedTransactions = transactionsToApply.filter((remoteTx) => {
+            const loc = localTxById.get(remoteTx.id);
+            if (!loc || loc.syncStatus !== 'synced') return true;
+            return (
+              loc.transactionType !== remoteTx.transactionType ||
+              loc.transactionTimestamp !== remoteTx.transactionTimestamp ||
+              (loc.checkInFuelPercentage ?? null) !== (remoteTx.checkInFuelPercentage ?? null) ||
+              (loc.checkOutFuelPercentage ?? null) !== (remoteTx.checkOutFuelPercentage ?? null) ||
+              (loc.checkInDefPercentage ?? null) !== (remoteTx.checkInDefPercentage ?? null) ||
+              (loc.checkOutDefPercentage ?? null) !== (remoteTx.checkOutDefPercentage ?? null) ||
+              (loc.checkInKWH ?? null) !== (remoteTx.checkInKWH ?? null) ||
+              (loc.checkOutKWH ?? null) !== (remoteTx.checkOutKWH ?? null) ||
+              (loc.checkInFuelEighths ?? null) !== (remoteTx.checkInFuelEighths ?? null) ||
+              (loc.checkOutFuelEighths ?? null) !== (remoteTx.checkOutFuelEighths ?? null) ||
+              (loc.fuelTransferLitres ?? null) !== (remoteTx.fuelTransferLitres ?? null) ||
+              (loc.defTransferLitres ?? null) !== (remoteTx.defTransferLitres ?? null)
+            );
+          });
+
+          if (changedTransactions.length > 0) {
+            await db.transactions.bulkPut(changedTransactions);
+            hadUpdates = true;
+          }
         } else if (allLocal.length > 0 && idsToDelete.length === allLocal.length) {
           await db.transactions.clear();
           hadUpdates = true;
@@ -673,7 +843,7 @@ class SyncEngine {
         }
 
         // If we only fetched transactions (not equipment), reconcile local equipment power states in-place
-        if (!remoteEquipment) {
+        if (!remoteEquipment && hadUpdates) {
           const allLocalEq = await db.equipments.toArray();
           if (allLocalEq.length > 0) {
             const allLocalTxs = await db.transactions.toArray();
@@ -686,6 +856,7 @@ class SyncEngine {
       if (remoteEquipment && Array.isArray(remoteEquipment)) {
         const remoteEqIdSet = new Set(remoteEquipment.map((e) => e.equipmentId));
         const allLocalEq = await db.equipments.toArray();
+        const localEqById = new Map(allLocalEq.map((e) => [e.equipmentId, e]));
         const eqIdsToDelete = allLocalEq
           .filter((e) => !remoteEqIdSet.has(e.equipmentId))
           .map((e) => e.equipmentId);
@@ -698,8 +869,27 @@ class SyncEngine {
         if (remoteEquipment.length > 0) {
           const allLocalTxs = await db.transactions.toArray();
           const reconciled = reconcileEquipmentPowerStates(remoteEquipment, allLocalTxs);
-          await db.equipments.bulkPut(reconciled);
-          hadUpdates = true;
+          const changedEquipment = reconciled.filter((remEq) => {
+            const loc = localEqById.get(remEq.equipmentId);
+            if (!loc) return true;
+            return (
+              loc.area !== remEq.area ||
+              loc.location !== remEq.location ||
+              loc.what3words !== remEq.what3words ||
+              loc.type !== remEq.type ||
+              (loc.capacity ?? null) !== (remEq.capacity ?? null) ||
+              loc.rentalSerialNumber !== remEq.rentalSerialNumber ||
+              (loc.poweredUpTimestamp ?? null) !== (remEq.poweredUpTimestamp ?? null) ||
+              (loc.poweredDownTimestamp ?? null) !== (remEq.poweredDownTimestamp ?? null) ||
+              (loc.latitude ?? null) !== (remEq.latitude ?? null) ||
+              (loc.longitude ?? null) !== (remEq.longitude ?? null)
+            );
+          });
+
+          if (changedEquipment.length > 0) {
+            await db.equipments.bulkPut(changedEquipment);
+            hadUpdates = true;
+          }
         }
       }
 

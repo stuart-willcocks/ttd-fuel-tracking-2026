@@ -22,6 +22,11 @@ export class FuelTrackingDatabase extends Dexie {
       transactions: 'id, equipmentId, transactionTimestamp, syncStatus',
       outbox: 'id, equipmentId, createdAt',
     });
+    this.version(2).stores({
+      equipments: 'equipmentId, type, area, location',
+      transactions: 'id, equipmentId, transactionTimestamp, [equipmentId+transactionTimestamp], syncStatus',
+      outbox: 'id, equipmentId, createdAt',
+    });
   }
 }
 

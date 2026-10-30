@@ -18,6 +18,7 @@ let cachedLocation: { latitude: number; longitude: number; locationAccuracy: num
 })();
 let lastLocationTime = cachedLocation ? Date.now() : 0;
 let lastLocationError: string | null = null;
+let isWatchingPosition = false;
 
 /**
  * Reads battery level and charging state via W3C Battery Status API.
@@ -126,7 +127,8 @@ export async function getCurrentLocation(): Promise<{
   locationAccuracy: number;
 } | null> {
   const now = Date.now();
-  if (cachedLocation && now - lastLocationTime < 180000) {
+  // When watchPosition is actively running, return cachedLocation immediately to avoid concurrent hardware GPS contention
+  if (isWatchingPosition || (cachedLocation && now - lastLocationTime < 180000)) {
     return cachedLocation;
   }
 
@@ -358,18 +360,11 @@ export function startTelemetryMonitoring(): () => void {
     }
   } catch {}
 
-  // Initial immediate collection on boot (sends battery + location + appVersion)
-  pushDeviceTelemetry(true);
-
-  // Periodic heartbeat every 5 minutes (low-frequency to protect free tier quotas)
-  const intervalId = setInterval(() => {
-    pushDeviceTelemetry(false);
-  }, 300000);
-
-  // Continuous background GPS watch
+  // Continuous background GPS watch (started before initial push to avoid concurrent getCurrentPosition contention)
   let watchId: number | null = null;
   if (typeof navigator !== 'undefined' && navigator.geolocation) {
     try {
+      isWatchingPosition = true;
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           const fix = {
@@ -404,9 +399,19 @@ export function startTelemetryMonitoring(): () => void {
         }
       );
     } catch (err) {
+      isWatchingPosition = false;
       console.warn('[Telemetry] Failed to start geolocation watcher:', err);
     }
   }
+
+  // Initial immediate collection on boot (sends battery + cached location + appVersion without blocking on GPS)
+  pushDeviceTelemetry(true);
+
+  // Periodic heartbeat every 5 minutes (low-frequency to protect free tier quotas)
+  const intervalId = setInterval(() => {
+    if (typeof document !== 'undefined' && document.hidden) return;
+    pushDeviceTelemetry(false);
+  }, 300000);
 
   // Battery status change listener
   const nav = navigator as unknown as {
@@ -437,6 +442,7 @@ export function startTelemetryMonitoring(): () => void {
 
   return () => {
     clearInterval(intervalId);
+    isWatchingPosition = false;
     if (watchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
       try {
         navigator.geolocation.clearWatch(watchId);

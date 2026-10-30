@@ -267,6 +267,8 @@ export const App: React.FC = () => {
   const [availableVersion, setAvailableVersion] = useState<string | null>(null);
 
   const checkForAppUpdate = useCallback(async () => {
+    if (typeof document !== 'undefined' && document.hidden) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     const res = await checkRemoteAppVersion();
     if (res.hasUpdate) {
       setHasUpdate(true);
@@ -278,8 +280,20 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     checkForAppUpdate();
-    const interval = setInterval(checkForAppUpdate, 15000);
-    return () => clearInterval(interval);
+    // Poll every 5 minutes and on visibility/online events to minimize Vercel CDN requests
+    const interval = setInterval(checkForAppUpdate, 300000);
+    const handleVisibilityOrOnline = () => {
+      if (!document.hidden && navigator.onLine) {
+        checkForAppUpdate();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrOnline);
+    window.addEventListener('online', handleVisibilityOrOnline);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityOrOnline);
+      window.removeEventListener('online', handleVisibilityOrOnline);
+    };
   }, [checkForAppUpdate]);
 
   const refreshAssetsList = useCallback(async () => {
@@ -320,11 +334,20 @@ export const App: React.FC = () => {
 
     setCurrentAsset(asset);
 
-    const txs = await db.transactions
-      .where('equipmentId')
-      .equals(asset.equipmentId)
-      .reverse()
-      .sortBy('transactionTimestamp');
+    let txs: Transaction[] = [];
+    try {
+      txs = await db.transactions
+        .where('[equipmentId+transactionTimestamp]')
+        .between([asset.equipmentId, ''], [asset.equipmentId, '\uffff'])
+        .reverse()
+        .toArray();
+    } catch {
+      txs = await db.transactions
+        .where('equipmentId')
+        .equals(asset.equipmentId)
+        .reverse()
+        .sortBy('transactionTimestamp');
+    }
     setCurrentAssetTransactions(txs);
     return asset;
   }, [refreshAssetsList]);
@@ -417,11 +440,13 @@ export const App: React.FC = () => {
   }, [refreshAssetsList, loadAssetDetails, isLaunchpadOnly]);
 
   const handleAssetScannedOrSelected = async (equipmentId: string) => {
-    const isAuth = await syncEngine.verifyDeviceAuthorization();
-    if (!isAuth) {
+    if (!isDeviceEnrolled()) {
       setIsEnrolled(false);
       return;
     }
+    syncEngine.verifyDeviceAuthorization().then((ok) => {
+      if (!ok) setIsEnrolled(false);
+    });
     setActiveAssetId(equipmentId);
     setActiveAction(null);
     await loadAssetDetails(equipmentId);
@@ -437,21 +462,25 @@ export const App: React.FC = () => {
   };
 
   const handleFormSubmitValues = async (data: Partial<Transaction>) => {
-    const isAuth = await syncEngine.verifyDeviceAuthorization();
-    if (!isAuth) {
+    if (!isDeviceEnrolled()) {
       setIsEnrolled(false);
       return;
     }
+    syncEngine.verifyDeviceAuthorization().then((ok) => {
+      if (!ok) setIsEnrolled(false);
+    });
     setPendingTxData(data);
     setIsConfirmModalOpen(true);
   };
 
   const handleConfirmTransaction = async () => {
-    const isAuth = await syncEngine.verifyDeviceAuthorization();
-    if (!isAuth) {
+    if (!isDeviceEnrolled()) {
       setIsEnrolled(false);
       return;
     }
+    syncEngine.verifyDeviceAuthorization().then((ok) => {
+      if (!ok) setIsEnrolled(false);
+    });
     if (!currentAsset || !pendingTxData) return;
 
     const nowIso = new Date().toISOString();
@@ -504,11 +533,13 @@ export const App: React.FC = () => {
   };
 
   const handleConfirmPowerEvent = async (timestamp: string) => {
-    const isAuth = await syncEngine.verifyDeviceAuthorization();
-    if (!isAuth) {
+    if (!isDeviceEnrolled()) {
       setIsEnrolled(false);
       return;
     }
+    syncEngine.verifyDeviceAuthorization().then((ok) => {
+      if (!ok) setIsEnrolled(false);
+    });
     if (!currentAsset || !powerModalType) return;
 
     const nowIso = new Date().toISOString();

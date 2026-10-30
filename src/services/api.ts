@@ -323,9 +323,7 @@ export async function verifyRemoteDeviceToken(
   if (!target) {
     return { valid: false, status: 'revoked' };
   }
-  const match =
-    Boolean(cleanToken) &&
-    (target.authToken === cleanToken || cleanToken === 'approved_by_admin');
+  const match = Boolean(cleanToken) && target.authToken === cleanToken;
   if (match && target.status === 'active') {
     target.lastSeenAt = new Date().toISOString();
     saveMockDevices(current);
