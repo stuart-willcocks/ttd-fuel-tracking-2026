@@ -21,10 +21,17 @@ interface DangerZoneModalProps {
   onClose: () => void;
   onDeleteAll: () => Promise<void>;
   onDeleteAllTransactions: () => Promise<void>;
+  onDeleteTransactionsForEquipment: (equipmentId: string) => Promise<void>;
   onBulkUpload: (equipmentList: Equipment[]) => Promise<void>;
 }
 
-type ModalStep = 'MAIN' | 'CONFIRM_DELETE_ALL' | 'CONFIRM_DELETE_TXS' | 'VERIFY_UPLOAD';
+type ModalStep =
+  | 'MAIN'
+  | 'CONFIRM_DELETE_ALL'
+  | 'CONFIRM_DELETE_TXS'
+  | 'SELECT_EQ_DELETE_TXS'
+  | 'CONFIRM_DELETE_EQ_TXS'
+  | 'VERIFY_UPLOAD';
 
 const PREVIEW_ROW_LIMIT = 5;
 
@@ -34,9 +41,11 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
   onClose,
   onDeleteAll,
   onDeleteAllTransactions,
+  onDeleteTransactionsForEquipment,
   onBulkUpload,
 }) => {
   const [step, setStep] = useState<ModalStep>('MAIN');
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isValidatingFile, setIsValidatingFile] = useState(false);
@@ -44,9 +53,18 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
   const [validationResult, setValidationResult] = useState<EquipmentFileValidationResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const sortedAssets = React.useMemo(
+    () =>
+      [...existingAssets].sort((a, b) =>
+        a.equipmentId.localeCompare(b.equipmentId, undefined, { numeric: true, sensitivity: 'base' })
+      ),
+    [existingAssets]
+  );
+
   React.useEffect(() => {
     if (isOpen) {
       setStep('MAIN');
+      setSelectedEquipmentId('');
       setIsDeleting(false);
       setIsUploading(false);
       setIsValidatingFile(false);
@@ -93,6 +111,23 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMsg(`Failed to delete transactions: ${msg}`);
+      setIsDeleting(false);
+    }
+  };
+
+  const handleConfirmDeleteEquipmentTransactions = async () => {
+    if (!selectedEquipmentId) return;
+    setIsDeleting(true);
+    setErrorMsg(null);
+    try {
+      await onDeleteTransactionsForEquipment(selectedEquipmentId);
+      setIsDeleting(false);
+      setSelectedEquipmentId('');
+      setStep('MAIN');
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(`Failed to delete transactions for ${selectedEquipmentId}: ${msg}`);
       setIsDeleting(false);
     }
   };
@@ -152,8 +187,15 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
   };
 
   const getHeaderTitle = () => {
-    if (step === 'CONFIRM_DELETE_ALL' || step === 'CONFIRM_DELETE_TXS') {
+    if (
+      step === 'CONFIRM_DELETE_ALL' ||
+      step === 'CONFIRM_DELETE_TXS' ||
+      step === 'CONFIRM_DELETE_EQ_TXS'
+    ) {
       return 'Confirm Deletion';
+    }
+    if (step === 'SELECT_EQ_DELETE_TXS') {
+      return 'Select Equipment ID';
     }
     if (step === 'VERIFY_UPLOAD') {
       return 'Bulk Upload Verification';
@@ -223,7 +265,9 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                     : '#ef4444',
               }}
             >
-              {step === 'CONFIRM_DELETE_ALL' || step === 'CONFIRM_DELETE_TXS' ? (
+              {step === 'CONFIRM_DELETE_ALL' ||
+              step === 'CONFIRM_DELETE_TXS' ||
+              step === 'CONFIRM_DELETE_EQ_TXS' ? (
                 <AlertOctagon size={20} />
               ) : step === 'VERIFY_UPLOAD' ? (
                 <FileSpreadsheet size={20} />
@@ -286,6 +330,34 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                 <span>
                   {isValidatingFile ? 'Validating file...' : 'Bulk upload equipment list'}
                 </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMsg(null);
+                  setSelectedEquipmentId('');
+                  setStep('SELECT_EQ_DELETE_TXS');
+                }}
+                className="admin-btn"
+                disabled={isBusy}
+                style={{
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  padding: '10px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  border: 'none',
+                  cursor: isBusy ? 'not-allowed' : 'pointer',
+                  width: '100%',
+                }}
+              >
+                <Trash2 size={16} />
+                <span>Delete transactions for one equipment ID</span>
               </button>
 
               <button
@@ -493,6 +565,194 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                   <>
                     <Trash2 size={15} />
                     <span>Delete all transactions</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'SELECT_EQ_DELETE_TXS' && (
+          /* Select Equipment ID to Delete Transactions For */
+          <div>
+            <p
+              style={{
+                fontSize: '0.94rem',
+                color: 'var(--adm-text-secondary)',
+                lineHeight: 1.5,
+                margin: '4px 0 14px 0',
+              }}
+            >
+              Select an equipment ID from the drop-down below to delete all of its transaction records:
+            </p>
+
+            <div style={{ marginBottom: '22px' }}>
+              <label
+                htmlFor="danger-zone-equipment-select"
+                style={{
+                  display: 'block',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  color: 'var(--adm-text-secondary)',
+                  marginBottom: '6px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                Equipment ID
+              </label>
+              <select
+                id="danger-zone-equipment-select"
+                className="admin-select"
+                value={selectedEquipmentId}
+                onChange={(e) => setSelectedEquipmentId(e.target.value)}
+                disabled={isDeleting || sortedAssets.length === 0}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  fontSize: '0.92rem',
+                  fontWeight: 600,
+                }}
+              >
+                <option value="">
+                  {sortedAssets.length === 0
+                    ? '-- No equipment IDs available --'
+                    : '-- Select an equipment ID --'}
+                </option>
+                {sortedAssets.map((eq) => (
+                  <option key={eq.equipmentId} value={eq.equipmentId}>
+                    {eq.equipmentId} — {eq.type}
+                    {eq.location ? ` (${eq.location})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'flex-end',
+                paddingTop: '16px',
+                borderTop: '1px solid var(--adm-border-subtle)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMsg(null);
+                  setSelectedEquipmentId('');
+                  setStep('MAIN');
+                }}
+                className="admin-btn"
+                style={{
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedEquipmentId) return;
+                  setErrorMsg(null);
+                  setStep('CONFIRM_DELETE_EQ_TXS');
+                }}
+                className="admin-btn"
+                style={{
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: 'none',
+                  opacity: selectedEquipmentId ? 1 : 0.5,
+                  cursor: selectedEquipmentId ? 'pointer' : 'not-allowed',
+                }}
+                disabled={!selectedEquipmentId}
+              >
+                <Trash2 size={15} />
+                <span>Continue</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'CONFIRM_DELETE_EQ_TXS' && (
+          /* Confirm Delete Transactions for Selected Equipment ID */
+          <div>
+            <p
+              style={{
+                fontSize: '1rem',
+                color: 'var(--adm-text-primary)',
+                fontWeight: 600,
+                lineHeight: 1.5,
+                margin: '12px 0 24px 0',
+              }}
+            >
+              All transaction records for equipment ID{' '}
+              <span style={{ fontFamily: 'var(--adm-font-mono)', color: '#ef4444' }}>
+                {selectedEquipmentId}
+              </span>{' '}
+              will be deleted (leaving the equipment record intact). Do you want to continue?
+            </p>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'flex-end',
+                paddingTop: '16px',
+                borderTop: '1px solid var(--adm-border-subtle)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMsg(null);
+                  setStep('SELECT_EQ_DELETE_TXS');
+                }}
+                className="admin-btn"
+                style={{
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  border: 'none',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmDeleteEquipmentTransactions}
+                className="admin-btn"
+                style={{
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: 'none',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                }}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <span>Deleting...</span>
+                ) : (
+                  <>
+                    <Trash2 size={15} />
+                    <span>Delete transactions</span>
                   </>
                 )}
               </button>

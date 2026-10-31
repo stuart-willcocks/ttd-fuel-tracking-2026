@@ -429,6 +429,33 @@ export async function clearAllTransactionsFromSupabase(): Promise<void> {
 }
 
 /**
+ * Wipe transaction records for a single equipment ID from Supabase
+ */
+export async function deleteTransactionsForEquipmentFromSupabase(equipmentId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase not configured');
+
+  const { error: txErr } = await client
+    .from('transactions')
+    .delete()
+    .eq('equipment_id', equipmentId);
+  if (txErr) throw txErr;
+
+  // Reset cached power timestamps on equipment_list for this equipment ID
+  const { error: eqErr } = await client
+    .from('equipment_list')
+    .update({
+      powered_up_timestamp: null,
+      powered_down_timestamp: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('equipment_id', equipmentId);
+  if (eqErr) {
+    console.warn(`Could not reset equipment power timestamps for ${equipmentId}:`, eqErr);
+  }
+}
+
+/**
  * Bulk import equipment records into Supabase in chunks (appends new IDs and overwrites duplicate IDs)
  */
 export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]): Promise<number> {

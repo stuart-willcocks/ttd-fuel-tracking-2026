@@ -10,6 +10,7 @@ import {
   fetchTransactionsFromSupabase,
   clearAllCloudData,
   clearAllTransactionsFromSupabase,
+  deleteTransactionsForEquipmentFromSupabase,
   bulkImportEquipmentToSupabase,
   bulkImportTransactionsToSupabase,
   uploadTransactionToCloud,
@@ -201,6 +202,28 @@ export async function deleteAllTransactionsOnly(): Promise<void> {
     localStorage.removeItem('ttd_deleted_tx_ids');
   } catch {
     // Ignore
+  }
+}
+
+export async function deleteTransactionsForEquipment(equipmentId: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    await deleteTransactionsForEquipmentFromSupabase(equipmentId);
+  }
+
+  try {
+    await fetch(`/api/transactions?equipmentId=${encodeURIComponent(equipmentId)}`, {
+      method: 'DELETE',
+    });
+  } catch {
+    // Ignore in static hosting environments
+  }
+
+  // Clear local IndexedDB transactions and outbox for this equipment ID
+  try {
+    await db.transactions.where('equipmentId').equals(equipmentId).delete();
+    await db.outbox.where('equipmentId').equals(equipmentId).delete();
+  } catch (err) {
+    console.warn('Local indexedDB clear equipment transactions error:', err);
   }
 }
 
