@@ -336,6 +336,14 @@ export function getGoogleSatelliteMapSrcDoc(
       color: #FFFFFF;
       border-color: #1D4ED8;
     }
+    .recenter-btn.active:hover {
+      background: #1D4ED8;
+    }
+    .recenter-btn.active {
+      background: #2563EB;
+      color: #FFFFFF;
+      border-color: #1D4ED8;
+    }
     @keyframes pdaPulseRing {
       0% { transform: scale(0.85); opacity: 0.75; }
       70% { transform: scale(1.65); opacity: 0; }
@@ -865,6 +873,14 @@ function getMoveEquipmentMapSrcDoc(
     .recenter-btn:hover {
       background: #F8FAFC;
     }
+    .recenter-btn.active {
+      background: #2563EB;
+      color: #FFFFFF;
+      border-color: #1D4ED8;
+    }
+    .recenter-btn.active:hover {
+      background: #1D4ED8;
+    }
     .eq-move-marker {
       position: relative;
       display: flex;
@@ -926,7 +942,14 @@ function getMoveEquipmentMapSrcDoc(
 </head>
 <body>
   <div id="map"></div>
-  <div class="map-bottom-controls">
+  <div class="map-bottom-controls" id="mapBottomControls">
+    <button type="button" class="recenter-btn" id="toggleLabelsBtn" title="Enable or disable Google Map labels">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+        <line x1="7" y1="7" x2="7.01" y2="7"/>
+      </svg>
+      <span id="toggleLabelsText">Map Labels: Off</span>
+    </button>
     <button type="button" class="recenter-btn" id="recenterBtn" title="Re-center on current equipment location">
       <span>⌖ Current Location</span>
     </button>
@@ -948,12 +971,59 @@ function getMoveEquipmentMapSrcDoc(
         doubleClickZoom: false
       });
 
+      var bottomControls = document.getElementById('mapBottomControls');
+      if (bottomControls && L.DomEvent) {
+        L.DomEvent.disableClickPropagation(bottomControls);
+      }
+
       L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
         maxZoom: 21,
         maxNativeZoom: 20,
         subdomains: ['0', '1', '2', '3'],
         attribution: 'Map data &copy; Google Satellite'
       }).addTo(map);
+
+      var labelsLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', {
+        maxZoom: 21,
+        maxNativeZoom: 20,
+        subdomains: ['0', '1', '2', '3']
+      });
+
+      var toggleLabelsBtn = document.getElementById('toggleLabelsBtn');
+      var toggleLabelsText = document.getElementById('toggleLabelsText');
+      var showLabels = false;
+      try {
+        showLabels = window.localStorage && window.localStorage.getItem('ttd_move_map_labels_enabled') === '1';
+      } catch (e) {}
+
+      function applyLabelsState() {
+        if (showLabels) {
+          if (!map.hasLayer(labelsLayer)) {
+            labelsLayer.addTo(map);
+          }
+          toggleLabelsBtn.classList.add('active');
+          toggleLabelsText.textContent = 'Map Labels: On';
+        } else {
+          if (map.hasLayer(labelsLayer)) {
+            map.removeLayer(labelsLayer);
+          }
+          toggleLabelsBtn.classList.remove('active');
+          toggleLabelsText.textContent = 'Map Labels: Off';
+        }
+      }
+
+      applyLabelsState();
+
+      toggleLabelsBtn.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        showLabels = !showLabels;
+        try {
+          if (window.localStorage) {
+            window.localStorage.setItem('ttd_move_map_labels_enabled', showLabels ? '1' : '0');
+          }
+        } catch (e) {}
+        applyLabelsState();
+      });
 
       function getEquipmentSvg(type, color) {
         if (type === 'GENERATOR') {
