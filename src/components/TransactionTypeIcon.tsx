@@ -28,8 +28,8 @@ export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({
 
   if (t.includes('CheckOut') || t === 'check-out') {
     return (
-      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Check Out'} style={{ color: '#16A34A' }}>
-        <IconCheckOut size={size} color="#16A34A" className="tx-type-icon" />
+      <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Check Out'} style={{ color: '#DC2626' }}>
+        <IconCheckOut size={size} color="#DC2626" className="tx-type-icon" />
       </span>
     );
   }

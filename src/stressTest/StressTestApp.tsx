@@ -19,6 +19,7 @@ import {
 import type { Session } from '@supabase/supabase-js';
 import '../admin/admin.css';
 import { AdminLoginView } from '../admin/components/AdminLoginView';
+import { TransactionTypeIcon } from '../components/TransactionTypeIcon';
 import type { Equipment, Transaction, TransactionType } from '../types';
 import { generateUUID } from '../types';
 import { fetchRemoteEquipment, postRemoteTransaction } from '../services/api';
@@ -205,7 +206,7 @@ export const StressTestApp: React.FC = () => {
       return { label: 'Check-In', color: '#4ADE80', bg: 'rgba(34, 197, 94, 0.14)' };
     }
     if (txType.startsWith('CheckOut')) {
-      return { label: 'Check-Out', color: '#FACC15', bg: 'rgba(250, 204, 21, 0.14)' };
+      return { label: 'Check-Out', color: '#F87171', bg: 'rgba(239, 68, 68, 0.14)' };
     }
     if (txType === 'PoweredUp') {
       return { label: 'Power-Up', color: '#34D399', bg: 'rgba(16, 185, 129, 0.15)' };
@@ -972,8 +973,8 @@ export const StressTestApp: React.FC = () => {
                     gap: '8px',
                     padding: '8px 10px',
                     borderRadius: '6px',
-                    background: includeCheckOut ? 'rgba(250, 204, 21, 0.12)' : '#030712',
-                    border: `1px solid ${includeCheckOut ? 'rgba(250, 204, 21, 0.45)' : '#334155'}`,
+                    background: includeCheckOut ? 'rgba(239, 68, 68, 0.12)' : '#030712',
+                    border: `1px solid ${includeCheckOut ? 'rgba(239, 68, 68, 0.45)' : '#334155'}`,
                     cursor: isRunning ? 'not-allowed' : 'pointer',
                     fontSize: '0.82rem',
                     fontWeight: 600,
@@ -985,8 +986,9 @@ export const StressTestApp: React.FC = () => {
                     checked={includeCheckOut}
                     onChange={(e) => setIncludeCheckOut(e.target.checked)}
                     disabled={isRunning}
-                    style={{ accentColor: '#FACC15', cursor: isRunning ? 'not-allowed' : 'pointer' }}
+                    style={{ accentColor: '#DC2626', cursor: isRunning ? 'not-allowed' : 'pointer' }}
                   />
+                  <TransactionTypeIcon type="check-out" size={16} />
                   <div>
                     <div>Check-Out</div>
                     <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 500 }}>
@@ -1614,7 +1616,9 @@ export const StressTestApp: React.FC = () => {
                         <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>
                           <span
                             style={{
-                              display: 'inline-block',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
                               padding: '2px 7px',
                               borderRadius: '4px',
                               fontSize: '0.72rem',
@@ -1623,7 +1627,8 @@ export const StressTestApp: React.FC = () => {
                               background: badge.bg,
                             }}
                           >
-                            {badge.label}
+                            <TransactionTypeIcon type={entry.transactionType} size={13} />
+                            <span>{badge.label}</span>
                           </span>
                         </td>
                         <td style={{ padding: '7px 10px', fontFamily: 'monospace', color: '#E2E8F0', fontWeight: 600 }}>

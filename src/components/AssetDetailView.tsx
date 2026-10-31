@@ -15,6 +15,7 @@ import {
 } from '../services/what3words';
 import { db } from '../db/indexedDB';
 import { postRemoteEquipment } from '../services/api';
+import { getCurrentLocation } from '../services/telemetry';
 
 export interface AssetDetailViewProps {
   asset: Equipment;
@@ -86,8 +87,89 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       cancelled = true;
     };
   }, [isMapModalOpen, resolvedCoords, cleanW3w, asset]);
+
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const mapIframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  // Bridge parent PDA GPS location into the in-app What3Words map modal when toggled by the user
+  useEffect(() => {
+    if (!isMapModalOpen) return;
+
+    let watchId: number | null = null;
+    let isTrackingActive = false;
+
+    const postLocationToIframe = (lat: number, lng: number) => {
+      mapIframeRef.current?.contentWindow?.postMessage(
+        { type: 'TTD_PDA_LOCATION_UPDATE', lat, lng },
+        '*'
+      );
+    };
+
+    const stopWatch = () => {
+      isTrackingActive = false;
+      if (watchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+        try {
+          navigator.geolocation.clearWatch(watchId);
+        } catch {}
+        watchId = null;
+      }
+    };
+
+    const handleMapMessage = (ev: MessageEvent) => {
+      const data = ev.data;
+      if (!data || data.type !== 'TTD_PDA_LOCATION_TOGGLE') return;
+
+      if (!data.enabled) {
+        stopWatch();
+        return;
+      }
+
+      isTrackingActive = true;
+
+      // 1. Immediately send cached location if available
+      try {
+        const raw =
+          sessionStorage.getItem('ttd_cached_location') ||
+          localStorage.getItem('ttd_cached_location');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (typeof parsed?.latitude === 'number' && typeof parsed?.longitude === 'number') {
+            postLocationToIframe(parsed.latitude, parsed.longitude);
+          }
+        }
+      } catch {}
+
+      // 2. Fetch fresh location via telemetry service
+      getCurrentLocation()
+        .then((loc) => {
+          if (isTrackingActive && loc) {
+            postLocationToIframe(loc.latitude, loc.longitude);
+          }
+        })
+        .catch(() => {});
+
+      // 3. Watch live position changes while enabled
+      if (watchId === null && typeof navigator !== 'undefined' && navigator.geolocation) {
+        try {
+          watchId = navigator.geolocation.watchPosition(
+            (pos) => {
+              if (!isTrackingActive) return;
+              postLocationToIframe(pos.coords.latitude, pos.coords.longitude);
+            },
+            () => {},
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+          );
+        } catch {}
+      }
+    };
+
+    window.addEventListener('message', handleMapMessage);
+    return () => {
+      window.removeEventListener('message', handleMapMessage);
+      stopWatch();
+    };
+  }, [isMapModalOpen]);
 
   const clearLongPress = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -455,6 +537,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
                 </div>
               ) : (
                 <iframe
+                  ref={mapIframeRef}
                   srcDoc={getGoogleSatelliteMapSrcDoc(cleanW3w, resolvedCoords?.lat, resolvedCoords?.lng)}
                   title={`Google Map for ${cleanW3w}`}
                   className="w3w-map-iframe"

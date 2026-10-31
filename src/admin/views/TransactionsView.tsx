@@ -18,6 +18,7 @@ import { formatAdminTimestamp } from '../../utils/dateFormat';
 import { getGeneratorPowerState } from '../../utils/powerState';
 import { getGoogleMapsExternalUrl, handleWhat3WordsLinkClick } from '../../services/what3words';
 import { postRemoteEquipment } from '../../services/api';
+import { TransactionTypeIcon } from '../../components/TransactionTypeIcon';
 
 interface TransactionsViewProps {
   transactions: Transaction[];
@@ -744,9 +745,13 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                           fontWeight: 600,
                           fontSize: '0.84rem',
                           color: 'var(--adm-text-primary)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
                         }}
                       >
-                        {tx.transactionType}
+                        <TransactionTypeIcon type={tx.transactionType} size={16} />
+                        <span>{tx.transactionType}</span>
                       </span>
                     </td>
 

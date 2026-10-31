@@ -243,11 +243,16 @@ export function getGoogleSatelliteMapSrcDoc(
     .leaflet-control-attribution a {
       color: #93C5FD !important;
     }
-    .recenter-btn {
+    .map-bottom-controls {
       position: absolute;
       bottom: 24px;
       right: 12px;
       z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .recenter-btn {
       background: #FFFFFF;
       color: #0F172A;
       border: 1px solid #CBD5E1;
@@ -260,17 +265,67 @@ export function getGoogleSatelliteMapSrcDoc(
       display: inline-flex;
       align-items: center;
       gap: 5px;
+      user-select: none;
     }
     .recenter-btn:hover {
       background: #F8FAFC;
+    }
+    .recenter-btn.active {
+      background: #2563EB;
+      color: #FFFFFF;
+      border-color: #1D4ED8;
+    }
+    @keyframes pdaPulseRing {
+      0% { transform: scale(0.85); opacity: 0.75; }
+      70% { transform: scale(1.65); opacity: 0; }
+      100% { transform: scale(1.65); opacity: 0; }
+    }
+    .pda-device-loc-wrap {
+      position: relative;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pda-device-loc-pulse {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(37, 99, 235, 0.45);
+      animation: pdaPulseRing 2s infinite ease-out;
+      pointer-events: none;
+    }
+    .pda-device-loc-disc {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #64748B;
+      border: 2.5px solid #FFFFFF;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <button type="button" class="recenter-btn" id="recenterBtn" title="Re-center on pin">
-    <span>⌖ Center Pin</span>
-  </button>
+  <div class="map-bottom-controls">
+    <button type="button" class="recenter-btn" id="deviceLocBtn" title="Show or hide current device location">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>
+        <path d="M12 18h.01"/>
+      </svg>
+      <span id="deviceLocLabel">My Location</span>
+    </button>
+    <button type="button" class="recenter-btn" id="recenterBtn" title="Re-center on pin">
+      <span>⌖ Center Pin</span>
+    </button>
+  </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     (function() {
@@ -307,6 +362,144 @@ export function getGoogleSatelliteMapSrcDoc(
       });
 
       L.marker(target, { icon: pinIcon }).addTo(map);
+
+      var deviceLocBtn = document.getElementById('deviceLocBtn');
+      var deviceLocLabel = document.getElementById('deviceLocLabel');
+      var isDeviceLocEnabled = false;
+      var deviceMarker = null;
+      var geoWatchId = null;
+      var hasFittedDeviceOnce = false;
+
+      var deviceIconHtml = '<div class="pda-device-loc-wrap">' +
+        '<div class="pda-device-loc-pulse"></div>' +
+        '<div class="pda-device-loc-disc">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>' +
+        '<path d="M12 18h.01"/>' +
+        '</svg>' +
+        '</div></div>';
+
+      var deviceDivIcon = L.divIcon({
+        html: deviceIconHtml,
+        className: '',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      function updateDeviceMarker(lat, lng) {
+        if (!isDeviceLocEnabled) return;
+        if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return;
+        var pos = [lat, lng];
+        if (!deviceMarker) {
+          deviceMarker = L.marker(pos, { icon: deviceDivIcon, zIndexOffset: 500 }).addTo(map);
+          deviceMarker.bindTooltip('Device Location', {
+            direction: 'top',
+            offset: [0, -16],
+            opacity: 0.92
+          });
+        } else {
+          deviceMarker.setLatLng(pos);
+        }
+        deviceLocLabel.textContent = 'My Location';
+        if (!hasFittedDeviceOnce) {
+          hasFittedDeviceOnce = true;
+          try {
+            map.fitBounds(L.latLngBounds([target, pos]), {
+              padding: [48, 48],
+              maxZoom: 19,
+              animate: true
+            });
+          } catch (e) {}
+        }
+      }
+
+      function stopDeviceTracking() {
+        if (geoWatchId !== null && navigator.geolocation) {
+          try {
+            navigator.geolocation.clearWatch(geoWatchId);
+          } catch (e) {}
+          geoWatchId = null;
+        }
+        if (deviceMarker) {
+          map.removeLayer(deviceMarker);
+          deviceMarker = null;
+        }
+        hasFittedDeviceOnce = false;
+        deviceLocBtn.classList.remove('active');
+        deviceLocLabel.textContent = 'My Location';
+        try {
+          window.parent.postMessage({ type: 'TTD_PDA_LOCATION_TOGGLE', enabled: false }, '*');
+        } catch (e) {}
+      }
+
+      function startDeviceTracking() {
+        deviceLocBtn.classList.add('active');
+        hasFittedDeviceOnce = false;
+
+        // 1. Check cached location if accessible
+        try {
+          var raw = (window.sessionStorage && window.sessionStorage.getItem('ttd_cached_location')) ||
+                    (window.localStorage && window.localStorage.getItem('ttd_cached_location'));
+          if (raw) {
+            var cached = JSON.parse(raw);
+            if (cached && typeof cached.latitude === 'number' && typeof cached.longitude === 'number') {
+              updateDeviceMarker(cached.latitude, cached.longitude);
+            }
+          }
+        } catch (e) {}
+
+        // 2. Ask parent PDA window for immediate cached + live GPS coordinates
+        try {
+          window.parent.postMessage({ type: 'TTD_PDA_LOCATION_TOGGLE', enabled: true }, '*');
+        } catch (e) {}
+
+        // 3. Direct browser geolocation watch inside iframe
+        if (navigator.geolocation) {
+          if (!deviceMarker) {
+            deviceLocLabel.textContent = 'Locating...';
+          }
+          try {
+            geoWatchId = navigator.geolocation.watchPosition(
+              function(pos) {
+                if (!isDeviceLocEnabled) return;
+                updateDeviceMarker(pos.coords.latitude, pos.coords.longitude);
+              },
+              function() {
+                if (!isDeviceLocEnabled) return;
+                navigator.geolocation.getCurrentPosition(
+                  function(pos2) {
+                    if (!isDeviceLocEnabled) return;
+                    updateDeviceMarker(pos2.coords.latitude, pos2.coords.longitude);
+                  },
+                  function() {
+                    if (!deviceMarker) {
+                      deviceLocLabel.textContent = 'My Location';
+                    }
+                  },
+                  { enableHighAccuracy: false, timeout: 5000, maximumAge: 180000 }
+                );
+              },
+              { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+            );
+          } catch (e) {}
+        }
+      }
+
+      deviceLocBtn.addEventListener('click', function() {
+        isDeviceLocEnabled = !isDeviceLocEnabled;
+        if (isDeviceLocEnabled) {
+          startDeviceTracking();
+        } else {
+          stopDeviceTracking();
+        }
+      });
+
+      window.addEventListener('message', function(ev) {
+        var data = ev && ev.data;
+        if (data && data.type === 'TTD_PDA_LOCATION_UPDATE') {
+          updateDeviceMarker(data.lat, data.lng);
+        }
+      });
 
       document.getElementById('recenterBtn').addEventListener('click', function() {
         map.setView(target, 19, { animate: true });
@@ -1025,7 +1218,7 @@ export function getFleetSatelliteMapSrcDoc(
             '<g transform="translate(-204)"><path d="M 216,5 V 3 h 9 v 18 h -9 v -1 -1" /><path d="m 218,12 h -10 -1" /><path d="m 214,9 4,3 -4,3" /></g></svg>';
         }
         if (t.indexOf('CheckOut') !== -1 || t === 'check-out') {
-          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#DC2626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
             '<g transform="translate(-34)"><path d="M 46,5 V 3 h 9 v 18 h -9 v -1 -1" /><path d="m 37,12 h 10 1" /><path d="m 41,9 -4,3 4,3" /></g></svg>';
         }
         if (t === 'PoweredUp' || t === 'power-up') {

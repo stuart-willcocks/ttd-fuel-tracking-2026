@@ -31,9 +31,24 @@ export function parseToDate(val?: string | number | Date | null): Date | null {
   return isNaN(fallback.getTime()) ? null : fallback;
 }
 
+const THREE_LETTER_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
 /**
  * Formats timestamps for the PDA app strictly in UK local time (Europe/London):
- * e.g. "Thu 2 July 2026 at 12:24"
+ * e.g. "Thu 2 Jul 2026 at 12:24:05"
  * Accurately accounts for British Summer Time (BST / UTC+1) and Greenwich Mean Time (GMT / UTC+0).
  */
 export function formatPdaTimestamp(val?: string | number | Date | null): string {
@@ -47,10 +62,11 @@ export function formatPdaTimestamp(val?: string | number | Date | null): string 
       timeZone: 'Europe/London',
       weekday: 'short',
       day: 'numeric',
-      month: 'long',
+      month: 'numeric',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
       hour12: false,
     }).formatToParts(d);
 
@@ -59,7 +75,10 @@ export function formatPdaTimestamp(val?: string | number | Date | null): string 
       m[p.type] = p.value;
     }
 
-    return `${m.weekday} ${m.day} ${m.month} ${m.year} at ${m.hour}:${m.minute}`;
+    const monthIdx = parseInt(m.month || '1', 10) - 1;
+    const shortMonth = THREE_LETTER_MONTHS[monthIdx] || (m.month || '').slice(0, 3);
+
+    return `${m.weekday} ${m.day} ${shortMonth} ${m.year} at ${m.hour}:${m.minute}:${m.second}`;
   } catch {
     return String(val);
   }
