@@ -292,6 +292,8 @@ export async function deleteTransactionFromSupabase(transactionId: string): Prom
     );
   }
 
+  broadcastTransactionDelete(transactionId);
+
   // 3. If this was a power event, reconcile the equipment's power state from remaining transactions
   if (targetTx && (targetTx.transaction_type === 'PoweredUp' || targetTx.transaction_type === 'PoweredDown')) {
     const { data: remainingPowerTxs } = await client
@@ -356,19 +358,41 @@ export async function updateTransactionInSupabase(tx: Transaction): Promise<void
     device_id: tx.deviceId ?? null,
   };
 
+  // Pre-register and broadcast the updated transaction before any DELETE + INSERT fallback
+  // so no connected Admin Console or PDA treats the transient DELETE WAL event as a real deletion
+  broadcastTransactionUpsert(payload);
+
   // 1. Try direct in-place UPDATE
-  const { data: updatedRows, error: updateErr } = await client
+  let { data: updatedRows, error: updateErr } = await client
     .from('transactions')
     .update(payload)
     .eq('id', tx.id)
     .select('id');
 
+  if (updateErr && (updateErr as any).code === 'PGRST204' && (updateErr as any).message?.includes('device_id')) {
+    delete payload.device_id;
+    const retryUpdate = await client
+      .from('transactions')
+      .update(payload)
+      .eq('id', tx.id)
+      .select('id');
+    updatedRows = retryUpdate.data;
+    updateErr = retryUpdate.error;
+  }
+
   // 2. If UPDATE RLS policy is not set or returned 0 updated rows, fallback to delete + insert for explicit edit
   if (updateErr || !updatedRows || updatedRows.length === 0) {
     await client.from('transactions').delete().eq('id', tx.id);
-    const { error: insertErr } = await client.from('transactions').insert(payload);
+    let { error: insertErr } = await client.from('transactions').insert(payload);
+    if (insertErr && (insertErr as any).code === 'PGRST204' && (insertErr as any).message?.includes('device_id')) {
+      delete payload.device_id;
+      const retryInsert = await client.from('transactions').insert(payload);
+      insertErr = retryInsert.error;
+    }
     if (insertErr) throw insertErr;
   }
+
+  broadcastTransactionUpsert({ ...payload, device_id: tx.deviceId ?? null });
 
   // 3. Reconcile generator power state if this transaction is a power event
   if (tx.transactionType === 'PoweredUp' || tx.transactionType === 'PoweredDown') {
@@ -397,6 +421,81 @@ export async function updateTransactionInSupabase(tx: Transaction): Promise<void
 
 let activeRealtimeChannel: RealtimeChannel | null = null;
 const FLEET_SYNC_BROADCAST_CHANNEL = 'ttd_fleet_sync_channel';
+const recentlyUpsertedTxRows = new Map<string, { row: Record<string, unknown>; expiresAt: number }>();
+
+function recordRecentTxUpsert(rowPayload: Record<string, unknown>): void {
+  if (rowPayload && typeof rowPayload.id === 'string') {
+    recentlyUpsertedTxRows.set(rowPayload.id, {
+      row: rowPayload,
+      expiresAt: Date.now() + 20000,
+    });
+  }
+}
+
+/**
+ * Broadcasts an instant transaction insert/update over both local BroadcastChannel
+ * and the shared Supabase Realtime WebSocket channel so all connected Admin Consoles
+ * and PDAs immediately reflect new or edited transactions without DELETE+INSERT WAL races.
+ */
+export function broadcastTransactionUpsert(rowPayload: Record<string, unknown>): void {
+  recordRecentTxUpsert(rowPayload);
+
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    try {
+      const bc = new BroadcastChannel(FLEET_SYNC_BROADCAST_CHANNEL);
+      bc.postMessage({ type: 'TRANSACTION_UPSERT', row: rowPayload });
+      bc.close();
+    } catch {
+      // Ignore BroadcastChannel errors
+    }
+  }
+
+  if (activeRealtimeChannel) {
+    try {
+      activeRealtimeChannel
+        .send({
+          type: 'broadcast',
+          event: 'ttd_tx_upsert',
+          payload: rowPayload,
+        })
+        .catch(() => {});
+    } catch {
+      // Ignore Realtime send errors
+    }
+  }
+}
+
+/**
+ * Broadcasts an instant single-transaction deletion over both local BroadcastChannel
+ * and the shared Supabase Realtime WebSocket channel.
+ */
+export function broadcastTransactionDelete(transactionId: string): void {
+  recentlyUpsertedTxRows.delete(transactionId);
+
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    try {
+      const bc = new BroadcastChannel(FLEET_SYNC_BROADCAST_CHANNEL);
+      bc.postMessage({ type: 'TRANSACTION_DELETE', id: transactionId });
+      bc.close();
+    } catch {
+      // Ignore BroadcastChannel errors
+    }
+  }
+
+  if (activeRealtimeChannel) {
+    try {
+      activeRealtimeChannel
+        .send({
+          type: 'broadcast',
+          event: 'ttd_tx_delete',
+          payload: { id: transactionId },
+        })
+        .catch(() => {});
+    } catch {
+      // Ignore Realtime send errors
+    }
+  }
+}
 
 /**
  * Broadcasts an instant equipment update over both local BroadcastChannel
@@ -787,11 +886,10 @@ export async function uploadTransactionToCloud(
 
     // If device_id column does not exist yet on remote Supabase table, retry without device_id
     if (txError && (txError as any).code === 'PGRST204' && (txError as any).message?.includes('device_id')) {
-      const fallbackPayload = { ...payload };
-      delete fallbackPayload.device_id;
+      delete payload.device_id;
       const retryRes = await client
         .from('transactions')
-        .insert(fallbackPayload);
+        .insert(payload);
       txError = retryRes.error;
     }
 
@@ -813,6 +911,8 @@ export async function uploadTransactionToCloud(
       const isSameAsExisting = Boolean(
         existingRow &&
         existingRow.transaction_type === payload.transaction_type &&
+        existingRow.transaction_timestamp === payload.transaction_timestamp &&
+        (existingRow.device_id ?? null) === (payload.device_id ?? null) &&
         (existingRow.check_in_fuel_percentage ?? null) === (payload.check_in_fuel_percentage ?? null) &&
         (existingRow.check_out_fuel_percentage ?? null) === (payload.check_out_fuel_percentage ?? null) &&
         (existingRow.check_in_def_percentage ?? null) === (payload.check_in_def_percentage ?? null) &&
@@ -829,24 +929,50 @@ export async function uploadTransactionToCloud(
         // Row in Supabase is already identical — do not delete or touch it
         txError = null;
       } else {
+        // Pre-broadcast the edited transaction before any DELETE + INSERT fallback
+        // so connected Admin Consoles and PDAs never treat the transient DELETE WAL event as a real deletion
+        broadcastTransactionUpsert({ ...payload, device_id: tx.deviceId ?? null });
+
         // Transaction was edited! Try in-place UPDATE first; if 0 rows affected (e.g. no UPDATE RLS policy), replace via DELETE + INSERT
-        const { data: updatedRows, error: updateErr } = await client
+        let { data: updatedRows, error: updateErr } = await client
           .from('transactions')
           .update(payload)
           .eq('id', tx.id)
           .select('id');
 
+        if (updateErr && (updateErr as any).code === 'PGRST204' && (updateErr as any).message?.includes('device_id')) {
+          delete payload.device_id;
+          const retryUpdate = await client
+            .from('transactions')
+            .update(payload)
+            .eq('id', tx.id)
+            .select('id');
+          updatedRows = retryUpdate.data;
+          updateErr = retryUpdate.error;
+        }
+
         if (!updateErr && updatedRows && updatedRows.length > 0) {
           txError = null;
         } else {
           await client.from('transactions').delete().eq('id', tx.id);
-          const replaceRes = await client.from('transactions').insert(payload);
+          let replaceRes = await client.from('transactions').insert(payload);
+          if (
+            replaceRes.error &&
+            (replaceRes.error as any).code === 'PGRST204' &&
+            (replaceRes.error as any).message?.includes('device_id')
+          ) {
+            delete payload.device_id;
+            replaceRes = await client.from('transactions').insert(payload);
+          }
           txError = replaceRes.error;
         }
       }
     }
 
     if (txError) throw txError;
+
+    // Broadcast transaction upsert so Admin Consoles and PDAs reflect the new/edited transaction immediately
+    broadcastTransactionUpsert({ ...payload, device_id: tx.deviceId ?? null });
 
     // Step 3: Update equipment power state in Supabase if PoweredUp / PoweredDown
     if (tx.transactionType === 'PoweredUp') {
@@ -1324,6 +1450,12 @@ export function subscribeToCloudChanges(
           onDataChange('transactions', 'BULK_DELETE', { old: ev.data });
         } else if (ev.data && ev.data.type === 'EQUIPMENT_UPDATE' && ev.data.row) {
           onDataChange('equipment_list', 'UPDATE', { new: ev.data.row });
+        } else if (ev.data && ev.data.type === 'TRANSACTION_UPSERT' && ev.data.row) {
+          recordRecentTxUpsert(ev.data.row);
+          onDataChange('transactions', 'UPDATE', { new: ev.data.row });
+        } else if (ev.data && ev.data.type === 'TRANSACTION_DELETE' && typeof ev.data.id === 'string') {
+          recentlyUpsertedTxRows.delete(ev.data.id);
+          onDataChange('transactions', 'DELETE', { old: { id: ev.data.id } });
         }
       };
     } catch {
@@ -1369,10 +1501,80 @@ export function subscribeToCloudChanges(
       }
     )
     .on(
+      'broadcast',
+      { event: 'ttd_tx_upsert' },
+      (msg) => {
+        const data = (msg?.payload || {}) as Record<string, unknown>;
+        if (data && typeof data.id === 'string') {
+          recordRecentTxUpsert(data);
+          onDataChange('transactions', 'UPDATE', { new: data });
+        }
+      }
+    )
+    .on(
+      'broadcast',
+      { event: 'ttd_tx_delete' },
+      (msg) => {
+        const data = (msg?.payload || {}) as Record<string, unknown>;
+        if (data && typeof data.id === 'string') {
+          recentlyUpsertedTxRows.delete(data.id);
+          onDataChange('transactions', 'DELETE', { old: { id: data.id } });
+        }
+      }
+    )
+    .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'transactions' },
       (payload) => {
-        onDataChange('transactions', payload.eventType, payload as { new?: Record<string, unknown>; old?: Record<string, unknown> });
+        const evType = payload.eventType;
+        const newRec = payload.new as Record<string, unknown> | undefined;
+        const oldRec = payload.old as Record<string, unknown> | undefined;
+
+        if ((evType === 'INSERT' || evType === 'UPDATE') && newRec && typeof newRec.id === 'string') {
+          recordRecentTxUpsert(newRec);
+          onDataChange('transactions', evType, { new: newRec, old: oldRec });
+          return;
+        }
+
+        if (evType === 'DELETE' && oldRec && typeof oldRec.id === 'string') {
+          const delId = oldRec.id;
+          const recentUpsert = recentlyUpsertedTxRows.get(delId);
+          if (recentUpsert && recentUpsert.expiresAt > Date.now()) {
+            // This DELETE WAL event is from a DELETE+INSERT transaction edit — apply the updated row instead of deleting
+            onDataChange('transactions', 'UPDATE', { new: recentUpsert.row });
+            return;
+          }
+
+          // Verify after 350ms whether the transaction was re-inserted by a DELETE+INSERT edit before removing it
+          setTimeout(() => {
+            const afterDelayUpsert = recentlyUpsertedTxRows.get(delId);
+            if (afterDelayUpsert && afterDelayUpsert.expiresAt > Date.now()) {
+              onDataChange('transactions', 'UPDATE', { new: afterDelayUpsert.row });
+              return;
+            }
+            client
+              .from('transactions')
+              .select('*')
+              .eq('id', delId)
+              .maybeSingle()
+              .then(
+                ({ data: existingRow }) => {
+                  if (existingRow && existingRow.id) {
+                    recordRecentTxUpsert(existingRow as Record<string, unknown>);
+                    onDataChange('transactions', 'UPDATE', { new: existingRow as Record<string, unknown> });
+                  } else {
+                    onDataChange('transactions', 'DELETE', { old: oldRec });
+                  }
+                },
+                () => {
+                  onDataChange('transactions', 'DELETE', { old: oldRec });
+                }
+              );
+          }, 350);
+          return;
+        }
+
+        onDataChange('transactions', evType, payload as { new?: Record<string, unknown>; old?: Record<string, unknown> });
       }
     )
     .on(

@@ -613,6 +613,13 @@ class SyncEngine {
           if (!existingTx && !hadTombstone) {
             return;
           }
+          if (!hadTombstone) {
+            const pendingOutbox = await db.outbox.get(delId);
+            if (pendingOutbox || existingTx?.syncStatus === 'pending') {
+              // Do not delete a locally pending transaction edit while DELETE+INSERT replacement is in flight
+              return;
+            }
+          }
           await db.transactions.delete(delId);
           await db.outbox.delete(delId);
           if (hadTombstone) {
