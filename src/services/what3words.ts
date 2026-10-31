@@ -1077,7 +1077,7 @@ export function getFleetSatelliteMapSrcDoc(
         balloonCooldownTimer = setTimeout(function() {
           balloonCooldownTimer = null;
           areBalloonsEnabled = true;
-        }, 1000);
+        }, 2000);
       }
 
       map.on('click', function() {
