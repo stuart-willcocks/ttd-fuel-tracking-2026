@@ -1053,6 +1053,8 @@ export function getFleetSatelliteMapSrcDoc(
       var currentAdjustedItems = [];
       var activePinnedId = null;
       var suppressedHoverById = {};
+      var areBalloonsEnabled = true;
+      var balloonCooldownTimer = null;
       var hasFittedOnce = hasValidSavedView;
       var isViewTrackingReady = hasValidSavedView;
       var ICON_RADIUS_PX = 16; // 32px diameter icon disc
@@ -1063,6 +1065,19 @@ export function getFleetSatelliteMapSrcDoc(
             markersById[id].closeTooltip();
           }
         });
+      }
+
+      function suspendBalloonsForZoom() {
+        areBalloonsEnabled = false;
+        activePinnedId = null;
+        closeAllOtherTooltips(null);
+        if (balloonCooldownTimer) {
+          clearTimeout(balloonCooldownTimer);
+        }
+        balloonCooldownTimer = setTimeout(function() {
+          balloonCooldownTimer = null;
+          areBalloonsEnabled = true;
+        }, 1000);
       }
 
       map.on('click', function() {
@@ -1167,15 +1182,24 @@ export function getFleetSatelliteMapSrcDoc(
         isViewTrackingReady = true;
       });
 
+      map.on('zoomstart', function() {
+        suspendBalloonsForZoom();
+      });
+
       map.on('moveend zoomend', function() {
         emitCurrentMapView();
       });
 
       // Animate leader triangle length in lockstep with Leaflet's zoom transition so base stays 32px and size never jumps after zoom
       map.on('zoomanim', function(ev) {
+        suspendBalloonsForZoom();
         if (ev && typeof ev.zoom === 'number') {
           updateLeaderTrianglesForZoom(ev.zoom);
         }
+      });
+
+      map.on('zoomend', function() {
+        suspendBalloonsForZoom();
       });
 
       map.on('zoomend viewreset', function() {
@@ -1428,6 +1452,7 @@ export function getFleetSatelliteMapSrcDoc(
             marker.off('mouseover');
             marker.off('mouseout');
             marker.on('mouseover', function() {
+              if (!areBalloonsEnabled) return;
               if (!suppressedHoverById[eqId]) {
                 closeAllOtherTooltips(eqId);
                 marker.openTooltip();
@@ -1437,7 +1462,7 @@ export function getFleetSatelliteMapSrcDoc(
               suppressedHoverById[eqId] = false;
               if (activePinnedId !== eqId) {
                 marker.closeTooltip();
-                if (activePinnedId && markersById[activePinnedId]) {
+                if (areBalloonsEnabled && activePinnedId && markersById[activePinnedId]) {
                   markersById[activePinnedId].openTooltip();
                 }
               }
@@ -1446,6 +1471,7 @@ export function getFleetSatelliteMapSrcDoc(
               if (ev && ev.originalEvent) {
                 ev.originalEvent.stopPropagation();
               }
+              if (!areBalloonsEnabled) return;
               if (activePinnedId === eqId) {
                 activePinnedId = null;
                 suppressedHoverById[eqId] = true;
