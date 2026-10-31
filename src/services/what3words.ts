@@ -1117,27 +1117,17 @@ export function getFleetSatelliteMapSrcDoc(
             singleCopy.isSharedLocation = false;
             result.push(singleCopy);
           } else {
-            // Spread icons radially in screen pixel space around the shared GPS location so icons have clear space between them
-            var origLat = group[0].lat;
-            var origLng = group[0].lng;
-            var originPt = map.latLngToLayerPoint([origLat, origLng]);
-            var minCircumferenceSpacingPx = 66;
-            var spreadRadiusPx = Math.max(46, Math.round((group.length * minCircumferenceSpacingPx) / (2 * Math.PI)));
-
+            var radiusLat = 0.000042;
+            var radiusLng = 0.000068;
             group.forEach(function(item, idx) {
-              var angle = (2 * Math.PI * idx) / group.length - Math.PI / 2;
-              var offsetPt = L.point(
-                originPt.x + spreadRadiusPx * Math.cos(angle),
-                originPt.y + spreadRadiusPx * Math.sin(angle)
-              );
-              var offsetLatLng = map.layerPointToLatLng(offsetPt);
+              var angle = (2 * Math.PI * idx) / group.length;
               var copy = {};
               Object.keys(item).forEach(function(k) { copy[k] = item[k]; });
-              copy.origLat = origLat;
-              copy.origLng = origLng;
+              copy.origLat = item.lat;
+              copy.origLng = item.lng;
               copy.isSharedLocation = true;
-              copy.lat = offsetLatLng.lat;
-              copy.lng = offsetLatLng.lng;
+              copy.lat = item.lat + radiusLat * Math.sin(angle);
+              copy.lng = item.lng + radiusLng * Math.cos(angle);
               result.push(copy);
             });
           }
@@ -1162,10 +1152,7 @@ export function getFleetSatelliteMapSrcDoc(
 
         adjusted.forEach(function(item) {
           var pt = [item.lat, item.lng];
-          boundsPoints.push([
-            typeof item.origLat === 'number' ? item.origLat : item.lat,
-            typeof item.origLng === 'number' ? item.origLng : item.lng
-          ]);
+          boundsPoints.push(pt);
           seenIds[item.equipmentId] = true;
 
           var bgColor = getIconDiscColor(item.type);
@@ -1177,15 +1164,14 @@ export function getFleetSatelliteMapSrcDoc(
               leaderTrianglesById[item.equipmentId].setLatLngs(triCoords);
               leaderTrianglesById[item.equipmentId].setStyle({
                 color: bgColor,
-                fillColor: bgColor
+                fillColor: bgColor,
+                fillOpacity: 0.5
               });
             } else {
               leaderTrianglesById[item.equipmentId] = L.polygon(triCoords, {
-                color: bgColor,
-                weight: 1,
-                opacity: 1,
+                stroke: false,
                 fillColor: bgColor,
-                fillOpacity: 1,
+                fillOpacity: 0.5,
                 interactive: false
               }).addTo(map);
             }
