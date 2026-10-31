@@ -853,10 +853,10 @@ export function getFleetSatelliteMapSrcDoc(
     .eq-map-leader {
       position: absolute;
       left: 0;
-      top: -16px;
+      top: -8px;
       width: 100px;
-      height: 32px;
-      transform-origin: 0 16px;
+      height: 16px;
+      transform-origin: 0 8px;
       pointer-events: none;
       will-change: transform;
     }
@@ -1463,8 +1463,8 @@ export function getFleetSatelliteMapSrcDoc(
           // Render or update the triangular leader marker in leaderPane (z-index 590, underneath all icon discs)
           if (item.isSharedLocation) {
             var leaderHtml = '<div class="eq-map-leader" style="visibility:hidden">' +
-              '<svg width="100" height="32" viewBox="0 0 100 32" preserveAspectRatio="none" style="display:block;overflow:visible">' +
-                '<polygon points="0,0 0,32 100,16" fill="' + bgColor + '" />' +
+              '<svg width="100" height="16" viewBox="0 0 100 16" preserveAspectRatio="none" style="display:block;overflow:visible">' +
+                '<polygon points="0,0 0,16 100,8" fill="' + bgColor + '" />' +
               '</svg>' +
             '</div>';
             var leaderIcon = L.divIcon({
