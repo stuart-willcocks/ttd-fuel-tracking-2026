@@ -38,7 +38,8 @@ interface ExecutionLogEntry {
   txId: string;
   equipmentId: string;
   transactionType: TransactionType;
-  fuelLitres: number;
+  summary: string;
+  fuelLitres?: number;
   defLitres?: number;
   timestamp: string;
   durationMs: number;
@@ -67,6 +68,12 @@ export const StressTestApp: React.FC = () => {
   const [rateValue, setRateValue] = useState<string>('1');
   const [rateUnit, setRateUnit] = useState<'per_second' | 'interval_ms'>('per_second');
   const [simulatedDeviceId, setSimulatedDeviceId] = useState<string>('STRESS-TEST-SIM');
+
+  // Bookend Transaction Toggles
+  const [includeCheckIn, setIncludeCheckIn] = useState<boolean>(false);
+  const [includePowerUp, setIncludePowerUp] = useState<boolean>(false);
+  const [includePowerDown, setIncludePowerDown] = useState<boolean>(false);
+  const [includeCheckOut, setIncludeCheckOut] = useState<boolean>(false);
 
   // Execution State
   const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -145,8 +152,9 @@ export const StressTestApp: React.FC = () => {
     [assets, selectedEquipmentId]
   );
 
-  // Generators support DEF in FuelTransferGenerator transactions
-  const isDefApplicable = selectedAsset?.type === 'GENERATOR';
+  // Generators support DEF in FuelTransferGenerator transactions and Power-Up / Power-Down events
+  const isGenerator = selectedAsset?.type === 'GENERATOR';
+  const isDefApplicable = isGenerator;
 
   const getTransactionTypeForAsset = (asset: Equipment): TransactionType => {
     switch (asset.type) {
@@ -159,6 +167,48 @@ export const StressTestApp: React.FC = () => {
       default:
         return 'FuelTransferGenerator';
     }
+  };
+
+  const getCheckInTypeForAsset = (asset: Equipment): TransactionType => {
+    switch (asset.type) {
+      case 'GENERATOR':
+        return 'CheckInGenerator';
+      case 'TANK':
+        return 'CheckInTank';
+      case 'PLANT':
+        return 'CheckInPlant';
+      default:
+        return 'CheckInGenerator';
+    }
+  };
+
+  const getCheckOutTypeForAsset = (asset: Equipment): TransactionType => {
+    switch (asset.type) {
+      case 'GENERATOR':
+        return 'CheckOutGenerator';
+      case 'TANK':
+        return 'CheckOutTank';
+      case 'PLANT':
+        return 'CheckOutPlant';
+      default:
+        return 'CheckOutGenerator';
+    }
+  };
+
+  const formatTxTypeBadge = (txType: TransactionType): { label: string; color: string; bg: string } => {
+    if (txType.startsWith('CheckIn')) {
+      return { label: 'Check-In', color: '#4ADE80', bg: 'rgba(34, 197, 94, 0.14)' };
+    }
+    if (txType.startsWith('CheckOut')) {
+      return { label: 'Check-Out', color: '#FACC15', bg: 'rgba(250, 204, 21, 0.14)' };
+    }
+    if (txType === 'PoweredUp') {
+      return { label: 'Power-Up', color: '#34D399', bg: 'rgba(16, 185, 129, 0.15)' };
+    }
+    if (txType === 'PoweredDown') {
+      return { label: 'Power-Down', color: '#F87171', bg: 'rgba(239, 68, 68, 0.15)' };
+    }
+    return { label: 'Fuel Transfer', color: '#38BDF8', bg: 'rgba(56, 189, 248, 0.14)' };
   };
 
   const computedIntervalMs = useMemo(() => {
@@ -179,13 +229,124 @@ export const StressTestApp: React.FC = () => {
     e.preventDefault();
     if (isRunning || !selectedAsset) return;
 
-    const totalQty = Math.max(1, Math.min(5000, Math.floor(Number(quantity) || 1)));
+    const fuelQty = Math.max(1, Math.min(5000, Math.floor(Number(quantity) || 1)));
     const initialFuel = Math.max(0, Math.round(Number(startFuelLitres) || 0));
     const initialDef = Math.max(0, Math.round(Number(startDefLitres) || 0));
     const stepLitres = Math.round(Number(incrementLitres) || 0);
     const delayMs = computedIntervalMs;
-    const txType = getTransactionTypeForAsset(selectedAsset);
+    const fuelTxType = getTransactionTypeForAsset(selectedAsset);
     const devId = simulatedDeviceId.trim() || 'STRESS-TEST-SIM';
+
+    interface PlannedStep {
+      transactionType: TransactionType;
+      summary: string;
+      fuelLitres?: number;
+      defLitres?: number;
+      fields: Partial<Transaction>;
+    }
+
+    const steps: PlannedStep[] = [];
+
+    // 1. Opening Bookend: Check-In
+    if (includeCheckIn) {
+      const checkInType = getCheckInTypeForAsset(selectedAsset);
+      if (selectedAsset.type === 'GENERATOR') {
+        steps.push({
+          transactionType: checkInType,
+          summary: 'Fuel: 100% • DEF: 100% • 1000 kWh',
+          fields: {
+            checkInFuelPercentage: 100,
+            checkInDefPercentage: 100,
+            checkInKWH: 1000,
+          },
+        });
+      } else if (selectedAsset.type === 'TANK') {
+        steps.push({
+          transactionType: checkInType,
+          summary: 'Fuel: 8/8',
+          fields: {
+            checkInFuelEighths: 8,
+          },
+        });
+      } else {
+        steps.push({
+          transactionType: checkInType,
+          summary: 'Fuel: 100%',
+          fields: {
+            checkInFuelPercentage: 100,
+          },
+        });
+      }
+    }
+
+    // 2. Opening Bookend: Power-Up (Generators only)
+    if (includePowerUp && selectedAsset.type === 'GENERATOR') {
+      steps.push({
+        transactionType: 'PoweredUp',
+        summary: 'Generator Powered Up (ON)',
+        fields: {},
+      });
+    }
+
+    // 3. Fuel Transfer Sequence
+    for (let i = 0; i < fuelQty; i++) {
+      const currentFuel = Math.max(0, initialFuel + i * stepLitres);
+      const currentDef = isDefApplicable ? Math.max(0, initialDef + i * stepLitres) : undefined;
+      steps.push({
+        transactionType: fuelTxType,
+        summary:
+          currentDef !== undefined
+            ? `Fuel: ${currentFuel} L • DEF: ${currentDef} L`
+            : `Fuel: ${currentFuel} L`,
+        fuelLitres: currentFuel,
+        defLitres: currentDef,
+        fields: {
+          fuelTransferLitres: currentFuel,
+          defTransferLitres: currentDef,
+        },
+      });
+    }
+
+    // 4. Closing Bookend: Power-Down (Generators only)
+    if (includePowerDown && selectedAsset.type === 'GENERATOR') {
+      steps.push({
+        transactionType: 'PoweredDown',
+        summary: 'Generator Powered Down (OFF)',
+        fields: {},
+      });
+    }
+
+    // 5. Closing Bookend: Check-Out
+    if (includeCheckOut) {
+      const checkOutType = getCheckOutTypeForAsset(selectedAsset);
+      if (selectedAsset.type === 'GENERATOR') {
+        steps.push({
+          transactionType: checkOutType,
+          summary: 'Fuel: 85% • DEF: 85% • 1250 kWh',
+          fields: {
+            checkOutFuelPercentage: 85,
+            checkOutDefPercentage: 85,
+            checkOutKWH: 1250,
+          },
+        });
+      } else if (selectedAsset.type === 'TANK') {
+        steps.push({
+          transactionType: checkOutType,
+          summary: 'Fuel: 6/8',
+          fields: {
+            checkOutFuelEighths: 6,
+          },
+        });
+      } else {
+        steps.push({
+          transactionType: checkOutType,
+          summary: 'Fuel: 85%',
+          fields: {
+            checkOutFuelPercentage: 85,
+          },
+        });
+      }
+    }
 
     abortRef.current = false;
     setIsRunning(true);
@@ -194,21 +355,23 @@ export const StressTestApp: React.FC = () => {
     setErrorCount(0);
     setLogs([]);
 
-    for (let i = 0; i < totalQty; i++) {
+    let lastTimestampMs = 0;
+
+    for (let i = 0; i < steps.length; i++) {
       if (abortRef.current) break;
 
-      const currentFuel = Math.max(0, initialFuel + i * stepLitres);
-      const currentDef = isDefApplicable ? Math.max(0, initialDef + i * stepLitres) : undefined;
-      const nowIso = new Date().toISOString();
+      const step = steps[i];
+      const nowMs = Math.max(Date.now(), lastTimestampMs + 1);
+      lastTimestampMs = nowMs;
+      const nowIso = new Date(nowMs).toISOString();
       const txId = generateUUID();
 
       const tx: Transaction = {
         id: txId,
         equipmentId: selectedAsset.equipmentId,
         transactionTimestamp: nowIso,
-        transactionType: txType,
-        fuelTransferLitres: currentFuel,
-        defTransferLitres: currentDef,
+        transactionType: step.transactionType,
+        ...step.fields,
         syncStatus: 'synced',
         deviceId: devId,
         createdAt: nowIso,
@@ -225,9 +388,10 @@ export const StressTestApp: React.FC = () => {
             index: i + 1,
             txId,
             equipmentId: selectedAsset.equipmentId,
-            transactionType: txType,
-            fuelLitres: currentFuel,
-            defLitres: currentDef,
+            transactionType: step.transactionType,
+            summary: step.summary,
+            fuelLitres: step.fuelLitres,
+            defLitres: step.defLitres,
             timestamp: nowIso,
             durationMs: elapsedMs,
             status: 'success',
@@ -244,9 +408,10 @@ export const StressTestApp: React.FC = () => {
             index: i + 1,
             txId,
             equipmentId: selectedAsset.equipmentId,
-            transactionType: txType,
-            fuelLitres: currentFuel,
-            defLitres: currentDef,
+            transactionType: step.transactionType,
+            summary: step.summary,
+            fuelLitres: step.fuelLitres,
+            defLitres: step.defLitres,
             timestamp: nowIso,
             durationMs: elapsedMs,
             status: 'error',
@@ -256,7 +421,7 @@ export const StressTestApp: React.FC = () => {
         ]);
       }
 
-      if (i < totalQty - 1 && !abortRef.current && delayMs > 0) {
+      if (i < steps.length - 1 && !abortRef.current && delayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
@@ -384,7 +549,13 @@ export const StressTestApp: React.FC = () => {
     );
   }
 
-  const totalPlanned = Math.max(1, Math.floor(Number(quantity) || 1));
+  const fuelTransferCount = Math.max(1, Math.floor(Number(quantity) || 1));
+  const extraBookendCount =
+    (includeCheckIn ? 1 : 0) +
+    (includePowerUp && isGenerator ? 1 : 0) +
+    (includePowerDown && isGenerator ? 1 : 0) +
+    (includeCheckOut ? 1 : 0);
+  const totalPlanned = fuelTransferCount + extraBookendCount;
   const progressPct = isRunning || sentCount > 0 ? Math.min(100, Math.round((sentCount / totalPlanned) * 100)) : 0;
 
   return (
@@ -609,10 +780,216 @@ export const StressTestApp: React.FC = () => {
               </select>
               {selectedAsset && (
                 <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#94A3B8' }}>
-                  Asset Type: <strong style={{ color: '#F8FAFC' }}>{selectedAsset.type}</strong> • Transaction Type:{' '}
+                  Asset Type: <strong style={{ color: '#F8FAFC' }}>{selectedAsset.type}</strong> • Fuel Transfer Type:{' '}
                   <code style={{ color: '#38BDF8' }}>{getTransactionTypeForAsset(selectedAsset)}</code>
                 </div>
               )}
+            </div>
+
+            {/* Bookend Transactions Options */}
+            <div
+              style={{
+                background: '#090D16',
+                border: '1px solid #1E293B',
+                borderRadius: '8px',
+                padding: '12px',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '10px',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    color: '#94A3B8',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  Bookend Transactions (Before / After Fuel Transfers)
+                </span>
+                <button
+                  type="button"
+                  disabled={isRunning}
+                  onClick={() => {
+                    const allSelected =
+                      includeCheckIn &&
+                      includeCheckOut &&
+                      (!isGenerator || (includePowerUp && includePowerDown));
+                    if (allSelected) {
+                      setIncludeCheckIn(false);
+                      setIncludePowerUp(false);
+                      setIncludePowerDown(false);
+                      setIncludeCheckOut(false);
+                    } else {
+                      setIncludeCheckIn(true);
+                      if (isGenerator) {
+                        setIncludePowerUp(true);
+                        setIncludePowerDown(true);
+                      }
+                      setIncludeCheckOut(true);
+                    }
+                  }}
+                  style={{
+                    background: '#1E293B',
+                    color: '#E2E8F0',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    padding: '3px 8px',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    cursor: isRunning ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {includeCheckIn &&
+                  includeCheckOut &&
+                  (!isGenerator || (includePowerUp && includePowerDown))
+                    ? 'Clear All'
+                    : 'Select All'}
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    background: includeCheckIn ? 'rgba(34, 197, 94, 0.12)' : '#030712',
+                    border: `1px solid ${includeCheckIn ? 'rgba(34, 197, 94, 0.45)' : '#334155'}`,
+                    cursor: isRunning ? 'not-allowed' : 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: '#F8FAFC',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeCheckIn}
+                    onChange={(e) => setIncludeCheckIn(e.target.checked)}
+                    disabled={isRunning}
+                    style={{ accentColor: '#22C55E', cursor: isRunning ? 'not-allowed' : 'pointer' }}
+                  />
+                  <div>
+                    <div>Check-In</div>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 500 }}>
+                      Opening bookend
+                    </div>
+                  </div>
+                </label>
+
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    background:
+                      isGenerator && includePowerUp ? 'rgba(16, 185, 129, 0.12)' : '#030712',
+                    border: `1px solid ${
+                      isGenerator && includePowerUp ? 'rgba(16, 185, 129, 0.45)' : '#334155'
+                    }`,
+                    opacity: isGenerator ? 1 : 0.45,
+                    cursor: isRunning || !isGenerator ? 'not-allowed' : 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: '#F8FAFC',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isGenerator && includePowerUp}
+                    onChange={(e) => setIncludePowerUp(e.target.checked)}
+                    disabled={isRunning || !isGenerator}
+                    style={{
+                      accentColor: '#10B981',
+                      cursor: isRunning || !isGenerator ? 'not-allowed' : 'pointer',
+                    }}
+                  />
+                  <div>
+                    <div>Power-Up</div>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 500 }}>
+                      {isGenerator ? 'Before fuel transfers' : 'Generators only'}
+                    </div>
+                  </div>
+                </label>
+
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    background:
+                      isGenerator && includePowerDown ? 'rgba(239, 68, 68, 0.12)' : '#030712',
+                    border: `1px solid ${
+                      isGenerator && includePowerDown ? 'rgba(239, 68, 68, 0.45)' : '#334155'
+                    }`,
+                    opacity: isGenerator ? 1 : 0.45,
+                    cursor: isRunning || !isGenerator ? 'not-allowed' : 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: '#F8FAFC',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isGenerator && includePowerDown}
+                    onChange={(e) => setIncludePowerDown(e.target.checked)}
+                    disabled={isRunning || !isGenerator}
+                    style={{
+                      accentColor: '#EF4444',
+                      cursor: isRunning || !isGenerator ? 'not-allowed' : 'pointer',
+                    }}
+                  />
+                  <div>
+                    <div>Power-Down</div>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 500 }}>
+                      {isGenerator ? 'After fuel transfers' : 'Generators only'}
+                    </div>
+                  </div>
+                </label>
+
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    background: includeCheckOut ? 'rgba(250, 204, 21, 0.12)' : '#030712',
+                    border: `1px solid ${includeCheckOut ? 'rgba(250, 204, 21, 0.45)' : '#334155'}`,
+                    cursor: isRunning ? 'not-allowed' : 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: '#F8FAFC',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeCheckOut}
+                    onChange={(e) => setIncludeCheckOut(e.target.checked)}
+                    disabled={isRunning}
+                    style={{ accentColor: '#FACC15', cursor: isRunning ? 'not-allowed' : 'pointer' }}
+                  />
+                  <div>
+                    <div>Check-Out</div>
+                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 500 }}>
+                      Closing bookend
+                    </div>
+                  </div>
+                </label>
+              </div>
             </div>
 
             {/* Quantity & Increment Row */}
@@ -911,24 +1288,44 @@ export const StressTestApp: React.FC = () => {
               }}
             >
               <div style={{ fontWeight: 700, color: '#E2E8F0', marginBottom: '4px' }}>
-                Sequence Preview ({totalPlanned} transactions @ {computedIntervalMs}ms interval):
+                Sequence Preview ({totalPlanned} total transactions @ {computedIntervalMs}ms interval):
               </div>
+              {includeCheckIn && (
+                <div>
+                  • Opening:{' '}
+                  <strong style={{ color: '#4ADE80' }}>
+                    Check-In (
+                    {selectedAsset?.type === 'GENERATOR'
+                      ? '100% Fuel, 100% DEF, 1000 kWh'
+                      : selectedAsset?.type === 'TANK'
+                        ? '8/8 Fuel'
+                        : '100% Fuel'}
+                    )
+                  </strong>
+                </div>
+              )}
+              {includePowerUp && isGenerator && (
+                <div>
+                  • Opening: <strong style={{ color: '#34D399' }}>Power-Up (Generator ON)</strong>
+                </div>
+              )}
               <div>
-                • Tx #1: Fuel = <strong>{Math.max(0, Math.round(Number(startFuelLitres) || 0))} L</strong>
+                • Fuel Transfer #1: Fuel ={' '}
+                <strong>{Math.max(0, Math.round(Number(startFuelLitres) || 0))} L</strong>
                 {isDefApplicable && (
                   <>
                     , DEF = <strong>{Math.max(0, Math.round(Number(startDefLitres) || 0))} L</strong>
                   </>
                 )}
               </div>
-              {totalPlanned > 1 && (
+              {fuelTransferCount > 1 && (
                 <div>
-                  • Tx #{totalPlanned}: Fuel ={' '}
+                  • Fuel Transfer #{fuelTransferCount}: Fuel ={' '}
                   <strong>
                     {Math.max(
                       0,
                       Math.round(Number(startFuelLitres) || 0) +
-                        (totalPlanned - 1) * Math.round(Number(incrementLitres) || 0)
+                        (fuelTransferCount - 1) * Math.round(Number(incrementLitres) || 0)
                     )}{' '}
                     L
                   </strong>
@@ -939,12 +1336,31 @@ export const StressTestApp: React.FC = () => {
                         {Math.max(
                           0,
                           Math.round(Number(startDefLitres) || 0) +
-                            (totalPlanned - 1) * Math.round(Number(incrementLitres) || 0)
+                            (fuelTransferCount - 1) * Math.round(Number(incrementLitres) || 0)
                         )}{' '}
                         L
                       </strong>
                     </>
                   )}
+                </div>
+              )}
+              {includePowerDown && isGenerator && (
+                <div>
+                  • Closing: <strong style={{ color: '#F87171' }}>Power-Down (Generator OFF)</strong>
+                </div>
+              )}
+              {includeCheckOut && (
+                <div>
+                  • Closing:{' '}
+                  <strong style={{ color: '#FACC15' }}>
+                    Check-Out (
+                    {selectedAsset?.type === 'GENERATOR'
+                      ? '85% Fuel, 85% DEF, 1250 kWh'
+                      : selectedAsset?.type === 'TANK'
+                        ? '6/8 Fuel'
+                        : '85% Fuel'}
+                    )
+                  </strong>
                 </div>
               )}
             </div>
@@ -1173,48 +1589,63 @@ export const StressTestApp: React.FC = () => {
                   <tr style={{ borderBottom: '1px solid #1E293B', background: '#0F172A', textAlign: 'left', color: '#94A3B8' }}>
                     <th style={{ padding: '8px 10px' }}>#</th>
                     <th style={{ padding: '8px 10px' }}>Asset</th>
-                    <th style={{ padding: '8px 10px' }}>Fuel (L)</th>
-                    <th style={{ padding: '8px 10px' }}>DEF (L)</th>
+                    <th style={{ padding: '8px 10px' }}>Type</th>
+                    <th style={{ padding: '8px 10px' }}>Details</th>
                     <th style={{ padding: '8px 10px' }}>Latency</th>
                     <th style={{ padding: '8px 10px' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {logs.map((entry) => (
-                    <tr key={entry.txId} style={{ borderBottom: '1px solid #1E293B' }}>
-                      <td style={{ padding: '7px 10px', fontFamily: 'monospace', color: '#94A3B8' }}>
-                        #{entry.index}
-                      </td>
-                      <td style={{ padding: '7px 10px', fontFamily: 'monospace', fontWeight: 700 }}>
-                        {entry.equipmentId}
-                      </td>
-                      <td style={{ padding: '7px 10px', fontFamily: 'monospace', color: '#FBBF24', fontWeight: 700 }}>
-                        {entry.fuelLitres} L
-                      </td>
-                      <td style={{ padding: '7px 10px', fontFamily: 'monospace', color: '#38BDF8', fontWeight: 700 }}>
-                        {entry.defLitres !== undefined ? `${entry.defLitres} L` : '—'}
-                      </td>
-                      <td style={{ padding: '7px 10px', fontFamily: 'monospace', color: '#94A3B8' }}>
-                        {entry.durationMs}ms
-                      </td>
-                      <td style={{ padding: '7px 10px' }}>
-                        {entry.status === 'success' ? (
-                          <span style={{ color: '#22C55E', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
-                            <CheckCircle2 size={13} />
-                            <span>Sent</span>
-                          </span>
-                        ) : (
+                  {logs.map((entry) => {
+                    const badge = formatTxTypeBadge(entry.transactionType);
+                    return (
+                      <tr key={entry.txId} style={{ borderBottom: '1px solid #1E293B' }}>
+                        <td style={{ padding: '7px 10px', fontFamily: 'monospace', color: '#94A3B8' }}>
+                          #{entry.index}
+                        </td>
+                        <td style={{ padding: '7px 10px', fontFamily: 'monospace', fontWeight: 700 }}>
+                          {entry.equipmentId}
+                        </td>
+                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>
                           <span
-                            title={entry.errorMessage}
-                            style={{ color: '#EF4444', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}
+                            style={{
+                              display: 'inline-block',
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              color: badge.color,
+                              background: badge.bg,
+                            }}
                           >
-                            <AlertTriangle size={13} />
-                            <span>Failed</span>
+                            {badge.label}
                           </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td style={{ padding: '7px 10px', fontFamily: 'monospace', color: '#E2E8F0', fontWeight: 600 }}>
+                          {entry.summary}
+                        </td>
+                        <td style={{ padding: '7px 10px', fontFamily: 'monospace', color: '#94A3B8' }}>
+                          {entry.durationMs}ms
+                        </td>
+                        <td style={{ padding: '7px 10px' }}>
+                          {entry.status === 'success' ? (
+                            <span style={{ color: '#22C55E', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
+                              <CheckCircle2 size={13} />
+                              <span>Sent</span>
+                            </span>
+                          ) : (
+                            <span
+                              title={entry.errorMessage}
+                              style={{ color: '#EF4444', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}
+                            >
+                              <AlertTriangle size={13} />
+                              <span>Failed</span>
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
