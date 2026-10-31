@@ -645,15 +645,17 @@ export function getFleetSatelliteMapSrcDoc(
       color: #93C5FD !important;
     }
     .eq-map-marker {
+      position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
-      transform: translate(-50%, -50%);
+      transform: translate(-50%, -16px);
       cursor: pointer;
       user-select: none;
     }
     .eq-map-icon-box {
       position: relative;
+      z-index: 2;
       width: 32px;
       height: 32px;
       border-radius: 50%;
@@ -689,6 +691,8 @@ export function getFleetSatelliteMapSrcDoc(
       flex-shrink: 0;
     }
     .eq-map-label {
+      position: relative;
+      z-index: 2;
       margin-top: 2px;
       padding: 1px 5px;
       border-radius: 3px;
@@ -1017,10 +1021,46 @@ export function getFleetSatelliteMapSrcDoc(
 
       var boundsPoints = [];
       var markersById = {};
+      var leaderTrianglesById = {};
+      var currentRawItems = items || [];
       var pinnedById = {};
       var suppressedHoverById = {};
       var hasFittedOnce = hasValidSavedView;
       var isViewTrackingReady = hasValidSavedView;
+      var ICON_RADIUS_PX = 16; // 32px diameter icon disc
+
+      function getIconDiscColor(type) {
+        return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : '#16A34A';
+      }
+
+      function computeLeaderTriangleLatLngs(item) {
+        if (!item || !item.isSharedLocation || typeof item.origLat !== 'number' || typeof item.origLng !== 'number') {
+          return null;
+        }
+        var centerPt = map.latLngToLayerPoint([item.lat, item.lng]);
+        var targetPt = map.latLngToLayerPoint([item.origLat, item.origLng]);
+        var dx = targetPt.x - centerPt.x;
+        var dy = targetPt.y - centerPt.y;
+        var len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 1) return null;
+
+        // Unit vector perpendicular to the line from icon center to actual GPS location,
+        // so the two base vertices lie on opposite ends of the icon disc's diameter (width = 2 * R = 32px)
+        var px = -dy / len;
+        var py = dx / len;
+
+        var v1Pt = L.point(centerPt.x + px * ICON_RADIUS_PX, centerPt.y + py * ICON_RADIUS_PX);
+        var v2Pt = L.point(centerPt.x - px * ICON_RADIUS_PX, centerPt.y - py * ICON_RADIUS_PX);
+
+        var v1LatLng = map.layerPointToLatLng(v1Pt);
+        var v2LatLng = map.layerPointToLatLng(v2Pt);
+
+        return [
+          [v1LatLng.lat, v1LatLng.lng],
+          [v2LatLng.lat, v2LatLng.lng],
+          [item.origLat, item.origLng]
+        ];
+      }
 
       function emitCurrentMapView() {
         if (!isViewTrackingReady) return;
@@ -1052,6 +1092,13 @@ export function getFleetSatelliteMapSrcDoc(
         emitCurrentMapView();
       });
 
+      // Keep pixel-spaced overlapping icons and their 32px-base leader triangles consistent across zoom levels
+      map.on('zoomend', function() {
+        if (currentRawItems && currentRawItems.length > 0) {
+          renderOrUpdateMarkers(currentRawItems);
+        }
+      });
+
       function spreadOverlappingItems(rawList) {
         var groups = {};
         (rawList || []).forEach(function(m) {
@@ -1063,16 +1110,34 @@ export function getFleetSatelliteMapSrcDoc(
         Object.keys(groups).forEach(function(key) {
           var group = groups[key];
           if (group.length === 1) {
-            result.push(group[0]);
+            var singleCopy = {};
+            Object.keys(group[0]).forEach(function(k) { singleCopy[k] = group[0][k]; });
+            singleCopy.origLat = group[0].lat;
+            singleCopy.origLng = group[0].lng;
+            singleCopy.isSharedLocation = false;
+            result.push(singleCopy);
           } else {
-            var radiusLat = 0.000042;
-            var radiusLng = 0.000068;
+            // Spread icons radially in screen pixel space around the shared GPS location so icons have clear space between them
+            var origLat = group[0].lat;
+            var origLng = group[0].lng;
+            var originPt = map.latLngToLayerPoint([origLat, origLng]);
+            var minCircumferenceSpacingPx = 66;
+            var spreadRadiusPx = Math.max(46, Math.round((group.length * minCircumferenceSpacingPx) / (2 * Math.PI)));
+
             group.forEach(function(item, idx) {
-              var angle = (2 * Math.PI * idx) / group.length;
+              var angle = (2 * Math.PI * idx) / group.length - Math.PI / 2;
+              var offsetPt = L.point(
+                originPt.x + spreadRadiusPx * Math.cos(angle),
+                originPt.y + spreadRadiusPx * Math.sin(angle)
+              );
+              var offsetLatLng = map.layerPointToLatLng(offsetPt);
               var copy = {};
               Object.keys(item).forEach(function(k) { copy[k] = item[k]; });
-              copy.lat = item.lat + radiusLat * Math.sin(angle);
-              copy.lng = item.lng + radiusLng * Math.cos(angle);
+              copy.origLat = origLat;
+              copy.origLng = origLng;
+              copy.isSharedLocation = true;
+              copy.lat = offsetLatLng.lat;
+              copy.lng = offsetLatLng.lng;
               result.push(copy);
             });
           }
@@ -1090,16 +1155,44 @@ export function getFleetSatelliteMapSrcDoc(
       }
 
       function renderOrUpdateMarkers(rawList) {
-        var adjusted = spreadOverlappingItems(rawList);
+        currentRawItems = rawList || [];
+        var adjusted = spreadOverlappingItems(currentRawItems);
         boundsPoints = [];
         var seenIds = {};
 
         adjusted.forEach(function(item) {
           var pt = [item.lat, item.lng];
-          boundsPoints.push(pt);
+          boundsPoints.push([
+            typeof item.origLat === 'number' ? item.origLat : item.lat,
+            typeof item.origLng === 'number' ? item.origLng : item.lng
+          ]);
           seenIds[item.equipmentId] = true;
 
-          var bgColor = item.type === 'GENERATOR' ? '#EC721E' : item.type === 'TANK' ? '#2563EB' : '#16A34A';
+          var bgColor = getIconDiscColor(item.type);
+
+          // Render or update the triangular leader line connecting the icon disc circumference (diameter = 32px) to the actual GPS location
+          var triCoords = computeLeaderTriangleLatLngs(item);
+          if (triCoords) {
+            if (leaderTrianglesById[item.equipmentId]) {
+              leaderTrianglesById[item.equipmentId].setLatLngs(triCoords);
+              leaderTrianglesById[item.equipmentId].setStyle({
+                color: bgColor,
+                fillColor: bgColor
+              });
+            } else {
+              leaderTrianglesById[item.equipmentId] = L.polygon(triCoords, {
+                color: bgColor,
+                weight: 1,
+                opacity: 1,
+                fillColor: bgColor,
+                fillOpacity: 1,
+                interactive: false
+              }).addTo(map);
+            }
+          } else if (leaderTrianglesById[item.equipmentId]) {
+            map.removeLayer(leaderTrianglesById[item.equipmentId]);
+            delete leaderTrianglesById[item.equipmentId];
+          }
           var iconColor = '#FFFFFF';
           var chkColor = item.checkInStatus === 'checked_in'
             ? '#16A34A'
@@ -1259,6 +1352,13 @@ export function getFleetSatelliteMapSrcDoc(
             delete markersById[eqId];
             delete pinnedById[eqId];
             delete suppressedHoverById[eqId];
+          }
+        });
+
+        Object.keys(leaderTrianglesById).forEach(function(eqId) {
+          if (!seenIds[eqId]) {
+            map.removeLayer(leaderTrianglesById[eqId]);
+            delete leaderTrianglesById[eqId];
           }
         });
 

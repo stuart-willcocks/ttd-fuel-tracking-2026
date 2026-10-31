@@ -16,3 +16,4 @@ if (rootEl) {
 } else {
   console.error('Fatal: #stress-test-root container not found in DOM.');
 }
+
