@@ -6,6 +6,7 @@ import {
   getBatteryStatus,
   getCachedTelemetryStatus,
 } from '../services/telemetry';
+import { checkRemoteAppVersion } from '../services/appUpdate';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -28,8 +29,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const [telemetry, setTelemetry] = useState(() => getCachedTelemetryStatus());
   const [batteryInfo, setBatteryInfo] = useState<{ batteryLevel: number; isCharging: boolean } | null>(null);
+  const [liveHasUpdate, setLiveHasUpdate] = useState<boolean>(hasUpdate);
+  const [liveAvailableVersion, setLiveAvailableVersion] = useState<string | null>(availableVersion);
 
   const currentDeviceId = getDeviceId();
+
+  useEffect(() => {
+    setLiveHasUpdate(hasUpdate);
+    setLiveAvailableVersion(availableVersion);
+  }, [hasUpdate, availableVersion]);
 
   useEffect(() => {
     if (isOpen) {
@@ -37,6 +45,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       getBatteryStatus().then((b) => {
         if (b) setBatteryInfo(b);
       }).catch(() => {});
+      checkRemoteAppVersion()
+        .then((res) => {
+          if (res.hasUpdate) {
+            setLiveHasUpdate(true);
+            if (res.remoteVersion) setLiveAvailableVersion(res.remoteVersion);
+          }
+        })
+        .catch(() => {});
     }
   }, [isOpen]);
 
@@ -48,8 +64,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const currentVerStr = formatVersionTag(APP_VERSION);
-  const availableVerStr = availableVersion ? formatVersionTag(availableVersion) : null;
-  const canUpdate = Boolean(hasUpdate && availableVerStr);
+  const effectiveAvailable = liveAvailableVersion || availableVersion;
+  const availableVerStr = effectiveAvailable ? formatVersionTag(effectiveAvailable) : null;
+  const canUpdate = Boolean((liveHasUpdate || hasUpdate) && availableVerStr);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

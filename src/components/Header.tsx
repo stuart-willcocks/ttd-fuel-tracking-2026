@@ -14,6 +14,7 @@ interface HeaderProps {
   onToggleFullscreen?: () => void;
   onOpenOutbox: () => void;
   onOpenSettings?: () => void;
+  onApplyUpdate?: () => void;
 }
 
 const LONG_PRESS_DURATION_MS = 600;
@@ -25,6 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   onTriggerSync,
   onOpenOutbox,
   onOpenSettings,
+  onApplyUpdate,
 }) => {
   const isStaging = getIsStaging();
   const nextVersionLabel = availableVersion
@@ -87,7 +89,22 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <span>V{APP_VERSION}{isStaging ? ' STAGING' : ''}</span>
             {hasUpdate && (
-              <span className="header-version-update-badge">
+              <span
+                className="header-version-update-badge"
+                role="button"
+                tabIndex={0}
+                title={`Tap to update to V${nextVersionLabel}`}
+                style={{ cursor: 'pointer' }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onApplyUpdate) {
+                    onApplyUpdate();
+                  } else {
+                    onOpenSettings?.();
+                  }
+                }}
+              >
                 V{nextVersionLabel} AVAILABLE
               </span>
             )}

@@ -280,17 +280,19 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     checkForAppUpdate();
-    // Poll every 5 minutes and on visibility/online events to minimize Vercel CDN requests
-    const interval = setInterval(checkForAppUpdate, 300000);
+    // Poll every 15 seconds and on focus/visibility/online events so PDAs promptly detect new builds
+    const interval = setInterval(checkForAppUpdate, 15000);
     const handleVisibilityOrOnline = () => {
-      if (!document.hidden && navigator.onLine) {
+      if ((typeof document === 'undefined' || !document.hidden) && navigator.onLine) {
         checkForAppUpdate();
       }
     };
+    window.addEventListener('focus', handleVisibilityOrOnline);
     document.addEventListener('visibilitychange', handleVisibilityOrOnline);
     window.addEventListener('online', handleVisibilityOrOnline);
     return () => {
       clearInterval(interval);
+      window.removeEventListener('focus', handleVisibilityOrOnline);
       document.removeEventListener('visibilitychange', handleVisibilityOrOnline);
       window.removeEventListener('online', handleVisibilityOrOnline);
     };
@@ -711,10 +713,19 @@ export const App: React.FC = () => {
         hasUpdate={hasUpdate}
         availableVersion={availableVersion}
         onToggleSimulatedOffline={() => syncEngine.toggleSimulatedOffline()}
-        onTriggerSync={() => syncEngine.syncWithRemote()}
+        onTriggerSync={() => {
+          checkForAppUpdate();
+          syncEngine.syncWithRemote();
+        }}
         onToggleFullscreen={toggleFullscreen}
         onOpenOutbox={() => setIsOutboxModalOpen(true)}
-        onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenSettings={() => {
+          checkForAppUpdate();
+          setIsSettingsModalOpen(true);
+        }}
+        onApplyUpdate={() => {
+          performAppUpdate(availableVersion || undefined);
+        }}
       />
 
       <main className="app-main">

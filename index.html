@@ -25,6 +25,15 @@
             } catch (e) {}
           }
         }
+        // Clean cache-busting ?v= parameter from URL bar immediately on load
+        try {
+          if (window.location.search.indexOf('v=') !== -1) {
+            var u = new URL(window.location.href);
+            u.searchParams.delete('v');
+            var q = u.searchParams.toString();
+            window.history.replaceState({}, '', u.pathname + (q ? '?' + q : '') + u.hash);
+          }
+        } catch (e) {}
         // Suppress injected Vercel Toolbar / Live Feedback widget on preview/staging builds
         var removeVercelToolbar = function() {
           var els = document.querySelectorAll('vercel-live-feedback, #vercel-live-feedback, iframe[src*="vercel.live"], script[src*="vercel.live"]');

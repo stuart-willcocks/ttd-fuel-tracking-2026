@@ -51,12 +51,22 @@ export async function checkRemoteAppVersion(): Promise<VersionCheckResult> {
     // Offline or network error
   }
 
-  // Fallback: only if /version.json could not be fetched on a field PDA, check if a service worker is waiting
   const isDesktopPortal =
     typeof window !== 'undefined' &&
     (window.location.pathname.startsWith('/admin') ||
       window.location.pathname.startsWith('/stress-test'));
 
+  // When a newer build is detected on a field PDA, also prompt the Service Worker registration to check for /sw.js updates
+  if (result.hasUpdate && !isDesktopPortal && 'serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        reg.update().catch(() => {});
+      }
+    } catch {}
+  }
+
+  // Fallback: only if /version.json could not be fetched on a field PDA, check if a service worker is waiting
   if (result.remoteBuild === null && !isDesktopPortal && 'serviceWorker' in navigator) {
     try {
       const reg = await navigator.serviceWorker.getRegistration();
@@ -128,24 +138,19 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
       }
     }
 
-    // 3. Only clear non-Workbox runtime caches when a Service Worker controller is still active
-    //    (deleting workbox-precache while a SW is active causes Workbox PrecacheStrategy to fail with ERR_FAILED)
+    // 3. Clear all browser CacheStorage caches after unregistering SW so any stale precached index.html is purged
     if (typeof window !== 'undefined' && 'caches' in window && !isAdminPage) {
       try {
-        const hasActiveController = Boolean(navigator.serviceWorker?.controller);
         const cacheKeys = await caches.keys();
-        const keysToDelete = hasActiveController
-          ? cacheKeys.filter((k) => !k.startsWith('workbox-precache'))
-          : cacheKeys;
-        await Promise.all(keysToDelete.map((key) => caches.delete(key)));
+        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
       } catch (cacheErr) {
         console.warn('[AppUpdate] Cache purge warning:', cacheErr);
       }
     }
 
-    // 4. Prime the HTTP cache with fresh HTML from the network, then navigate with cache-busting query param
+    // 4. Prime the HTTP cache with fresh HTML from the network, then navigate with cache-busting query param while preserving pda_window=1
     const cleanUrl = window.location.origin + window.location.pathname;
-    const urlsToRevalidate = [cleanUrl];
+    const urlsToRevalidate = [cleanUrl, `${window.location.origin}/index.html`];
     if (window.location.pathname.startsWith('/admin')) {
       urlsToRevalidate.push(`${window.location.origin}/admin`, `${window.location.origin}/admin.html`);
     }
@@ -165,7 +170,7 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
       // Ignore network pre-fetch error and proceed to reload
     }
 
-    const bustUrl = new URL(cleanUrl);
+    const bustUrl = new URL(window.location.href);
     bustUrl.searchParams.set('v', String(Date.now()));
     window.location.replace(bustUrl.toString());
   } catch (err) {

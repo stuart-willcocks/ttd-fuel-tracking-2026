@@ -87,10 +87,25 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        navigateFallbackDenylist: [/^\/api/, /^\/version\.json$/, /^\/admin/, /^\/stress-test/],
-        globPatterns: ['**/*.{html,ico,png,svg,woff,woff2}'],
-        globIgnores: ['**/admin.html', '**/stress-test.html', '**/assets/**'],
+        navigateFallback: null,
+        globPatterns: ['**/*.{ico,png,svg,woff,woff2}'],
+        globIgnores: ['**/admin.html', '**/stress-test.html', '**/index.html', '**/assets/**'],
         runtimeCaching: [
+          {
+            urlPattern: ({ request, url }: { request: Request; url: URL }) =>
+              request.mode === 'navigate' &&
+              !url.pathname.startsWith('/admin') &&
+              !url.pathname.startsWith('/stress-test') &&
+              !url.pathname.startsWith('/api'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'ttd-pda-html-shell-cache',
+              networkTimeoutSeconds: 3,
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
