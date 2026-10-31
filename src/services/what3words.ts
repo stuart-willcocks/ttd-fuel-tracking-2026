@@ -538,7 +538,7 @@ export interface FleetMapTransactionItem {
 
 export interface FleetMapMarkerItem {
   equipmentId: string;
-  type: 'GENERATOR' | 'TANK' | 'PLANT';
+  type: 'GENERATOR' | 'TANK' | 'PLANT' | 'PDA';
   area: string;
   location: string;
   what3words: string;
@@ -548,6 +548,10 @@ export interface FleetMapMarkerItem {
   checkInStatus?: 'checked_in' | 'checked_out' | 'none';
   txCount?: number;
   recentTransactions?: FleetMapTransactionItem[];
+  batteryLevel?: number | null;
+  isCharging?: boolean | null;
+  appVersion?: string | null;
+  lastSeenAt?: string;
   lat: number;
   lng: number;
 }
@@ -980,6 +984,12 @@ export function getFleetSatelliteMapSrcDoc(
             '<path d="m 143,16 h -3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
             '</g></svg>';
         }
+        if (type === 'PDA') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="' + color + '" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">' +
+            '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>' +
+            '<path d="M12 18h.01"/>' +
+            '</svg>';
+        }
         // PLANT (Forklift / Plant)
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
           '<g transform="translate(-170)">' +
@@ -1023,18 +1033,32 @@ export function getFleetSatelliteMapSrcDoc(
       var markersById = {};
       var leaderTrianglesById = {};
       var currentRawItems = items || [];
-      var pinnedById = {};
+      var activePinnedId = null;
       var suppressedHoverById = {};
       var hasFittedOnce = hasValidSavedView;
       var isViewTrackingReady = hasValidSavedView;
       var ICON_RADIUS_PX = 16; // 32px diameter icon disc
 
+      function closeAllOtherTooltips(exceptEqId) {
+        Object.keys(markersById).forEach(function(id) {
+          if (id !== exceptEqId && markersById[id]) {
+            markersById[id].closeTooltip();
+          }
+        });
+      }
+
+      map.on('click', function() {
+        activePinnedId = null;
+        closeAllOtherTooltips(null);
+      });
+
       function getIconDiscColor(type) {
+        if (type === 'PDA') return '#64748B';
         return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : '#16A34A';
       }
 
       function computeLeaderTriangleLatLngs(item) {
-        if (!item || !item.isSharedLocation || typeof item.origLat !== 'number' || typeof item.origLng !== 'number') {
+        if (!item || !item.isSharedLocation || item.iconsOverlap || typeof item.origLat !== 'number' || typeof item.origLng !== 'number') {
           return null;
         }
         var centerPt = map.latLngToLayerPoint([item.lat, item.lng]);
@@ -1042,7 +1066,7 @@ export function getFleetSatelliteMapSrcDoc(
         var dx = targetPt.x - centerPt.x;
         var dy = targetPt.y - centerPt.y;
         var len = Math.sqrt(dx * dx + dy * dy);
-        if (len < 1) return null;
+        if (len <= ICON_RADIUS_PX) return null;
 
         // Unit vector perpendicular to the line from icon center to actual GPS location,
         // so the two base vertices lie on opposite ends of the icon disc's diameter (width = 2 * R = 32px)
@@ -1115,10 +1139,12 @@ export function getFleetSatelliteMapSrcDoc(
             singleCopy.origLat = group[0].lat;
             singleCopy.origLng = group[0].lng;
             singleCopy.isSharedLocation = false;
+            singleCopy.iconsOverlap = false;
             result.push(singleCopy);
           } else {
             var radiusLat = 0.000042;
             var radiusLng = 0.000068;
+            var groupCopies = [];
             group.forEach(function(item, idx) {
               var angle = (2 * Math.PI * idx) / group.length;
               var copy = {};
@@ -1128,7 +1154,26 @@ export function getFleetSatelliteMapSrcDoc(
               copy.isSharedLocation = true;
               copy.lat = item.lat + radiusLat * Math.sin(angle);
               copy.lng = item.lng + radiusLng * Math.cos(angle);
-              result.push(copy);
+              groupCopies.push(copy);
+            });
+
+            // Check if any two spread icons in this group overlap in screen pixel space (diameter = 32px)
+            var groupPts = groupCopies.map(function(c) {
+              return map.latLngToLayerPoint([c.lat, c.lng]);
+            });
+            var minDistPx = Infinity;
+            for (var i = 0; i < groupPts.length; i++) {
+              for (var j = i + 1; j < groupPts.length; j++) {
+                var dx = groupPts[i].x - groupPts[j].x;
+                var dy = groupPts[i].y - groupPts[j].y;
+                var dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < minDistPx) minDistPx = dist;
+              }
+            }
+            var iconsOverlap = minDistPx < (ICON_RADIUS_PX * 2);
+            groupCopies.forEach(function(c) {
+              c.iconsOverlap = iconsOverlap;
+              result.push(c);
             });
           }
         });
@@ -1165,13 +1210,15 @@ export function getFleetSatelliteMapSrcDoc(
               leaderTrianglesById[item.equipmentId].setStyle({
                 color: bgColor,
                 fillColor: bgColor,
-                fillOpacity: 0.5
+                fillOpacity: 1
               });
             } else {
               leaderTrianglesById[item.equipmentId] = L.polygon(triCoords, {
-                stroke: false,
+                color: bgColor,
+                weight: 1,
+                opacity: 1,
                 fillColor: bgColor,
-                fillOpacity: 0.5,
+                fillOpacity: 1,
                 interactive: false
               }).addTo(map);
             }
@@ -1186,14 +1233,16 @@ export function getFleetSatelliteMapSrcDoc(
               ? '#DC2626'
               : '#94A3B8';
           var pwrColor = item.isOn ? '#16A34A' : '#DC2626';
-          var statusSqHtml = item.type === 'GENERATOR'
-            ? '<span class="eq-map-status-cluster">' +
-                '<span class="eq-map-status-sq" style="background:' + chkColor + '"></span>' +
-                '<span class="eq-map-status-sq" style="background:' + pwrColor + '"></span>' +
-              '</span>'
-            : '<span class="eq-map-status-cluster">' +
-                '<span class="eq-map-status-sq" style="background:' + chkColor + '"></span>' +
-              '</span>';
+          var statusSqHtml = item.type === 'PDA'
+            ? ''
+            : item.type === 'GENERATOR'
+              ? '<span class="eq-map-status-cluster">' +
+                  '<span class="eq-map-status-sq" style="background:' + chkColor + '"></span>' +
+                  '<span class="eq-map-status-sq" style="background:' + pwrColor + '"></span>' +
+                '</span>'
+              : '<span class="eq-map-status-cluster">' +
+                  '<span class="eq-map-status-sq" style="background:' + chkColor + '"></span>' +
+                '</span>';
 
           var html = '<div class="eq-map-marker">' +
             '<div class="eq-map-icon-box" style="background:' + bgColor + '">' +
@@ -1210,76 +1259,96 @@ export function getFleetSatelliteMapSrcDoc(
             iconAnchor: [0, 0]
           });
 
-          var capStr = item.type === 'GENERATOR' && item.capacity ? (item.capacity + ' kVA')
-            : item.type === 'TANK' && item.capacity ? (item.capacity + ' L')
-            : 'Unrated';
-
-          var txList = Array.isArray(item.recentTransactions) ? item.recentTransactions : [];
-          var maxBalloonTx = 10;
-          var visibleTx = txList.slice(0, maxBalloonTx);
-          var txRowsHtml = '';
-
-          if (visibleTx.length === 0) {
-            txRowsHtml = '<div class="tx-balloon-empty">No transactions recorded</div>';
+          var balloonHtml = '';
+          if (item.type === 'PDA') {
+            var batStr = typeof item.batteryLevel === 'number'
+              ? (Math.round(item.batteryLevel) + '%' + (item.isCharging ? ' (Charging)' : ''))
+              : '—';
+            var verStr = item.appVersion ? ('V' + String(item.appVersion).replace(/^[vV]/, '')) : '—';
+            balloonHtml = '<div>' +
+              '<div class="tx-balloon-hdr">' +
+                '<span class="tx-balloon-hdr-left">' +
+                  '<span class="tx-balloon-id">' + item.equipmentId + '</span>' +
+                  '<span class="tx-balloon-hdr-meta">• PDA • ' + verStr + '</span>' +
+                '</span>' +
+              '</div>' +
+              '<div class="tx-balloon-sub">' +
+                '<span>Battery: <strong>' + batStr + '</strong></span>' +
+                '<span>•</span>' +
+                '<span class="tx-balloon-w3w">' + (item.what3words || '') + '</span>' +
+              '</div>' +
+              (item.lastSeenAt
+                ? '<div class="tx-balloon-row"><span class="tx-balloon-ts">Last active:</span><span class="tx-balloon-val">' + item.lastSeenAt + '</span></div>'
+                : '') +
+            '</div>';
           } else {
-            txRowsHtml = '<div class="tx-balloon-list">';
-            visibleTx.forEach(function(tx) {
-              txRowsHtml += '<div class="tx-balloon-row">' +
-                '<span class="tx-balloon-icon">' + getTxTypeSvg(tx.type) + '</span>' +
-                '<span class="tx-balloon-ts">' + tx.timestamp + '</span>' +
-                '<span class="tx-balloon-val">' + tx.summary + '</span>' +
-              '</div>';
-            });
-            txRowsHtml += '</div>';
-            if ((item.txCount || txList.length) > visibleTx.length) {
-              var remaining = (item.txCount || txList.length) - visibleTx.length;
-              txRowsHtml += '<div class="tx-balloon-more">+' + remaining + ' earlier transaction' + (remaining === 1 ? '' : 's') + '</div>';
+            var txList = Array.isArray(item.recentTransactions) ? item.recentTransactions : [];
+            var maxBalloonTx = 10;
+            var visibleTx = txList.slice(0, maxBalloonTx);
+            var txRowsHtml = '';
+
+            if (visibleTx.length === 0) {
+              txRowsHtml = '<div class="tx-balloon-empty">No transactions recorded</div>';
+            } else {
+              txRowsHtml = '<div class="tx-balloon-list">';
+              visibleTx.forEach(function(tx) {
+                txRowsHtml += '<div class="tx-balloon-row">' +
+                  '<span class="tx-balloon-icon">' + getTxTypeSvg(tx.type) + '</span>' +
+                  '<span class="tx-balloon-ts">' + tx.timestamp + '</span>' +
+                  '<span class="tx-balloon-val">' + tx.summary + '</span>' +
+                '</div>';
+              });
+              txRowsHtml += '</div>';
+              if ((item.txCount || txList.length) > visibleTx.length) {
+                var remaining = (item.txCount || txList.length) - visibleTx.length;
+                txRowsHtml += '<div class="tx-balloon-more">+' + remaining + ' earlier transaction' + (remaining === 1 ? '' : 's') + '</div>';
+              }
             }
+
+            var hdrMetaParts = [];
+            if (item.type === 'GENERATOR' && item.capacity) {
+              hdrMetaParts.push(item.capacity + ' kVA');
+            } else if (item.type === 'TANK' && item.capacity) {
+              hdrMetaParts.push(item.capacity + ' L');
+            } else if (item.capacity) {
+              hdrMetaParts.push(String(item.capacity));
+            }
+            if (item.rentalSerialNumber) {
+              hdrMetaParts.push(item.rentalSerialNumber);
+            }
+
+            var w3wDisplay = item.what3words
+              ? (item.what3words.indexOf('///') === 0 ? item.what3words : '///' + item.what3words)
+              : '';
+            var areaLocStr = (item.area && item.location)
+              ? (item.area + ' / ' + item.location)
+              : (item.area || item.location || '');
+
+            var chkSqSymbolSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+            var pwrSqSymbolSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg>';
+
+            var balloonStatusHtml = '<span class="tx-balloon-hdr-status">' +
+              '<span class="tx-balloon-status-sq" style="background:' + chkColor + '">' + chkSqSymbolSvg + '</span>' +
+              (item.type === 'GENERATOR'
+                ? '<span class="tx-balloon-status-sq" style="background:' + pwrColor + '">' + pwrSqSymbolSvg + '</span>'
+                : '') +
+            '</span>';
+
+            balloonHtml = '<div>' +
+              '<div class="tx-balloon-hdr">' +
+                '<span class="tx-balloon-hdr-left">' +
+                  '<span class="tx-balloon-id">' + item.equipmentId + '</span>' +
+                  (hdrMetaParts.length > 0 ? '<span class="tx-balloon-hdr-meta">• ' + hdrMetaParts.join(' • ') + '</span>' : '') +
+                '</span>' +
+                balloonStatusHtml +
+              '</div>' +
+              '<div class="tx-balloon-sub">' +
+                '<span>' + areaLocStr + '</span>' +
+                (w3wDisplay ? '<span>•</span><span class="tx-balloon-w3w">' + w3wDisplay + '</span>' : '') +
+              '</div>' +
+              txRowsHtml +
+            '</div>';
           }
-
-          var hdrMetaParts = [];
-          if (item.type === 'GENERATOR' && item.capacity) {
-            hdrMetaParts.push(item.capacity + ' kVA');
-          } else if (item.type === 'TANK' && item.capacity) {
-            hdrMetaParts.push(item.capacity + ' L');
-          } else if (item.capacity) {
-            hdrMetaParts.push(String(item.capacity));
-          }
-          if (item.rentalSerialNumber) {
-            hdrMetaParts.push(item.rentalSerialNumber);
-          }
-
-          var w3wDisplay = item.what3words
-            ? (item.what3words.indexOf('///') === 0 ? item.what3words : '///' + item.what3words)
-            : '';
-          var areaLocStr = (item.area && item.location)
-            ? (item.area + ' / ' + item.location)
-            : (item.area || item.location || '');
-
-          var chkSqSymbolSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-          var pwrSqSymbolSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg>';
-
-          var balloonStatusHtml = '<span class="tx-balloon-hdr-status">' +
-            '<span class="tx-balloon-status-sq" style="background:' + chkColor + '">' + chkSqSymbolSvg + '</span>' +
-            (item.type === 'GENERATOR'
-              ? '<span class="tx-balloon-status-sq" style="background:' + pwrColor + '">' + pwrSqSymbolSvg + '</span>'
-              : '') +
-          '</span>';
-
-          var balloonHtml = '<div>' +
-            '<div class="tx-balloon-hdr">' +
-              '<span class="tx-balloon-hdr-left">' +
-                '<span class="tx-balloon-id">' + item.equipmentId + '</span>' +
-                (hdrMetaParts.length > 0 ? '<span class="tx-balloon-hdr-meta">• ' + hdrMetaParts.join(' • ') + '</span>' : '') +
-              '</span>' +
-              balloonStatusHtml +
-            '</div>' +
-            '<div class="tx-balloon-sub">' +
-              '<span>' + areaLocStr + '</span>' +
-              (w3wDisplay ? '<span>•</span><span class="tx-balloon-w3w">' + w3wDisplay + '</span>' : '') +
-            '</div>' +
-            txRowsHtml +
-          '</div>';
 
           var existing = markersById[item.equipmentId];
           if (existing) {
@@ -1289,7 +1358,8 @@ export function getFleetSatelliteMapSrcDoc(
             }
             existing.setIcon(divIcon);
             existing.setTooltipContent(balloonHtml);
-            if (pinnedById[item.equipmentId]) {
+            if (activePinnedId === item.equipmentId) {
+              closeAllOtherTooltips(item.equipmentId);
               existing.openTooltip();
             }
           } else {
@@ -1305,26 +1375,31 @@ export function getFleetSatelliteMapSrcDoc(
             marker.off('mouseout');
             marker.on('mouseover', function() {
               if (!suppressedHoverById[eqId]) {
+                closeAllOtherTooltips(eqId);
                 marker.openTooltip();
               }
             });
             marker.on('mouseout', function() {
               suppressedHoverById[eqId] = false;
-              if (!pinnedById[eqId]) {
+              if (activePinnedId !== eqId) {
                 marker.closeTooltip();
+                if (activePinnedId && markersById[activePinnedId]) {
+                  markersById[activePinnedId].openTooltip();
+                }
               }
             });
             marker.on('click', function(ev) {
               if (ev && ev.originalEvent) {
                 ev.originalEvent.stopPropagation();
               }
-              if (pinnedById[eqId]) {
-                pinnedById[eqId] = false;
+              if (activePinnedId === eqId) {
+                activePinnedId = null;
                 suppressedHoverById[eqId] = true;
                 marker.closeTooltip();
               } else {
-                pinnedById[eqId] = true;
+                activePinnedId = eqId;
                 suppressedHoverById[eqId] = false;
+                closeAllOtherTooltips(eqId);
                 marker.openTooltip();
               }
             });
@@ -1336,7 +1411,9 @@ export function getFleetSatelliteMapSrcDoc(
           if (!seenIds[eqId]) {
             map.removeLayer(markersById[eqId]);
             delete markersById[eqId];
-            delete pinnedById[eqId];
+            if (activePinnedId === eqId) {
+              activePinnedId = null;
+            }
             delete suppressedHoverById[eqId];
           }
         });

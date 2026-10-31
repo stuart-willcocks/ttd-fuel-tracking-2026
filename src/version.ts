@@ -1,7 +1,7 @@
 // Auto-generated build version - DO NOT EDIT MANUALLY
-export const APP_VERSION = '184';
-export const BUILD_NUMBER = 184;
-export const BUILD_TIME = '2026-10-31 10:47';
+export const APP_VERSION = '185';
+export const BUILD_NUMBER = 185;
+export const BUILD_TIME = '2026-10-31 10:59';
 export const GIT_BRANCH = 'staging';
 export const IS_STAGING = true;
 

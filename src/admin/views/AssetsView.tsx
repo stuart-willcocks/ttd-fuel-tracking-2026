@@ -10,8 +10,9 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Smartphone,
 } from 'lucide-react';
-import type { Equipment, Transaction } from '../../types';
+import type { Equipment, Transaction, AuthorizedDevice } from '../../types';
 import { EquipmentTypeIcon } from '../../components/EquipmentTypeIcon';
 import { formatPdaTimestamp } from '../../utils/dateFormat';
 import {
@@ -32,6 +33,7 @@ import { postRemoteEquipment } from '../../services/api';
 interface AssetsViewProps {
   assets: Equipment[];
   transactions: Transaction[];
+  devices?: AuthorizedDevice[];
   viewMode?: 'TABLE' | 'MAP';
   onOpenCreateModal: () => void;
   onOpenEditModal: (asset: Equipment) => void;
@@ -47,6 +49,7 @@ type PowerFilter = 'ALL' | 'POWERED_UP' | 'POWERED_DOWN';
 export const AssetsView: React.FC<AssetsViewProps> = ({
   assets,
   transactions,
+  devices = [],
   viewMode = 'TABLE',
   onOpenCreateModal,
   onOpenEditModal,
@@ -58,6 +61,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('ALL');
   const [checkInFilter, setCheckInFilter] = useState<CheckInFilter>('ALL');
   const [powerFilter, setPowerFilter] = useState<PowerFilter>('ALL');
+  const [showPdaLocations, setShowPdaLocations] = useState<boolean>(false);
   const [coordResolveTick, setCoordResolveTick] = useState(0);
   const mapIframeRef = useRef<HTMLIFrameElement | null>(null);
   const staticMapSrcDoc = useMemo(
@@ -162,8 +166,16 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       checkedOut: assets.filter((a) => checkInStatusByAsset[a.equipmentId] === 'checked_out').length,
       poweredUp: assets.filter((a) => a.type === 'GENERATOR' && Boolean(powerStateByAsset[a.equipmentId])).length,
       poweredDown: assets.filter((a) => a.type === 'GENERATOR' && !powerStateByAsset[a.equipmentId]).length,
+      pdaWithGps: devices.filter(
+        (d) =>
+          d.status === 'active' &&
+          typeof d.latitude === 'number' &&
+          !Number.isNaN(d.latitude) &&
+          typeof d.longitude === 'number' &&
+          !Number.isNaN(d.longitude)
+      ).length,
     };
-  }, [assets, checkInStatusByAsset, powerStateByAsset]);
+  }, [assets, devices, checkInStatusByAsset, powerStateByAsset]);
 
   // Sorting State
   type AssetSortField = 'equipmentId' | 'type' | 'capacity' | 'location' | 'what3words' | 'rentalSerialNumber' | 'powerState' | 'transactions';
@@ -379,8 +391,46 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         lng: coords.lng,
       });
     }
+
+    if (showPdaLocations) {
+      for (const dev of devices) {
+        if (
+          dev.status !== 'active' ||
+          typeof dev.latitude !== 'number' ||
+          Number.isNaN(dev.latitude) ||
+          typeof dev.longitude !== 'number' ||
+          Number.isNaN(dev.longitude)
+        ) {
+          continue;
+        }
+        items.push({
+          equipmentId: dev.deviceId,
+          type: 'PDA',
+          area: 'Handheld PDA',
+          location: typeof dev.locationAccuracy === 'number' ? `GPS ±${dev.locationAccuracy}m` : 'GPS Active',
+          what3words: `${dev.latitude.toFixed(5)}, ${dev.longitude.toFixed(5)}`,
+          rentalSerialNumber: dev.appVersion ? `V${String(dev.appVersion).replace(/^[vV]/, '')}` : '',
+          batteryLevel: dev.batteryLevel,
+          isCharging: dev.isCharging,
+          appVersion: dev.appVersion,
+          lastSeenAt: dev.lastSeenAt ? formatPdaTimestamp(dev.lastSeenAt) : undefined,
+          lat: dev.latitude,
+          lng: dev.longitude,
+        });
+      }
+    }
+
     return items;
-  }, [sortedAssets, transactions, txCounts, checkInStatusByAsset, powerStateByAsset, coordResolveTick]);
+  }, [
+    sortedAssets,
+    transactions,
+    devices,
+    showPdaLocations,
+    txCounts,
+    checkInStatusByAsset,
+    powerStateByAsset,
+    coordResolveTick,
+  ]);
 
   // Push live marker/transaction updates into the map iframe without reloading or resetting center/zoom
   useEffect(() => {
@@ -702,6 +752,57 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             </button>
           );
         })}
+
+        {viewMode === 'MAP' && (
+          <>
+            <span style={{ width: '1px', height: '22px', background: 'var(--adm-border-medium)', margin: '0 2px' }} />
+
+            <button
+              type="button"
+              onClick={() => setShowPdaLocations((prev) => !prev)}
+              className={`admin-btn ${showPdaLocations ? 'admin-btn-primary' : 'admin-btn-outline'} admin-btn-sm`}
+              style={{
+                background: showPdaLocations ? '#2563EB' : 'transparent',
+                borderColor: showPdaLocations ? '#2563EB' : 'var(--adm-border-medium)',
+                color: showPdaLocations ? '#FFFFFF' : 'var(--adm-text-primary)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontWeight: showPdaLocations ? 700 : 500,
+              }}
+              title="Toggle PDA handheld GPS locations on map"
+            >
+              <span
+                style={{
+                  width: 15,
+                  height: 15,
+                  borderRadius: '50%',
+                  background: '#64748B',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  color: '#FFFFFF',
+                }}
+              >
+                <Smartphone size={10} />
+              </span>
+              <span>PDA locations</span>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  padding: '1px 6px',
+                  borderRadius: '999px',
+                  background: showPdaLocations ? 'rgba(255, 255, 255, 0.25)' : 'var(--adm-surface-3)',
+                  color: showPdaLocations ? '#FFFFFF' : 'var(--adm-text-secondary)',
+                  fontFamily: 'var(--adm-font-mono)',
+                }}
+              >
+                {counts.pdaWithGps}
+              </span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* Main Content Area */}

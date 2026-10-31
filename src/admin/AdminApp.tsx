@@ -645,6 +645,7 @@ export const AdminApp: React.FC = () => {
               <AssetsView
                 assets={assets}
                 transactions={transactions}
+                devices={devices}
                 viewMode={currentView === 'MAP' ? 'MAP' : 'TABLE'}
                 onOpenCreateModal={() => setIsCreateModalOpen(true)}
                 onOpenEditModal={(asset) => setEditingAsset(asset)}
