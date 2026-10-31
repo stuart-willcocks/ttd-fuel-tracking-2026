@@ -43,7 +43,7 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
 
     const checkVersion = async () => {
       const res = await checkRemoteAppVersion();
-      if (res.hasUpdate) {
+      if (res.hasUpdate && res.remoteBuild && res.remoteBuild > res.currentBuild) {
         setHasNewVersion(true);
         if (res.remoteVersion) setNewVersionTag(res.remoteVersion);
 
@@ -81,8 +81,8 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
       }
     };
 
-    checkVersion();
-    const interval = setInterval(() => checkVersion(), 15000);
+    const initTimer = setTimeout(() => checkVersion(), 3000);
+    const interval = setInterval(() => checkVersion(), 20000);
     const onFocusOrVisible = () => {
       if (typeof document === 'undefined' || !document.hidden) {
         checkVersion();
@@ -91,6 +91,7 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
     window.addEventListener('focus', onFocusOrVisible);
     document.addEventListener('visibilitychange', onFocusOrVisible);
     return () => {
+      clearTimeout(initTimer);
       clearInterval(interval);
       window.removeEventListener('focus', onFocusOrVisible);
       document.removeEventListener('visibilitychange', onFocusOrVisible);

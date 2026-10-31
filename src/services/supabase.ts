@@ -1576,25 +1576,61 @@ export async function checkNativeTelemetryColumns(): Promise<boolean> {
 /**
  * Retrieves the currently active Supabase Auth session for the Admin Console.
  */
+function readCachedSupabaseSessionFromStorage(): Session | null {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && parsed.access_token) {
+          // Ensure user object is attached if GoTrue v2 stored it in the companion -user key
+          if (!parsed.user) {
+            const rawUser = window.localStorage.getItem(`${key}-user`);
+            if (rawUser) {
+              try {
+                const parsedUser = JSON.parse(rawUser);
+                if (parsedUser?.user) parsed.user = parsedUser.user;
+              } catch {}
+            }
+          }
+          if (parsed.user) {
+            return parsed as Session;
+          }
+        }
+      }
+    }
+  } catch {}
+  return null;
+}
+
 export async function getAdminSession(): Promise<Session | null> {
   const client = getSupabaseClient();
   if (!client) return null;
+  const cachedFallback = readCachedSupabaseSessionFromStorage();
   try {
     const sessionPromise = client.auth.getSession().then(({ data, error }) => {
       if (error) {
         console.warn('[Supabase Auth] getSession error:', error.message);
-        hasActiveAdminSession = false;
-        return null;
+        hasActiveAdminSession = Boolean(cachedFallback);
+        return cachedFallback;
       }
-      hasActiveAdminSession = Boolean(data.session);
-      return data.session;
+      const resolvedSession = data.session ?? cachedFallback;
+      hasActiveAdminSession = Boolean(resolvedSession);
+      return resolvedSession;
     });
     const timeoutPromise = new Promise<Session | null>((resolve) =>
-      setTimeout(() => resolve(null), 3500)
+      setTimeout(() => {
+        hasActiveAdminSession = Boolean(cachedFallback);
+        resolve(cachedFallback);
+      }, 2500)
     );
     return await Promise.race([sessionPromise, timeoutPromise]);
   } catch {
-    return null;
+    hasActiveAdminSession = Boolean(cachedFallback);
+    return cachedFallback;
   }
 }
 

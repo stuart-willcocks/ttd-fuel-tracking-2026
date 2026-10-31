@@ -51,18 +51,19 @@ export async function checkRemoteAppVersion(): Promise<VersionCheckResult> {
     // Offline or network error
   }
 
-  // Also check if any service worker is currently waiting to activate
-  if ('serviceWorker' in navigator) {
+  // Fallback: only if /version.json could not be fetched on a field PDA, check if a service worker is waiting
+  const isDesktopPortal =
+    typeof window !== 'undefined' &&
+    (window.location.pathname.startsWith('/admin') ||
+      window.location.pathname.startsWith('/stress-test'));
+
+  if (result.remoteBuild === null && !isDesktopPortal && 'serviceWorker' in navigator) {
     try {
       const reg = await navigator.serviceWorker.getRegistration();
-      if (reg) {
-        if (reg.waiting || reg.installing) {
-          result.hasUpdate = true;
-          if (!result.remoteBuild) {
-            result.remoteBuild = BUILD_NUMBER + 1;
-            result.remoteVersion = String(BUILD_NUMBER + 1);
-          }
-        }
+      if (reg && reg.waiting) {
+        result.hasUpdate = true;
+        result.remoteBuild = BUILD_NUMBER + 1;
+        result.remoteVersion = String(BUILD_NUMBER + 1);
       }
     } catch {
       // Ignore SW registration check errors
@@ -111,24 +112,19 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
       } catch {}
     }
 
-    // 2. Update or unregister service workers safely WITHOUT wiping active Workbox precaches out from under running tabs
+    // 2. Unregister any active service workers before reloading into the new build
     if ('serviceWorker' in navigator) {
       try {
         const registrations = await navigator.serviceWorker.getRegistrations();
         await Promise.all(
           registrations.map(async (reg) => {
             try {
-              if (isAdminPage) {
-                // On /admin, trigger a non-destructive SW update check without deleting active precaches
-                await reg.update();
-              } else {
-                await reg.unregister();
-              }
+              await reg.unregister();
             } catch {}
           }),
         );
       } catch (swErr) {
-        console.warn('[AppUpdate] SW update/unregister warning:', swErr);
+        console.warn('[AppUpdate] SW unregister warning:', swErr);
       }
     }
 

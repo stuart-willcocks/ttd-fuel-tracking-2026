@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import { setupServiceWorkerAutoReload } from './services/appUpdate';
+import { isMobileDevice } from './utils/deviceDetector';
 import './index.css';
 import App from './App.tsx';
 
@@ -22,20 +23,28 @@ if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admi
   }
 }
 
-// Enable automatic reload when a new service worker takes control
-setupServiceWorkerAutoReload();
-
-// Register PWA service worker with auto-update
-const updateSW = registerSW({
-  immediate: true,
-  onNeedRefresh() {
-    console.log('New app version available, activating...');
-    updateSW(true);
-  },
-  onOfflineReady() {
-    console.log('App ready to work offline');
-  },
-});
+// Only register offline PWA Service Worker on dedicated mobile/Zebra handheld devices.
+// On desktop workstations, actively unregister any Service Worker so /admin and /stress-test are never intercepted.
+if (typeof window !== 'undefined') {
+  if (isMobileDevice()) {
+    setupServiceWorkerAutoReload();
+    const updateSW = registerSW({
+      immediate: true,
+      onNeedRefresh() {
+        console.log('New app version available, activating...');
+        updateSW(true);
+      },
+      onOfflineReady() {
+        console.log('App ready to work offline');
+      },
+    });
+  } else if ('serviceWorker' in navigator) {
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((regs) => Promise.all(regs.map((r) => r.unregister().catch(() => {}))))
+      .catch(() => {});
+  }
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

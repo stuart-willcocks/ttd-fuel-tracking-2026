@@ -163,6 +163,10 @@ export const AdminApp: React.FC = () => {
     }
 
     let mounted = true;
+    const safetyTimer = setTimeout(() => {
+      if (mounted) setIsAuthChecking(false);
+    }, 2800);
+
     getAdminSession()
       .then((session) => {
         if (mounted) {
@@ -187,6 +191,7 @@ export const AdminApp: React.FC = () => {
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimer);
       unsubscribe();
     };
   }, []);

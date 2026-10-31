@@ -13,15 +13,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      injectRegister: false,
       includeAssets: [
         'favicon.svg',
         'apple-touch-icon.png',
         'pwa-192x192.png',
         'pwa-512x512.png',
         'favicon-64x64.png',
-        'screenshot-mobile.png',
-        'screenshot-desktop.png',
       ],
       manifest: {
         id: 'com.ttd.fueltracking',
@@ -91,22 +89,8 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         navigateFallbackDenylist: [/^\/api/, /^\/version\.json$/, /^\/admin/, /^\/stress-test/],
         globPatterns: ['**/*.{html,ico,png,svg,woff,woff2}'],
-        globIgnores: ['**/admin.html', '**/stress-test.html'],
+        globIgnores: ['**/admin.html', '**/stress-test.html', '**/assets/**'],
         runtimeCaching: [
-          {
-            urlPattern: /\/assets\/.*\.(?:js|css)$/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'ttd-hashed-assets-cache',
-              expiration: {
-                maxEntries: 60,
-                maxAgeSeconds: 60 * 60 * 24 * 30,
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
