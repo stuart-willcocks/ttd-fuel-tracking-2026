@@ -657,6 +657,19 @@ export function getFleetSatelliteMapSrcDoc(
       cursor: pointer;
       user-select: none;
     }
+    .eq-map-leader {
+      position: absolute;
+      left: 0;
+      top: -16px;
+      width: 100px;
+      height: 32px;
+      transform-origin: 0 16px;
+      pointer-events: none;
+      will-change: transform;
+    }
+    .leaflet-zoom-anim .eq-map-leader {
+      transition: transform 0.25s cubic-bezier(0, 0, 0.25, 1);
+    }
     .eq-map-icon-box {
       position: relative;
       z-index: 2;
@@ -956,6 +969,10 @@ export function getFleetSatelliteMapSrcDoc(
         zoomControl: true
       });
 
+      var leaderPane = map.createPane('leaderPane');
+      leaderPane.style.zIndex = '590';
+      leaderPane.style.pointerEvents = 'none';
+
       // Pure Google Satellite layer (lyrs=s) - zero POI clutter
       L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
         maxZoom: 21,
@@ -1033,6 +1050,7 @@ export function getFleetSatelliteMapSrcDoc(
       var markersById = {};
       var leaderTrianglesById = {};
       var currentRawItems = items || [];
+      var currentAdjustedItems = [];
       var activePinnedId = null;
       var suppressedHoverById = {};
       var hasFittedOnce = hasValidSavedView;
@@ -1057,33 +1075,70 @@ export function getFleetSatelliteMapSrcDoc(
         return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : '#16A34A';
       }
 
-      function computeLeaderTriangleLatLngs(item) {
-        if (!item || !item.isSharedLocation || item.iconsOverlap || typeof item.origLat !== 'number' || typeof item.origLng !== 'number') {
+      function computeLeaderMetricsForZoom(item, zoomLevel) {
+        if (!item || !item.isSharedLocation || typeof item.origLat !== 'number' || typeof item.origLng !== 'number') {
           return null;
         }
-        var centerPt = map.latLngToLayerPoint([item.lat, item.lng]);
-        var targetPt = map.latLngToLayerPoint([item.origLat, item.origLng]);
+        var centerPt = map.project([item.lat, item.lng], zoomLevel);
+        var targetPt = map.project([item.origLat, item.origLng], zoomLevel);
         var dx = targetPt.x - centerPt.x;
         var dy = targetPt.y - centerPt.y;
         var len = Math.sqrt(dx * dx + dy * dy);
-        if (len <= ICON_RADIUS_PX) return null;
+        var angleRad = Math.atan2(dy, dx);
+        return {
+          len: len,
+          angleRad: angleRad
+        };
+      }
 
-        // Unit vector perpendicular to the line from icon center to actual GPS location,
-        // so the two base vertices lie on opposite ends of the icon disc's diameter (width = 2 * R = 32px)
-        var px = -dy / len;
-        var py = dx / len;
+      function updateLeaderTrianglesForZoom(zoomLevel) {
+        if (typeof zoomLevel !== 'number' || isNaN(zoomLevel)) {
+          zoomLevel = map.getZoom();
+        }
+        var sharedGroups = {};
+        currentAdjustedItems.forEach(function(item) {
+          if (item.isSharedLocation && item.groupKey) {
+            if (!sharedGroups[item.groupKey]) sharedGroups[item.groupKey] = [];
+            sharedGroups[item.groupKey].push(item);
+          }
+        });
 
-        var v1Pt = L.point(centerPt.x + px * ICON_RADIUS_PX, centerPt.y + py * ICON_RADIUS_PX);
-        var v2Pt = L.point(centerPt.x - px * ICON_RADIUS_PX, centerPt.y - py * ICON_RADIUS_PX);
+        var groupOverlaps = {};
+        Object.keys(sharedGroups).forEach(function(gKey) {
+          var grp = sharedGroups[gKey];
+          var pts = grp.map(function(c) {
+            return map.project([c.lat, c.lng], zoomLevel);
+          });
+          var minDistPx = Infinity;
+          for (var i = 0; i < pts.length; i++) {
+            for (var j = i + 1; j < pts.length; j++) {
+              var dx = pts[i].x - pts[j].x;
+              var dy = pts[i].y - pts[j].y;
+              var dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < minDistPx) minDistPx = dist;
+            }
+          }
+          groupOverlaps[gKey] = minDistPx < (ICON_RADIUS_PX * 2);
+        });
 
-        var v1LatLng = map.layerPointToLatLng(v1Pt);
-        var v2LatLng = map.layerPointToLatLng(v2Pt);
+        currentAdjustedItems.forEach(function(item) {
+          var leaderMarker = leaderTrianglesById[item.equipmentId];
+          if (!leaderMarker) return;
+          var rootEl = leaderMarker.getElement();
+          if (!rootEl) return;
+          var innerEl = rootEl.querySelector('.eq-map-leader');
+          if (!innerEl) return;
 
-        return [
-          [v1LatLng.lat, v1LatLng.lng],
-          [v2LatLng.lat, v2LatLng.lng],
-          [item.origLat, item.origLng]
-        ];
+          var metrics = computeLeaderMetricsForZoom(item, zoomLevel);
+          if (!metrics) {
+            innerEl.style.visibility = 'hidden';
+            return;
+          }
+          var shouldShow = !groupOverlaps[item.groupKey] && metrics.len > ICON_RADIUS_PX;
+          innerEl.style.transform =
+            'rotate(' + metrics.angleRad + 'rad) scaleX(' + (Math.max(metrics.len, 0.1) / 100) + ')';
+          innerEl.style.visibility = shouldShow ? 'visible' : 'hidden';
+        });
       }
 
       function emitCurrentMapView() {
@@ -1116,11 +1171,15 @@ export function getFleetSatelliteMapSrcDoc(
         emitCurrentMapView();
       });
 
-      // Keep pixel-spaced overlapping icons and their 32px-base leader triangles consistent across zoom levels
-      map.on('zoomend', function() {
-        if (currentRawItems && currentRawItems.length > 0) {
-          renderOrUpdateMarkers(currentRawItems);
+      // Animate leader triangle length in lockstep with Leaflet's zoom transition so base stays 32px and size never jumps after zoom
+      map.on('zoomanim', function(ev) {
+        if (ev && typeof ev.zoom === 'number') {
+          updateLeaderTrianglesForZoom(ev.zoom);
         }
+      });
+
+      map.on('zoomend viewreset', function() {
+        updateLeaderTrianglesForZoom(map.getZoom());
       });
 
       function spreadOverlappingItems(rawList) {
@@ -1139,12 +1198,11 @@ export function getFleetSatelliteMapSrcDoc(
             singleCopy.origLat = group[0].lat;
             singleCopy.origLng = group[0].lng;
             singleCopy.isSharedLocation = false;
-            singleCopy.iconsOverlap = false;
+            singleCopy.groupKey = key;
             result.push(singleCopy);
           } else {
             var radiusLat = 0.000042;
             var radiusLng = 0.000068;
-            var groupCopies = [];
             group.forEach(function(item, idx) {
               var angle = (2 * Math.PI * idx) / group.length;
               var copy = {};
@@ -1152,28 +1210,10 @@ export function getFleetSatelliteMapSrcDoc(
               copy.origLat = item.lat;
               copy.origLng = item.lng;
               copy.isSharedLocation = true;
+              copy.groupKey = key;
               copy.lat = item.lat + radiusLat * Math.sin(angle);
               copy.lng = item.lng + radiusLng * Math.cos(angle);
-              groupCopies.push(copy);
-            });
-
-            // Check if any two spread icons in this group overlap in screen pixel space (diameter = 32px)
-            var groupPts = groupCopies.map(function(c) {
-              return map.latLngToLayerPoint([c.lat, c.lng]);
-            });
-            var minDistPx = Infinity;
-            for (var i = 0; i < groupPts.length; i++) {
-              for (var j = i + 1; j < groupPts.length; j++) {
-                var dx = groupPts[i].x - groupPts[j].x;
-                var dy = groupPts[i].y - groupPts[j].y;
-                var dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < minDistPx) minDistPx = dist;
-              }
-            }
-            var iconsOverlap = minDistPx < (ICON_RADIUS_PX * 2);
-            groupCopies.forEach(function(c) {
-              c.iconsOverlap = iconsOverlap;
-              result.push(c);
+              result.push(copy);
             });
           }
         });
@@ -1192,6 +1232,7 @@ export function getFleetSatelliteMapSrcDoc(
       function renderOrUpdateMarkers(rawList) {
         currentRawItems = rawList || [];
         var adjusted = spreadOverlappingItems(currentRawItems);
+        currentAdjustedItems = adjusted;
         boundsPoints = [];
         var seenIds = {};
 
@@ -1202,24 +1243,37 @@ export function getFleetSatelliteMapSrcDoc(
 
           var bgColor = getIconDiscColor(item.type);
 
-          // Render or update the triangular leader line connecting the icon disc circumference (diameter = 32px) to the actual GPS location
-          var triCoords = computeLeaderTriangleLatLngs(item);
-          if (triCoords) {
+          // Render or update the triangular leader marker in leaderPane (z-index 590, underneath all icon discs)
+          if (item.isSharedLocation) {
+            var leaderHtml = '<div class="eq-map-leader" style="visibility:hidden">' +
+              '<svg width="100" height="32" viewBox="0 0 100 32" preserveAspectRatio="none" style="display:block;overflow:visible">' +
+                '<polygon points="0,0 0,32 100,16" fill="' + bgColor + '" />' +
+              '</svg>' +
+            '</div>';
+            var leaderIcon = L.divIcon({
+              html: leaderHtml,
+              className: '',
+              iconSize: [0, 0],
+              iconAnchor: [0, 0]
+            });
             if (leaderTrianglesById[item.equipmentId]) {
-              leaderTrianglesById[item.equipmentId].setLatLngs(triCoords);
-              leaderTrianglesById[item.equipmentId].setStyle({
-                color: bgColor,
-                fillColor: bgColor,
-                fillOpacity: 1
-              });
+              var oldLeaderLatLng = leaderTrianglesById[item.equipmentId].getLatLng();
+              if (Math.abs(oldLeaderLatLng.lat - pt[0]) > 1e-7 || Math.abs(oldLeaderLatLng.lng - pt[1]) > 1e-7) {
+                leaderTrianglesById[item.equipmentId].setLatLng(pt);
+              }
+              var existingRoot = leaderTrianglesById[item.equipmentId].getElement();
+              var existingPoly = existingRoot && existingRoot.querySelector('polygon');
+              if (existingPoly) {
+                existingPoly.setAttribute('fill', bgColor);
+              } else {
+                leaderTrianglesById[item.equipmentId].setIcon(leaderIcon);
+              }
             } else {
-              leaderTrianglesById[item.equipmentId] = L.polygon(triCoords, {
-                color: bgColor,
-                weight: 1,
-                opacity: 1,
-                fillColor: bgColor,
-                fillOpacity: 1,
-                interactive: false
+              leaderTrianglesById[item.equipmentId] = L.marker(pt, {
+                pane: 'leaderPane',
+                icon: leaderIcon,
+                interactive: false,
+                keyboard: false
               }).addTo(map);
             }
           } else if (leaderTrianglesById[item.equipmentId]) {
@@ -1431,6 +1485,8 @@ export function getFleetSatelliteMapSrcDoc(
           fitAll();
           emitCurrentMapView();
         }
+
+        updateLeaderTrianglesForZoom(map.getZoom());
       }
 
       renderOrUpdateMarkers(items);
