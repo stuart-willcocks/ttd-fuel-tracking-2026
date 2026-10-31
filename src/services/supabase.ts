@@ -1,4 +1,10 @@
-import { createClient, type SupabaseClient, type Session, type AuthChangeEvent } from '@supabase/supabase-js';
+import {
+  createClient,
+  type SupabaseClient,
+  type Session,
+  type AuthChangeEvent,
+  type RealtimeChannel,
+} from '@supabase/supabase-js';
 import type { Equipment, Transaction, AuthorizedDevice, DeviceStatus, DeviceTelemetry } from '../types';
 import { generateSecureDeviceToken, getDeviceId, getDeviceToken, saveDeviceEnrollment } from './device';
 import { getReportedAppVersion } from '../version';
@@ -381,12 +387,52 @@ export async function updateTransactionInSupabase(tx: Transaction): Promise<void
   }
 }
 
+let activeRealtimeChannel: RealtimeChannel | null = null;
+const FLEET_SYNC_BROADCAST_CHANNEL = 'ttd_fleet_sync_channel';
+
+/**
+ * Broadcasts an instant bulk-delete notification over both local BroadcastChannel
+ * and the shared Supabase Realtime WebSocket channel so PDAs update in <30ms
+ * without waiting for hundreds of individual PostgreSQL WAL DELETE events.
+ */
+export function broadcastBulkTransactionDelete(payload: {
+  equipmentId?: string;
+  all?: boolean;
+  wipeEquipment?: boolean;
+}): void {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    try {
+      const bc = new BroadcastChannel(FLEET_SYNC_BROADCAST_CHANNEL);
+      bc.postMessage({ type: 'BULK_DELETE', ...payload });
+      bc.close();
+    } catch {
+      // Ignore BroadcastChannel errors
+    }
+  }
+
+  if (activeRealtimeChannel) {
+    try {
+      activeRealtimeChannel
+        .send({
+          type: 'broadcast',
+          event: 'ttd_bulk_tx_delete',
+          payload,
+        })
+        .catch(() => {});
+    } catch {
+      // Ignore Realtime send errors
+    }
+  }
+}
+
 /**
  * Wipe all transactions and equipment from Supabase
  */
 export async function clearAllCloudData(): Promise<void> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
+
+  broadcastBulkTransactionDelete({ all: true, wipeEquipment: true });
 
   const { error: txErr } = await client
     .from('transactions')
@@ -399,6 +445,8 @@ export async function clearAllCloudData(): Promise<void> {
     .delete()
     .neq('equipment_id', '__DUMMY_NEQ_ALL__');
   if (eqErr) throw eqErr;
+
+  broadcastBulkTransactionDelete({ all: true, wipeEquipment: true });
 }
 
 /**
@@ -408,24 +456,28 @@ export async function clearAllTransactionsFromSupabase(): Promise<void> {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
-  const { error: txErr } = await client
-    .from('transactions')
-    .delete()
-    .neq('id', '00000000-0000-0000-0000-000000000000');
-  if (txErr) throw txErr;
+  broadcastBulkTransactionDelete({ all: true });
 
-  // Reset cached power timestamps on equipment_list since all transactions are cleared
-  const { error: eqErr } = await client
-    .from('equipment_list')
-    .update({
-      powered_up_timestamp: null,
-      powered_down_timestamp: null,
-      updated_at: new Date().toISOString(),
-    })
-    .neq('equipment_id', '__DUMMY_NEQ_ALL__');
+  const [{ error: txErr }, { error: eqErr }] = await Promise.all([
+    client
+      .from('transactions')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'),
+    client
+      .from('equipment_list')
+      .update({
+        powered_up_timestamp: null,
+        powered_down_timestamp: null,
+        updated_at: new Date().toISOString(),
+      })
+      .neq('equipment_id', '__DUMMY_NEQ_ALL__'),
+  ]);
+  if (txErr) throw txErr;
   if (eqErr) {
     console.warn('Could not reset equipment power timestamps after clearing transactions:', eqErr);
   }
+
+  broadcastBulkTransactionDelete({ all: true });
 }
 
 /**
@@ -435,24 +487,28 @@ export async function deleteTransactionsForEquipmentFromSupabase(equipmentId: st
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase not configured');
 
-  const { error: txErr } = await client
-    .from('transactions')
-    .delete()
-    .eq('equipment_id', equipmentId);
-  if (txErr) throw txErr;
+  broadcastBulkTransactionDelete({ equipmentId });
 
-  // Reset cached power timestamps on equipment_list for this equipment ID
-  const { error: eqErr } = await client
-    .from('equipment_list')
-    .update({
-      powered_up_timestamp: null,
-      powered_down_timestamp: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('equipment_id', equipmentId);
+  const [{ error: txErr }, { error: eqErr }] = await Promise.all([
+    client
+      .from('transactions')
+      .delete()
+      .eq('equipment_id', equipmentId),
+    client
+      .from('equipment_list')
+      .update({
+        powered_up_timestamp: null,
+        powered_down_timestamp: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('equipment_id', equipmentId),
+  ]);
+  if (txErr) throw txErr;
   if (eqErr) {
     console.warn(`Could not reset equipment power timestamps for ${equipmentId}:`, eqErr);
   }
+
+  broadcastBulkTransactionDelete({ equipmentId });
 }
 
 /**
@@ -1208,7 +1264,7 @@ export function subscribeToCloudChanges(
     payload?: { new?: Record<string, unknown>; old?: Record<string, unknown> }
   ) => void,
   onReconnect?: () => void,
-  options?: { deviceIdFilter?: string; includeAllDevices?: boolean }
+  _options?: { deviceIdFilter?: string; includeAllDevices?: boolean }
 ): () => void {
   const client = getSupabaseClient();
   if (!client) return () => {};
@@ -1216,9 +1272,23 @@ export function subscribeToCloudChanges(
   let hasConnectedOnce = false;
   let wasDisconnected = false;
 
-  const cleanFilterId = options?.deviceIdFilter?.trim().toUpperCase();
-  const useDeviceFilter = Boolean(cleanFilterId && !options?.includeAllDevices);
-  const channelName = useDeviceFilter ? `ttd-cloud-realtime-${cleanFilterId}` : 'ttd-cloud-realtime-admin';
+  // Use a single shared Realtime channel name across Admin Console and all PDAs
+  // so Supabase Realtime Broadcast events ('ttd_bulk_tx_delete') reach all connected devices immediately
+  const channelName = 'ttd-cloud-realtime';
+
+  let localBc: BroadcastChannel | null = null;
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    try {
+      localBc = new BroadcastChannel(FLEET_SYNC_BROADCAST_CHANNEL);
+      localBc.onmessage = (ev) => {
+        if (ev.data && ev.data.type === 'BULK_DELETE') {
+          onDataChange('transactions', 'BULK_DELETE', { old: ev.data });
+        }
+      };
+    } catch {
+      localBc = null;
+    }
+  }
 
   // Do NOT apply a column filter (device_id=eq.X) on authorized_devices because:
   // 1) Under PostgreSQL REPLICA IDENTITY DEFAULT, verify/ check filters on DELETE events may drop or omit events
@@ -1234,7 +1304,19 @@ export function subscribeToCloudChanges(
   };
 
   const channel = client
-    .channel(channelName)
+    .channel(channelName, {
+      config: {
+        broadcast: { self: false },
+      },
+    })
+    .on(
+      'broadcast',
+      { event: 'ttd_bulk_tx_delete' },
+      (msg) => {
+        const data = (msg?.payload || {}) as Record<string, unknown>;
+        onDataChange('transactions', 'BULK_DELETE', { old: data });
+      }
+    )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'transactions' },
@@ -1258,6 +1340,7 @@ export function subscribeToCloudChanges(
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
+        activeRealtimeChannel = channel;
         if (hasConnectedOnce && wasDisconnected) {
           wasDisconnected = false;
           console.log('[Supabase Realtime] Reconnected after WebSocket drop — syncing missed changes');
@@ -1273,7 +1356,20 @@ export function subscribeToCloudChanges(
       }
     });
 
+  activeRealtimeChannel = channel;
+
   return () => {
+    if (localBc) {
+      try {
+        localBc.close();
+      } catch {
+        // Ignore
+      }
+      localBc = null;
+    }
+    if (activeRealtimeChannel === channel) {
+      activeRealtimeChannel = null;
+    }
     try {
       client.removeChannel(channel);
     } catch (err) {

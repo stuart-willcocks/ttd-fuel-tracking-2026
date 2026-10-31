@@ -51,6 +51,7 @@ class SyncEngine {
   private outboxTimer: ReturnType<typeof setInterval> | null = null;
   private authTimer: ReturnType<typeof setInterval> | null = null;
   private realtimeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private uiRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingRealtimeTables: { equipment: boolean; transactions: boolean } = {
     equipment: false,
     transactions: false,
@@ -309,6 +310,15 @@ class SyncEngine {
     this.dataListeners.forEach((listener) => listener());
   }
 
+  private scheduleUiRefresh(delayMs: number = 16) {
+    if (this.uiRefreshTimer) return;
+    this.uiRefreshTimer = setTimeout(async () => {
+      this.uiRefreshTimer = null;
+      await this.notify();
+      this.notifyDataChange();
+    }, delayMs);
+  }
+
   private saveDeletedTxIds() {
     try {
       localStorage.setItem('ttd_deleted_tx_ids', JSON.stringify(Array.from(this.deletedTxIds)));
@@ -539,13 +549,66 @@ class SyncEngine {
         return;
       }
 
+      if (eventType === 'BULK_DELETE') {
+        const eqId = payload?.old?.equipmentId ? String(payload.old.equipmentId) : null;
+        const wipeAll = Boolean(payload?.old?.all);
+        const wipeEquipment = Boolean(payload?.old?.wipeEquipment);
+
+        if (wipeAll) {
+          await db.transactions.clear();
+          await db.outbox.clear();
+          if (wipeEquipment) {
+            await db.equipments.clear();
+          } else {
+            const allEq = await db.equipments.toArray();
+            const resetEq = allEq.map((eq) => {
+              if (eq.type === 'GENERATOR') {
+                const copy = { ...eq };
+                delete copy.poweredUpTimestamp;
+                delete copy.poweredDownTimestamp;
+                return copy;
+              }
+              return eq;
+            });
+            if (resetEq.length > 0) {
+              await db.equipments.bulkPut(resetEq);
+            }
+          }
+          this.lastSyncTime = new Date().toLocaleTimeString();
+          await this.notify();
+          this.notifyDataChange();
+          return;
+        }
+
+        if (eqId) {
+          await db.transactions.where('equipmentId').equals(eqId).delete();
+          await db.outbox.where('equipmentId').equals(eqId).delete();
+          const eq = await db.equipments.get(eqId);
+          if (eq && eq.type === 'GENERATOR') {
+            const copy = { ...eq };
+            delete copy.poweredUpTimestamp;
+            delete copy.poweredDownTimestamp;
+            await db.equipments.put(copy);
+          }
+          this.lastSyncTime = new Date().toLocaleTimeString();
+          await this.notify();
+          this.notifyDataChange();
+          return;
+        }
+        return;
+      }
+
       if (eventType === 'DELETE') {
         const delId = payload?.old?.id ? String(payload.old.id) : null;
         if (delId) {
           const existingTx = await db.transactions.get(delId);
+          const hadTombstone = this.deletedTxIds.has(delId);
+          if (!existingTx && !hadTombstone) {
+            return;
+          }
           await db.transactions.delete(delId);
           await db.outbox.delete(delId);
-          if (this.deletedTxIds.has(delId)) {
+          if (hadTombstone) {
             this.deletedTxIds.delete(delId);
             this.saveDeletedTxIds();
           }
@@ -567,8 +630,7 @@ class SyncEngine {
           }
 
           this.lastSyncTime = new Date().toLocaleTimeString();
-          await this.notify();
-          this.notifyDataChange();
+          this.scheduleUiRefresh();
           return;
         }
         // Fallback if DELETE event had no old.id (e.g. bulk clear)

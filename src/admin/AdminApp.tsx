@@ -263,9 +263,29 @@ export const AdminApp: React.FC = () => {
             });
             return;
           }
+          if (eventType === 'BULK_DELETE' && oldRec) {
+            const eqId = oldRec.equipmentId ? String(oldRec.equipmentId) : null;
+            const wipeAll = Boolean(oldRec.all);
+            if (wipeAll) {
+              setTransactions([]);
+              setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, []));
+              return;
+            }
+            if (eqId) {
+              setTransactions((prevTxs) => {
+                if (!prevTxs.some((t) => t.equipmentId === eqId)) return prevTxs;
+                const nextTxs = prevTxs.filter((t) => t.equipmentId !== eqId);
+                setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, nextTxs));
+                return nextTxs;
+              });
+              return;
+            }
+            return;
+          }
           if (eventType === 'DELETE' && oldRec && oldRec.id) {
             const delId = String(oldRec.id);
             setTransactions((prevTxs) => {
+              if (!prevTxs.some((t) => t.id === delId)) return prevTxs;
               const nextTxs = prevTxs.filter((t) => t.id !== delId);
               setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, nextTxs));
               return nextTxs;
