@@ -19,6 +19,8 @@ import { TELEMETRY_SQL_MIGRATION, checkNativeTelemetryColumns } from '../../serv
 
 interface DevicesViewProps {
   devices: AuthorizedDevice[];
+  selectedDeviceId?: string | null;
+  onSelectDevice?: (deviceId: string | null) => void;
   onUpdateStatus: (deviceId: string, status: DeviceStatus, assignedDeviceId?: string) => Promise<void>;
   onDeleteDevice: (deviceId: string) => Promise<void>;
   onRefresh: () => void;
@@ -27,6 +29,8 @@ interface DevicesViewProps {
 
 export const DevicesView: React.FC<DevicesViewProps> = ({
   devices,
+  selectedDeviceId = null,
+  onSelectDevice,
   onUpdateStatus,
   onDeleteDevice,
   onRefresh,
@@ -73,6 +77,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const filteredDevices = useMemo(() => {
     return devices
       .filter((dev) => {
+        if (selectedDeviceId && dev.deviceId.toUpperCase() !== selectedDeviceId.toUpperCase()) {
+          return false;
+        }
         if (statusFilter !== 'ALL' && dev.status !== statusFilter) {
           return false;
         }
@@ -81,7 +88,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
       .sort((a, b) =>
         a.deviceId.localeCompare(b.deviceId, undefined, { numeric: true, sensitivity: 'base' })
       );
-  }, [devices, statusFilter]);
+  }, [devices, selectedDeviceId, statusFilter]);
 
   const formatDate = (isoString?: string) => {
     if (!isoString) return '—';
@@ -420,7 +427,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         </div>
       )}
 
-      {/* Controls Bar: Status Filters */}
+      {/* Controls Bar: Status Filters & Selected PDA Filter */}
       <div
         style={{
           display: 'flex',
@@ -436,7 +443,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         }}
       >
         {/* Filter Pills */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
           {[
             { key: 'ALL', label: 'All Devices', count: counts.total },
             { key: 'active', label: 'Authorized', count: counts.active },
@@ -472,6 +479,44 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               </button>
             );
           })}
+
+          {selectedDeviceId && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                background: 'rgba(37, 99, 235, 0.12)',
+                border: '1px solid rgba(37, 99, 235, 0.35)',
+                color: '#1D4ED8',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+              }}
+            >
+              <Smartphone size={14} />
+              <span>Filtered PDA: {selectedDeviceId}</span>
+              {onSelectDevice && (
+                <button
+                  type="button"
+                  onClick={() => onSelectDevice(null)}
+                  title="Clear PDA filter"
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#1D4ED8',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '2px',
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -488,6 +533,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 ? 'No handheld scanners have requested registration yet. Submit a registration request from a PDA to approve it here.'
                 : 'No devices match your filter criteria.'}
             </p>
+            {selectedDeviceId && onSelectDevice && (
+              <button
+                type="button"
+                onClick={() => onSelectDevice(null)}
+                className="admin-btn admin-btn-outline admin-btn-sm"
+                style={{ marginTop: '12px' }}
+              >
+                Show All Devices
+              </button>
+            )}
           </div>
         ) : (
           <table className="admin-table">

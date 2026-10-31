@@ -241,6 +241,8 @@ export async function saveEquipmentToSupabase(equipment: Equipment, previousW3wH
   } catch {
     // Ignore local db put error
   }
+
+  broadcastEquipmentUpdate(payload);
 }
 
 /**
@@ -395,6 +397,37 @@ export async function updateTransactionInSupabase(tx: Transaction): Promise<void
 
 let activeRealtimeChannel: RealtimeChannel | null = null;
 const FLEET_SYNC_BROADCAST_CHANNEL = 'ttd_fleet_sync_channel';
+
+/**
+ * Broadcasts an instant equipment update over both local BroadcastChannel
+ * and the shared Supabase Realtime WebSocket channel so all connected PDAs
+ * and Admin Consoles immediately reflect updated what3words locations and metadata.
+ */
+export function broadcastEquipmentUpdate(rowPayload: Record<string, unknown>): void {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    try {
+      const bc = new BroadcastChannel(FLEET_SYNC_BROADCAST_CHANNEL);
+      bc.postMessage({ type: 'EQUIPMENT_UPDATE', row: rowPayload });
+      bc.close();
+    } catch {
+      // Ignore BroadcastChannel errors
+    }
+  }
+
+  if (activeRealtimeChannel) {
+    try {
+      activeRealtimeChannel
+        .send({
+          type: 'broadcast',
+          event: 'ttd_equipment_update',
+          payload: rowPayload,
+        })
+        .catch(() => {});
+    } catch {
+      // Ignore Realtime send errors
+    }
+  }
+}
 
 /**
  * Broadcasts an instant bulk-delete notification over both local BroadcastChannel
@@ -1289,6 +1322,8 @@ export function subscribeToCloudChanges(
       localBc.onmessage = (ev) => {
         if (ev.data && ev.data.type === 'BULK_DELETE') {
           onDataChange('transactions', 'BULK_DELETE', { old: ev.data });
+        } else if (ev.data && ev.data.type === 'EQUIPMENT_UPDATE' && ev.data.row) {
+          onDataChange('equipment_list', 'UPDATE', { new: ev.data.row });
         }
       };
     } catch {
@@ -1321,6 +1356,16 @@ export function subscribeToCloudChanges(
       (msg) => {
         const data = (msg?.payload || {}) as Record<string, unknown>;
         onDataChange('transactions', 'BULK_DELETE', { old: data });
+      }
+    )
+    .on(
+      'broadcast',
+      { event: 'ttd_equipment_update' },
+      (msg) => {
+        const data = (msg?.payload || {}) as Record<string, unknown>;
+        if (data && data.equipment_id) {
+          onDataChange('equipment_list', 'UPDATE', { new: data });
+        }
       }
     )
     .on(

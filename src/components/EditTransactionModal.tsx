@@ -3,6 +3,7 @@ import { Trash2, Check, Power, PowerOff, Lock, Unlock, Pencil } from 'lucide-rea
 import { IconCancel } from './icons/AppIcons';
 import type { Equipment, Transaction } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
+import { getDeviceId } from '../services/device';
 import { InAppNumpad } from './InAppNumpad';
 import { ActionConfirmModal } from './ActionConfirmModal';
 
@@ -390,8 +391,13 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     setShowConfirmSave(false);
     if (!isValid || !isDirty) return;
 
+    const editTimestamp = new Date().toISOString();
+    const editingDeviceId = getDeviceId() || transaction.deviceId;
+
     const updated: Transaction = {
       ...transaction,
+      transactionTimestamp: editTimestamp,
+      deviceId: editingDeviceId,
     };
 
     if (isCheckIn) {

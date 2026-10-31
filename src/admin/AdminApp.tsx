@@ -65,6 +65,7 @@ export const AdminApp: React.FC = () => {
 
   // Modals & Drawers state
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Equipment | null>(null);
   const [assetPendingDelete, setAssetPendingDelete] = useState<Equipment | null>(null);
@@ -688,6 +689,7 @@ export const AdminApp: React.FC = () => {
             type="button"
             onClick={() => {
               setSelectedAssetId(null);
+              setSelectedDeviceId(null);
               setCurrentView('DEVICES');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
@@ -720,6 +722,15 @@ export const AdminApp: React.FC = () => {
                   setCurrentView('TRANSACTIONS');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
+                onSwitchToTableWithEquipment={() => {
+                  setCurrentView('ASSETS');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onSelectPda={(deviceId) => {
+                  setSelectedDeviceId(deviceId);
+                  setCurrentView('DEVICES');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
               />
             )}
 
@@ -744,6 +755,8 @@ export const AdminApp: React.FC = () => {
             {currentView === 'DEVICES' && (
               <DevicesView
                 devices={devices}
+                selectedDeviceId={selectedDeviceId}
+                onSelectDevice={(devId) => setSelectedDeviceId(devId)}
                 onUpdateStatus={handleUpdateDeviceStatus}
                 onDeleteDevice={handleDeleteDevice}
                 onRefresh={() => loadFleetData()}

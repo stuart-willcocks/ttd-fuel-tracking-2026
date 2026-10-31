@@ -21,6 +21,8 @@ import {
   openMoveEquipmentModal,
   getCachedWhat3WordsCoordinates,
   convertWhat3WordsToCoordinates,
+  convertCoordinatesToWhat3Words,
+  getWhat3WordsApiKey,
   isValidWhat3WordsFormat,
   normalizeWhat3Words,
   getFleetSatelliteMapSrcDoc,
@@ -40,6 +42,8 @@ interface AssetsViewProps {
   onOpenEditModal: (asset: Equipment) => void;
   onOpenQRModal: (asset: Equipment) => void;
   onSelectAsset: (equipmentId: string) => void;
+  onSelectPda?: (deviceId: string) => void;
+  onSwitchToTableWithEquipment?: (equipmentId: string) => void;
   onOpenDangerZone?: () => void;
   onMoveAsset?: (updatedAsset: Equipment) => Promise<void>;
 }
@@ -47,6 +51,15 @@ interface AssetsViewProps {
 type TypeFilter = 'ALL' | 'GENERATOR' | 'TANK' | 'PLANT';
 type CheckInFilter = 'ALL' | 'NONE' | 'CHECKED_IN' | 'CHECKED_OUT';
 type PowerFilter = 'ALL' | 'POWERED_UP' | 'POWERED_DOWN';
+
+interface MapSearchSuggestion {
+  kind: 'w3w' | 'place' | 'coords';
+  title: string;
+  subtitle: string;
+  w3w?: string;
+  lat?: number;
+  lng?: number;
+}
 
 export const AssetsView: React.FC<AssetsViewProps> = ({
   assets,
@@ -57,6 +70,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   onOpenEditModal,
   onOpenQRModal,
   onSelectAsset,
+  onSelectPda,
+  onSwitchToTableWithEquipment,
   onOpenDangerZone,
   onMoveAsset,
 }) => {
@@ -71,6 +86,28 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     () => (viewMode === 'MAP' ? getFleetSatelliteMapSrcDoc([], getSavedFleetMapView()) : ''),
     [viewMode]
   );
+
+  // In-Map Move State (triggered when user clicks "Move" inside an equipment double-click popup on the map)
+  const [movingAssetId, setMovingAssetId] = useState<string | null>(null);
+  const [moveCandidate, setMoveCandidate] = useState<{
+    lat: number;
+    lng: number;
+    words?: string;
+    formattedWords?: string;
+    resolving: boolean;
+    error?: string;
+  } | null>(null);
+  const [isSavingMove, setIsSavingMove] = useState(false);
+  const moveLookupSeqRef = useRef(0);
+
+  // Fleet Map Search State (location names, GPS coordinates, what3words locations)
+  const [mapSearchInput, setMapSearchInput] = useState('');
+  const [mapSearchResults, setMapSearchResults] = useState<MapSearchSuggestion[]>([]);
+  const [mapSearchOpen, setMapSearchOpen] = useState(false);
+  const [mapSearchLoading, setMapSearchLoading] = useState(false);
+  const mapSearchDebounceRef = useRef<number | null>(null);
+  const mapSearchReqSeqRef = useRef(0);
+  const mapSearchContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Single O(T + E) pass for transaction counts, check-in/check-out status, and generator power state per asset
   const { txCounts, checkInStatusByAsset, powerStateByAsset } = useMemo(() => {
@@ -250,6 +287,241 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     );
   };
 
+  const handleCancelInMapMove = () => {
+    moveLookupSeqRef.current += 1;
+    setMovingAssetId(null);
+    setMoveCandidate(null);
+    setIsSavingMove(false);
+    mapIframeRef.current?.contentWindow?.postMessage({ type: 'TTD_MAP_MOVE_END' }, '*');
+  };
+
+  const handleConfirmInMapMove = async () => {
+    if (!movingAssetId || !moveCandidate || !moveCandidate.words || isSavingMove) return;
+    const targetAsset = assets.find((a) => a.equipmentId === movingAssetId);
+    if (!targetAsset) {
+      handleCancelInMapMove();
+      return;
+    }
+
+    setIsSavingMove(true);
+    try {
+      const updatedAsset: Equipment = {
+        ...targetAsset,
+        what3words: moveCandidate.words,
+        latitude: moveCandidate.lat,
+        longitude: moveCandidate.lng,
+        updatedAt: new Date().toISOString(),
+      };
+      if (onMoveAsset) {
+        await onMoveAsset(updatedAsset);
+      } else {
+        await postRemoteEquipment(updatedAsset);
+      }
+      setCoordResolveTick((prev) => prev + 1);
+      handleCancelInMapMove();
+    } catch {
+      setIsSavingMove(false);
+      setMoveCandidate((prev) =>
+        prev
+          ? {
+              ...prev,
+              error: 'Failed to save new location to database. Please try again.',
+            }
+          : prev
+      );
+    }
+  };
+
+  // Close map search dropdown when clicking outside
+  useEffect(() => {
+    if (viewMode !== 'MAP') return;
+    const handleOutsideClick = (ev: MouseEvent) => {
+      if (mapSearchContainerRef.current && !mapSearchContainerRef.current.contains(ev.target as Node)) {
+        setMapSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [viewMode]);
+
+  const looksLikeW3wQuery = (raw: string): boolean => {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('/')) return true;
+    return /^[a-zA-Z]+\.[a-zA-Z]+(\.[a-zA-Z]*)?$/.test(trimmed);
+  };
+
+  const parseGpsCoordinatePair = (raw: string): { lat: number; lng: number } | null => {
+    const cleaned = raw.trim().replace(/[°NSEWnsew]/g, (ch) => {
+      const upper = ch.toUpperCase();
+      if (upper === 'S' || upper === 'W') return '-';
+      return '';
+    });
+    const m = cleaned.match(/^(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)$/);
+    if (!m) return null;
+    const lat = parseFloat(m[1]);
+    const lng = parseFloat(m[2]);
+    if (Number.isNaN(lat) || Number.isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      return null;
+    }
+    return { lat, lng };
+  };
+
+  const panFleetMapTo = (lat: number, lng: number, zoom = 19) => {
+    mapIframeRef.current?.contentWindow?.postMessage(
+      {
+        type: 'TTD_MAP_PAN_TO',
+        lat,
+        lng,
+        zoom,
+      },
+      '*'
+    );
+  };
+
+  const handleSelectMapSearchSuggestion = async (item: MapSearchSuggestion) => {
+    setMapSearchOpen(false);
+    if (item.kind === 'coords' && typeof item.lat === 'number' && typeof item.lng === 'number') {
+      setMapSearchInput(`${item.lat.toFixed(6)}, ${item.lng.toFixed(6)}`);
+      panFleetMapTo(item.lat, item.lng, 19);
+      return;
+    }
+    if (item.kind === 'place' && typeof item.lat === 'number' && typeof item.lng === 'number') {
+      setMapSearchInput(item.title);
+      panFleetMapTo(item.lat, item.lng, 18);
+      return;
+    }
+    if (item.kind === 'w3w' && item.w3w) {
+      const clean = normalizeWhat3Words(item.w3w);
+      setMapSearchInput(`///${clean}`);
+      const coords = getCachedWhat3WordsCoordinates(clean) || (await convertWhat3WordsToCoordinates(clean));
+      if (coords) {
+        panFleetMapTo(coords.lat, coords.lng, 19);
+      }
+    }
+  };
+
+  const executeFleetMapSearch = async (rawQuery: string, isAutoSuggest: boolean) => {
+    const q = rawQuery.trim();
+    if (!q) {
+      setMapSearchResults([]);
+      setMapSearchOpen(false);
+      setMapSearchLoading(false);
+      return;
+    }
+
+    const reqId = ++mapSearchReqSeqRef.current;
+
+    // 1. Direct GPS coordinate pair ("52.0733, -1.0147" or "52.0733 -1.0147")
+    const gpsPair = parseGpsCoordinatePair(q);
+    if (gpsPair) {
+      const coordSuggestion: MapSearchSuggestion = {
+        kind: 'coords',
+        title: `${gpsPair.lat.toFixed(6)}, ${gpsPair.lng.toFixed(6)}`,
+        subtitle: 'GPS Coordinates',
+        lat: gpsPair.lat,
+        lng: gpsPair.lng,
+      };
+      if (!isAutoSuggest) {
+        await handleSelectMapSearchSuggestion(coordSuggestion);
+        return;
+      }
+      setMapSearchResults([coordSuggestion]);
+      setMapSearchOpen(true);
+      setMapSearchLoading(false);
+      return;
+    }
+
+    // 2. Direct full 3-word address on Enter/Search button
+    const cleanW3wCandidate = normalizeWhat3Words(q);
+    if (!isAutoSuggest && looksLikeW3wQuery(q) && isValidWhat3WordsFormat(cleanW3wCandidate)) {
+      await handleSelectMapSearchSuggestion({
+        kind: 'w3w',
+        title: `///${cleanW3wCandidate}`,
+        subtitle: 'what3words location',
+        w3w: cleanW3wCandidate,
+      });
+      return;
+    }
+
+    setMapSearchLoading(true);
+    setMapSearchOpen(true);
+
+    try {
+      const suggestions: MapSearchSuggestion[] = [];
+      const promises: Promise<void>[] = [];
+
+      if (looksLikeW3wQuery(q) && cleanW3wCandidate.split('.').length >= 2) {
+        const apiKey = getWhat3WordsApiKey();
+        const savedView = getSavedFleetMapView();
+        const focusLat = savedView?.lat ?? 52.0733;
+        const focusLng = savedView?.lng ?? -1.0147;
+        const w3wUrl = `https://api.what3words.com/v3/autosuggest?input=${encodeURIComponent(cleanW3wCandidate)}&focus=${encodeURIComponent(`${focusLat},${focusLng}`)}&key=${encodeURIComponent(apiKey)}`;
+        promises.push(
+          fetch(w3wUrl)
+            .then((r) => r.json())
+            .then((data) => {
+              if (Array.isArray(data?.suggestions)) {
+                for (const s of data.suggestions.slice(0, 5)) {
+                  if (s && typeof s.words === 'string') {
+                    const cleanWords = normalizeWhat3Words(s.words);
+                    suggestions.push({
+                      kind: 'w3w',
+                      title: `///${cleanWords}`,
+                      subtitle: [s.nearestPlace, s.country].filter(Boolean).join(', '),
+                      w3w: cleanWords,
+                    });
+                  }
+                }
+              }
+            })
+            .catch(() => {})
+        );
+      }
+
+      if (!q.startsWith('/')) {
+        const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${encodeURIComponent(q)}`;
+        promises.push(
+          fetch(nomUrl, { headers: { Accept: 'application/json' } })
+            .then((r) => r.json())
+            .then((rows) => {
+              if (Array.isArray(rows)) {
+                for (const item of rows.slice(0, 5)) {
+                  const lat = parseFloat(item?.lat);
+                  const lng = parseFloat(item?.lon);
+                  if (!Number.isNaN(lat) && !Number.isNaN(lng) && typeof item?.display_name === 'string') {
+                    const parts = item.display_name.split(',');
+                    suggestions.push({
+                      kind: 'place',
+                      title: (parts[0] || item.display_name).trim(),
+                      subtitle: parts.slice(1).join(',').trim(),
+                      lat,
+                      lng,
+                    });
+                  }
+                }
+              }
+            })
+            .catch(() => {})
+        );
+      }
+
+      await Promise.all(promises);
+      if (reqId !== mapSearchReqSeqRef.current) return;
+
+      setMapSearchLoading(false);
+      if (!isAutoSuggest && suggestions.length === 1) {
+        await handleSelectMapSearchSuggestion(suggestions[0]);
+        return;
+      }
+      setMapSearchResults(suggestions);
+    } catch {
+      if (reqId === mapSearchReqSeqRef.current) {
+        setMapSearchLoading(false);
+        setMapSearchResults([]);
+      }
+    }
+  };
+
   // Listen for actions triggered inside the Fleet Satellite Map iframe popups
   useEffect(() => {
     if (viewMode !== 'MAP') return;
@@ -257,6 +529,66 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       if (!e.data || typeof e.data !== 'object') return;
       if (e.data.type === 'TTD_MAP_SELECT_ASSET' && typeof e.data.equipmentId === 'string') {
         onSelectAsset(e.data.equipmentId);
+      } else if (e.data.type === 'TTD_MAP_EQUIPMENT_DETAILS' && typeof e.data.equipmentId === 'string') {
+        setSearchQuery(e.data.equipmentId);
+        setTypeFilter('ALL');
+        setCheckInFilter('ALL');
+        setPowerFilter('ALL');
+        if (onSwitchToTableWithEquipment) {
+          onSwitchToTableWithEquipment(e.data.equipmentId);
+        }
+      } else if (e.data.type === 'TTD_MAP_SELECT_PDA' && typeof e.data.deviceId === 'string') {
+        if (onSelectPda) {
+          onSelectPda(e.data.deviceId);
+        }
+      } else if (e.data.type === 'TTD_MAP_START_MOVE' && typeof e.data.equipmentId === 'string') {
+        moveLookupSeqRef.current += 1;
+        setMovingAssetId(e.data.equipmentId);
+        setMoveCandidate(null);
+        setIsSavingMove(false);
+      } else if (
+        e.data.type === 'TTD_MAP_MOVE_PICK_LOCATION' &&
+        typeof e.data.equipmentId === 'string' &&
+        typeof e.data.lat === 'number' &&
+        typeof e.data.lng === 'number'
+      ) {
+        const pickedLat = e.data.lat;
+        const pickedLng = e.data.lng;
+        const seq = ++moveLookupSeqRef.current;
+        setMovingAssetId(e.data.equipmentId);
+        setMoveCandidate({
+          lat: pickedLat,
+          lng: pickedLng,
+          resolving: true,
+        });
+        convertCoordinatesToWhat3Words(pickedLat, pickedLng).then((resolved) => {
+          if (seq !== moveLookupSeqRef.current) return;
+          if (!resolved) {
+            setMoveCandidate({
+              lat: pickedLat,
+              lng: pickedLng,
+              resolving: false,
+              error: 'Unable to resolve a what3words address for that point. Please double-click again.',
+            });
+            return;
+          }
+          setMoveCandidate({
+            lat: resolved.lat,
+            lng: resolved.lng,
+            words: resolved.words,
+            formattedWords: resolved.formattedWords,
+            resolving: false,
+          });
+          mapIframeRef.current?.contentWindow?.postMessage(
+            {
+              type: 'TTD_MAP_MOVE_RESOLVED',
+              lat: resolved.lat,
+              lng: resolved.lng,
+              w3wDisplay: resolved.formattedWords,
+            },
+            '*'
+          );
+        });
       } else if (e.data.type === 'TTD_MAP_EDIT_ASSET' && typeof e.data.equipmentId === 'string') {
         const found = assets.find((a) => a.equipmentId === e.data.equipmentId);
         if (found) onOpenEditModal(found);
@@ -275,7 +607,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [viewMode, assets, onSelectAsset, onOpenEditModal]);
+  }, [viewMode, assets, onSelectAsset, onSelectPda, onSwitchToTableWithEquipment, onOpenEditModal]);
 
   // Resolve any uncached What3Words coordinates when switching to MAP view
   useEffect(() => {
@@ -1101,26 +1433,320 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             minHeight: '560px',
             border: '1px solid var(--adm-border-subtle)',
             position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
-          <iframe
-            ref={mapIframeRef}
-            srcDoc={staticMapSrcDoc}
-            onLoad={() => {
-              mapIframeRef.current?.contentWindow?.postMessage(
-                { type: 'TTD_MAP_UPDATE_MARKERS', markers: fleetMapMarkers },
-                '*'
-              );
-            }}
-            title="Fleet Equipment Satellite Map"
-            style={{
-              width: '100%',
-              height: '100%',
-              border: '0',
-              display: 'block',
-            }}
-            allow="geolocation"
-          />
+          {/* In-Map Move Banner & Confirmation Bar */}
+          {movingAssetId && (
+            <div
+              style={{
+                padding: '10px 16px',
+                background: moveCandidate?.words
+                  ? 'rgba(30, 58, 138, 0.96)'
+                  : 'rgba(15, 23, 42, 0.95)',
+                borderBottom: '1px solid rgba(147, 197, 253, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                flexWrap: 'wrap',
+                zIndex: 1100,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    background: '#F59E0B',
+                    color: '#0F172A',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  Move Mode
+                </span>
+                {!moveCandidate ? (
+                  <span style={{ fontSize: '0.86rem', color: '#F8FAFC', fontWeight: 600 }}>
+                    Relocating{' '}
+                    <strong style={{ fontFamily: 'var(--adm-font-mono)', color: '#FDE68A' }}>{movingAssetId}</strong> —{' '}
+                    <strong>double-click</strong> on the map to place the asset at its new location.
+                  </span>
+                ) : moveCandidate.resolving ? (
+                  <span style={{ fontSize: '0.86rem', color: '#93C5FD', fontWeight: 600 }}>
+                    Resolving what3words location for ({moveCandidate.lat.toFixed(5)}, {moveCandidate.lng.toFixed(5)})...
+                  </span>
+                ) : moveCandidate.error ? (
+                  <span style={{ fontSize: '0.86rem', color: '#FCA5A5', fontWeight: 600 }}>
+                    {moveCandidate.error}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.86rem', color: '#F8FAFC', fontWeight: 600 }}>
+                    Confirm moving{' '}
+                    <strong style={{ fontFamily: 'var(--adm-font-mono)', color: '#FDE68A' }}>{movingAssetId}</strong> to{' '}
+                    <strong
+                      style={{
+                        fontFamily: 'var(--adm-font-mono)',
+                        color: '#93C5FD',
+                        background: 'rgba(15, 23, 42, 0.55)',
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                      }}
+                    >
+                      {moveCandidate.formattedWords || `///${moveCandidate.words}`}
+                    </strong>
+                    ?
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {moveCandidate?.words && !moveCandidate.resolving && (
+                  <button
+                    type="button"
+                    disabled={isSavingMove}
+                    onClick={handleConfirmInMapMove}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      border: '1px solid #60A5FA',
+                      background: '#2563EB',
+                      color: '#FFFFFF',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: isSavingMove ? 'wait' : 'pointer',
+                    }}
+                  >
+                    {isSavingMove ? 'Saving...' : 'Confirm Move'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={isSavingMove}
+                  onClick={handleCancelInMapMove}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(203, 213, 225, 0.4)',
+                    background: 'rgba(30, 41, 59, 0.85)',
+                    color: '#E2E8F0',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+            {/* Map Search Overlay (Location names, GPS coordinates, what3words locations) */}
+            <div
+              ref={mapSearchContainerRef}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                left: '56px',
+                zIndex: 1000,
+                width: 'min(380px, calc(100% - 70px))',
+              }}
+            >
+              <form
+                onSubmit={(ev) => {
+                  ev.preventDefault();
+                  if (mapSearchDebounceRef.current) {
+                    window.clearTimeout(mapSearchDebounceRef.current);
+                  }
+                  executeFleetMapSearch(mapSearchInput, false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#FFFFFF',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.28)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    paddingLeft: '10px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    color: '#64748B',
+                  }}
+                >
+                  <Search size={15} />
+                </div>
+                <input
+                  type="text"
+                  value={mapSearchInput}
+                  onChange={(ev) => {
+                    const val = ev.target.value;
+                    setMapSearchInput(val);
+                    if (mapSearchDebounceRef.current) {
+                      window.clearTimeout(mapSearchDebounceRef.current);
+                    }
+                    if (!val.trim()) {
+                      setMapSearchResults([]);
+                      setMapSearchOpen(false);
+                      setMapSearchLoading(false);
+                      return;
+                    }
+                    mapSearchDebounceRef.current = window.setTimeout(() => {
+                      executeFleetMapSearch(val, true);
+                    }, 260);
+                  }}
+                  onFocus={() => {
+                    if (mapSearchResults.length > 0) {
+                      setMapSearchOpen(true);
+                    }
+                  }}
+                  placeholder="Search place name, GPS (lat, lng) or ///w3w..."
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    outline: 'none',
+                    padding: '8px 10px',
+                    fontSize: '0.82rem',
+                    fontWeight: 500,
+                    color: '#0F172A',
+                    background: 'transparent',
+                  }}
+                />
+                {mapSearchInput && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMapSearchInput('');
+                      setMapSearchResults([]);
+                      setMapSearchOpen(false);
+                      setMapSearchLoading(false);
+                    }}
+                    title="Clear map search"
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#64748B',
+                      padding: '0 8px',
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  style={{
+                    border: 'none',
+                    borderLeft: '1px solid #E2E8F0',
+                    background: '#F8FAFC',
+                    color: '#0F172A',
+                    padding: '8px 12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Go
+                </button>
+              </form>
+
+              {mapSearchOpen && (mapSearchLoading || mapSearchResults.length > 0 || mapSearchInput.trim().length > 0) && (
+                <div
+                  style={{
+                    marginTop: '4px',
+                    background: '#FFFFFF',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.32)',
+                    maxHeight: '260px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {mapSearchLoading ? (
+                    <div style={{ padding: '10px 12px', fontSize: '0.78rem', color: '#64748B', fontWeight: 600 }}>
+                      Searching locations...
+                    </div>
+                  ) : mapSearchResults.length === 0 ? (
+                    <div style={{ padding: '10px 12px', fontSize: '0.78rem', color: '#64748B' }}>
+                      No matching locations, coordinates, or what3words found.
+                    </div>
+                  ) : (
+                    mapSearchResults.map((res, idx) => (
+                      <button
+                        key={`${res.kind}-${res.title}-${idx}`}
+                        type="button"
+                        onClick={() => handleSelectMapSearchSuggestion(res)}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '8px 12px',
+                          border: 'none',
+                          borderBottom: idx < mapSearchResults.length - 1 ? '1px solid #F1F5F9' : 'none',
+                          background: '#FFFFFF',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            color: res.kind === 'w3w' ? '#2563EB' : '#0F172A',
+                            fontFamily: res.kind === 'w3w' || res.kind === 'coords' ? 'var(--adm-font-mono)' : 'inherit',
+                          }}
+                        >
+                          {res.title}
+                        </div>
+                        {res.subtitle && (
+                          <div
+                            style={{
+                              fontSize: '0.72rem',
+                              color: '#64748B',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {res.subtitle}
+                          </div>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <iframe
+              ref={mapIframeRef}
+              srcDoc={staticMapSrcDoc}
+              onLoad={() => {
+                mapIframeRef.current?.contentWindow?.postMessage(
+                  { type: 'TTD_MAP_UPDATE_MARKERS', markers: fleetMapMarkers },
+                  '*'
+                );
+              }}
+              title="Fleet Equipment Satellite Map"
+              style={{
+                width: '100%',
+                height: '100%',
+                border: '0',
+                display: 'block',
+              }}
+              allow="geolocation"
+            />
+          </div>
         </div>
       )}
     </div>

@@ -2333,11 +2333,16 @@ export function getFleetSatelliteMapSrcDoc(
       border: 1px solid rgba(255, 255, 255, 0.22);
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
     }
-    .fit-btn {
+    .map-bottom-controls {
       position: absolute;
       bottom: 24px;
       right: 12px;
       z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .fit-btn {
       background: #FFFFFF;
       color: #0F172A;
       border: 1px solid #CBD5E1;
@@ -2350,9 +2355,15 @@ export function getFleetSatelliteMapSrcDoc(
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      transition: all 0.15s ease;
     }
     .fit-btn:hover {
       background: #F8FAFC;
+    }
+    .fit-btn.active {
+      background: #EFF6FF;
+      color: #1D4ED8;
+      border-color: #3B82F6;
     }
     .leaflet-popup-content-wrapper {
       border-radius: 8px !important;
@@ -2361,7 +2372,7 @@ export function getFleetSatelliteMapSrcDoc(
     }
     .leaflet-popup-content {
       margin: 10px 12px !important;
-      min-width: 210px;
+      min-width: 240px;
     }
     .popup-id {
       font-family: 'JetBrains Mono', monospace;
@@ -2372,7 +2383,7 @@ export function getFleetSatelliteMapSrcDoc(
     .popup-meta {
       font-size: 12px;
       color: #475569;
-      margin: 4px 0;
+      margin: 3px 0;
     }
     .popup-w3w {
       font-family: 'JetBrains Mono', monospace;
@@ -2383,25 +2394,41 @@ export function getFleetSatelliteMapSrcDoc(
     }
     .popup-actions {
       display: flex;
+      flex-direction: column;
       gap: 6px;
       margin-top: 8px;
     }
     .popup-btn {
-      flex: 1;
-      padding: 5px 8px;
-      font-size: 11px;
+      width: 100%;
+      padding: 6px 10px;
+      font-size: 12px;
       font-weight: 700;
-      border-radius: 4px;
+      border-radius: 5px;
       border: 1px solid #CBD5E1;
       background: #F8FAFC;
       color: #0F172A;
       cursor: pointer;
       text-align: center;
+      transition: background 0.15s ease;
+    }
+    .popup-btn:hover {
+      background: #F1F5F9;
     }
     .popup-btn-primary {
       background: #2563EB;
       border-color: #2563EB;
       color: #FFFFFF;
+    }
+    .popup-btn-primary:hover {
+      background: #1D4ED8;
+    }
+    .popup-btn-amber {
+      background: #FFFBEB;
+      border-color: #F59E0B;
+      color: #B45309;
+    }
+    .popup-btn-amber:hover {
+      background: #FEF3C7;
     }
     .leaflet-tooltip.eq-tx-balloon {
       background: #FFFFFF !important;
@@ -2541,9 +2568,14 @@ export function getFleetSatelliteMapSrcDoc(
 </head>
 <body>
   <div id="map"></div>
-  <button type="button" class="fit-btn" id="fitBoundsBtn" title="Fit all equipment on map">
-    <span>⌖ Fit All Equipment</span>
-  </button>
+  <div class="map-bottom-controls">
+    <button type="button" class="fit-btn" id="toggleLabelsBtn" title="Toggle default Google Maps location labels">
+      <span>🏷 Map Labels: <span id="labelsStatusText">Off</span></span>
+    </button>
+    <button type="button" class="fit-btn" id="fitBoundsBtn" title="Fit all equipment on map">
+      <span>⌖ Fit All Equipment</span>
+    </button>
+  </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     (function() {
@@ -2577,7 +2609,8 @@ export function getFleetSatelliteMapSrcDoc(
         zoom: initialZoom,
         maxZoom: 21,
         minZoom: 3,
-        zoomControl: true
+        zoomControl: true,
+        doubleClickZoom: false
       });
 
       var leaderPane = map.createPane('leaderPane');
@@ -2591,6 +2624,51 @@ export function getFleetSatelliteMapSrcDoc(
         subdomains: ['0', '1', '2', '3'],
         attribution: 'Map data &copy; Google Satellite'
       }).addTo(map);
+
+      // Optional Google Map Labels overlay (lyrs=h)
+      var labelsLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', {
+        maxZoom: 21,
+        maxNativeZoom: 20,
+        subdomains: ['0', '1', '2', '3'],
+        pane: 'overlayPane'
+      });
+
+      var showLabels = false;
+      try {
+        showLabels = window.localStorage && window.localStorage.getItem('ttd_admin_fleet_map_labels_v1') === 'true';
+      } catch (e) {}
+
+      var toggleLabelsBtn = document.getElementById('toggleLabelsBtn');
+      var labelsStatusText = document.getElementById('labelsStatusText');
+
+      function applyLabelsState() {
+        if (showLabels) {
+          if (!map.hasLayer(labelsLayer)) {
+            labelsLayer.addTo(map);
+          }
+          if (toggleLabelsBtn) toggleLabelsBtn.classList.add('active');
+          if (labelsStatusText) labelsStatusText.textContent = 'On';
+        } else {
+          if (map.hasLayer(labelsLayer)) {
+            map.removeLayer(labelsLayer);
+          }
+          if (toggleLabelsBtn) toggleLabelsBtn.classList.remove('active');
+          if (labelsStatusText) labelsStatusText.textContent = 'Off';
+        }
+      }
+      applyLabelsState();
+
+      if (toggleLabelsBtn) {
+        toggleLabelsBtn.addEventListener('click', function() {
+          showLabels = !showLabels;
+          try {
+            if (window.localStorage) {
+              window.localStorage.setItem('ttd_admin_fleet_map_labels_v1', showLabels ? 'true' : 'false');
+            }
+          } catch (e) {}
+          applyLabelsState();
+        });
+      }
 
       function getEquipmentSvg(type, color) {
         if (type === 'GENERATOR') {
@@ -2659,6 +2737,7 @@ export function getFleetSatelliteMapSrcDoc(
 
       var boundsPoints = [];
       var markersById = {};
+      var itemsById = {};
       var leaderTrianglesById = {};
       var currentRawItems = items || [];
       var currentAdjustedItems = [];
@@ -2670,12 +2749,100 @@ export function getFleetSatelliteMapSrcDoc(
       var isViewTrackingReady = hasValidSavedView;
       var ICON_RADIUS_PX = 16; // 32px diameter icon disc
 
+      // In-map Move Mode state
+      var movingEquipmentId = null;
+      var moveCandidateMarker = null;
+      var moveCandidateLine = null;
+
       function closeAllOtherTooltips(exceptEqId) {
         Object.keys(markersById).forEach(function(id) {
           if (id !== exceptEqId && markersById[id]) {
             markersById[id].closeTooltip();
           }
         });
+      }
+
+      function clearMoveMode() {
+        movingEquipmentId = null;
+        if (moveCandidateMarker) {
+          map.removeLayer(moveCandidateMarker);
+          moveCandidateMarker = null;
+        }
+        if (moveCandidateLine) {
+          map.removeLayer(moveCandidateLine);
+          moveCandidateLine = null;
+        }
+        document.getElementById('map').style.cursor = '';
+      }
+
+      function setMoveCandidateLocation(lat, lng, w3wDisplayText) {
+        if (!movingEquipmentId) return;
+        var currentItem = itemsById[movingEquipmentId];
+        var origPt = currentItem && typeof currentItem.origLat === 'number' && typeof currentItem.origLng === 'number'
+          ? [currentItem.origLat, currentItem.origLng]
+          : currentItem ? [currentItem.lat, currentItem.lng] : [lat, lng];
+
+        var newHtml = '<div class="eq-map-marker">' +
+          '<div class="eq-map-icon-box" style="background:#2563EB;border-color:#93C5FD;box-shadow:0 0 0 4px rgba(37,99,235,0.45),0 2px 8px rgba(0,0,0,0.48);">' +
+            getEquipmentSvg(currentItem ? currentItem.type : 'PLANT', '#FFFFFF') +
+          '</div>' +
+          '<div class="eq-map-label" style="background:#1E40AF;color:#FFFFFF;border-color:#93C5FD;">' +
+            movingEquipmentId + ' → ' + (w3wDisplayText || 'Resolving...') +
+          '</div>' +
+        '</div>';
+
+        var newDivIcon = L.divIcon({
+          html: newHtml,
+          className: '',
+          iconSize: [0, 0],
+          iconAnchor: [0, 0]
+        });
+
+        if (moveCandidateMarker) {
+          moveCandidateMarker.setLatLng([lat, lng]);
+          moveCandidateMarker.setIcon(newDivIcon);
+        } else {
+          moveCandidateMarker = L.marker([lat, lng], { icon: newDivIcon, zIndexOffset: 2000 }).addTo(map);
+        }
+
+        if (moveCandidateLine) {
+          moveCandidateLine.setLatLngs([origPt, [lat, lng]]);
+        } else {
+          moveCandidateLine = L.polyline([origPt, [lat, lng]], {
+            color: '#2563EB',
+            weight: 3,
+            dashArray: '6, 6',
+            opacity: 0.9
+          }).addTo(map);
+        }
+      }
+
+      function handleMoveMapPick(lat, lng) {
+        if (!movingEquipmentId) return;
+        setMoveCandidateLocation(lat, lng, 'Resolving...');
+        try {
+          window.parent.postMessage({
+            type: 'TTD_MAP_MOVE_PICK_LOCATION',
+            equipmentId: movingEquipmentId,
+            lat: lat,
+            lng: lng
+          }, '*');
+        } catch (e) {}
+      }
+
+      function startMoveMode(eqId) {
+        clearMoveMode();
+        movingEquipmentId = eqId;
+        activePinnedId = null;
+        closeAllOtherTooltips(null);
+        map.closePopup();
+        document.getElementById('map').style.cursor = 'crosshair';
+        try {
+          window.parent.postMessage({
+            type: 'TTD_MAP_START_MOVE',
+            equipmentId: eqId
+          }, '*');
+        } catch (e) {}
       }
 
       function suspendBalloonsForZoom() {
@@ -2694,6 +2861,12 @@ export function getFleetSatelliteMapSrcDoc(
       map.on('click', function() {
         activePinnedId = null;
         closeAllOtherTooltips(null);
+      });
+
+      map.on('dblclick', function(ev) {
+        if (movingEquipmentId && ev && ev.latlng) {
+          handleMoveMapPick(ev.latlng.lat, ev.latlng.lng);
+        }
       });
 
       function getIconDiscColor(type) {
@@ -2870,11 +3043,13 @@ export function getFleetSatelliteMapSrcDoc(
         currentAdjustedItems = adjusted;
         boundsPoints = [];
         var seenIds = {};
+        itemsById = {};
 
         adjusted.forEach(function(item) {
           var pt = [item.lat, item.lng];
           boundsPoints.push(pt);
           seenIds[item.equipmentId] = true;
+          itemsById[item.equipmentId] = item;
 
           var bgColor = getIconDiscColor(item.type);
 
@@ -3082,6 +3257,7 @@ export function getFleetSatelliteMapSrcDoc(
               if (ev && ev.originalEvent) {
                 ev.originalEvent.stopPropagation();
               }
+              if (movingEquipmentId) return;
               if (!areBalloonsEnabled) return;
               if (activePinnedId === eqId) {
                 activePinnedId = null;
@@ -3093,6 +3269,100 @@ export function getFleetSatelliteMapSrcDoc(
                 closeAllOtherTooltips(eqId);
                 marker.openTooltip();
               }
+            });
+            marker.on('dblclick', function(ev) {
+              if (ev && ev.originalEvent) {
+                ev.originalEvent.stopPropagation();
+              }
+              if (movingEquipmentId) {
+                var clickLatLng = (ev && ev.latlng) ? ev.latlng : marker.getLatLng();
+                if (clickLatLng) {
+                  handleMoveMapPick(clickLatLng.lat, clickLatLng.lng);
+                }
+                return;
+              }
+              var currentItem = itemsById[eqId] || item;
+              if (currentItem && currentItem.type === 'PDA') {
+                try {
+                  window.parent.postMessage({
+                    type: 'TTD_MAP_SELECT_PDA',
+                    deviceId: eqId
+                  }, '*');
+                } catch (e) {}
+                return;
+              }
+
+              // Non-PDA equipment double-click: open action popup with 3 buttons
+              activePinnedId = null;
+              closeAllOtherTooltips(null);
+              marker.closeTooltip();
+
+              var popupContainer = document.createElement('div');
+              var w3wDisplayPopup = (currentItem && currentItem.what3words)
+                ? (currentItem.what3words.indexOf('///') === 0 ? currentItem.what3words : '///' + currentItem.what3words)
+                : '';
+              var areaLocStrPopup = (currentItem && currentItem.area && currentItem.location)
+                ? (currentItem.area + ' / ' + currentItem.location)
+                : (currentItem ? (currentItem.area || currentItem.location || '') : '');
+
+              var headerDiv = document.createElement('div');
+              headerDiv.innerHTML =
+                '<div class="popup-id">' + eqId + '</div>' +
+                (areaLocStrPopup ? '<div class="popup-meta">' + areaLocStrPopup + '</div>' : '') +
+                (w3wDisplayPopup ? '<div class="popup-w3w">' + w3wDisplayPopup + '</div>' : '');
+              popupContainer.appendChild(headerDiv);
+
+              var actionsDiv = document.createElement('div');
+              actionsDiv.className = 'popup-actions';
+
+              var detailsBtn = document.createElement('button');
+              detailsBtn.type = 'button';
+              detailsBtn.className = 'popup-btn popup-btn-primary';
+              detailsBtn.textContent = 'Equipment details';
+              detailsBtn.addEventListener('click', function(btnEv) {
+                btnEv.stopPropagation();
+                map.closePopup();
+                try {
+                  window.parent.postMessage({
+                    type: 'TTD_MAP_EQUIPMENT_DETAILS',
+                    equipmentId: eqId
+                  }, '*');
+                } catch (e) {}
+              });
+
+              var txBtn = document.createElement('button');
+              txBtn.type = 'button';
+              txBtn.className = 'popup-btn';
+              txBtn.textContent = 'Transactions';
+              txBtn.addEventListener('click', function(btnEv) {
+                btnEv.stopPropagation();
+                map.closePopup();
+                try {
+                  window.parent.postMessage({
+                    type: 'TTD_MAP_SELECT_ASSET',
+                    equipmentId: eqId
+                  }, '*');
+                } catch (e) {}
+              });
+
+              var moveBtn = document.createElement('button');
+              moveBtn.type = 'button';
+              moveBtn.className = 'popup-btn popup-btn-amber';
+              moveBtn.textContent = 'Move';
+              moveBtn.addEventListener('click', function(btnEv) {
+                btnEv.stopPropagation();
+                startMoveMode(eqId);
+              });
+
+              actionsDiv.appendChild(detailsBtn);
+              actionsDiv.appendChild(txBtn);
+              actionsDiv.appendChild(moveBtn);
+              popupContainer.appendChild(actionsDiv);
+
+              L.popup({ offset: [0, -18], closeButton: true, autoPan: true })
+                .setLatLng(marker.getLatLng())
+                .setContent(popupContainer)
+                .openOn(map);
             });
             markersById[eqId] = marker;
           }
@@ -3132,6 +3402,15 @@ export function getFleetSatelliteMapSrcDoc(
         if (!e.data || typeof e.data !== 'object') return;
         if (e.data.type === 'TTD_MAP_UPDATE_MARKERS' && Array.isArray(e.data.markers)) {
           renderOrUpdateMarkers(e.data.markers);
+        } else if (e.data.type === 'TTD_MAP_MOVE_RESOLVED' && typeof e.data.lat === 'number' && typeof e.data.lng === 'number') {
+          setMoveCandidateLocation(e.data.lat, e.data.lng, e.data.w3wDisplay || '');
+        } else if (e.data.type === 'TTD_MAP_MOVE_END') {
+          clearMoveMode();
+        } else if (e.data.type === 'TTD_MAP_PAN_TO' && typeof e.data.lat === 'number' && typeof e.data.lng === 'number') {
+          hasFittedOnce = true;
+          isViewTrackingReady = true;
+          map.setView([e.data.lat, e.data.lng], typeof e.data.zoom === 'number' ? e.data.zoom : Math.max(map.getZoom(), 18), { animate: true });
+          emitCurrentMapView();
         }
       });
 

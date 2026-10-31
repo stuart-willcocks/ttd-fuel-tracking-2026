@@ -439,8 +439,13 @@ class SyncEngine {
       throw new Error('DEVICE_UNAUTHORIZED: This device has been deleted or revoked');
     }
 
+    const editNowIso = new Date().toISOString();
+    const editingDeviceId = getDeviceId() || tx.deviceId;
+
     const updatedTx: Transaction = {
       ...tx,
+      transactionTimestamp: editNowIso,
+      deviceId: editingDeviceId,
       syncStatus: 'pending',
       uploadTimestamp: undefined,
     };
@@ -510,6 +515,8 @@ class SyncEngine {
           const isSame = Boolean(
             localTx &&
             localTx.transactionType === incomingTx.transactionType &&
+            localTx.transactionTimestamp === incomingTx.transactionTimestamp &&
+            (localTx.deviceId ?? null) === (incomingTx.deviceId ?? null) &&
             (localTx.checkInFuelPercentage ?? null) === (incomingTx.checkInFuelPercentage ?? null) &&
             (localTx.checkOutFuelPercentage ?? null) === (incomingTx.checkOutFuelPercentage ?? null) &&
             (localTx.checkInDefPercentage ?? null) === (incomingTx.checkInDefPercentage ?? null) &&
@@ -844,6 +851,8 @@ class SyncEngine {
             const isIdenticalOnServer = Boolean(
               remoteMatch &&
               remoteMatch.transactionType === localTx.transactionType &&
+              remoteMatch.transactionTimestamp === localTx.transactionTimestamp &&
+              (remoteMatch.deviceId ?? null) === (localTx.deviceId ?? null) &&
               (remoteMatch.checkInFuelPercentage ?? null) === (localTx.checkInFuelPercentage ?? null) &&
               (remoteMatch.checkOutFuelPercentage ?? null) === (localTx.checkOutFuelPercentage ?? null) &&
               (remoteMatch.checkInDefPercentage ?? null) === (localTx.checkInDefPercentage ?? null) &&
@@ -896,6 +905,7 @@ class SyncEngine {
             return (
               loc.transactionType !== remoteTx.transactionType ||
               loc.transactionTimestamp !== remoteTx.transactionTimestamp ||
+              (loc.deviceId ?? null) !== (remoteTx.deviceId ?? null) ||
               (loc.checkInFuelPercentage ?? null) !== (remoteTx.checkInFuelPercentage ?? null) ||
               (loc.checkOutFuelPercentage ?? null) !== (remoteTx.checkOutFuelPercentage ?? null) ||
               (loc.checkInDefPercentage ?? null) !== (remoteTx.checkInDefPercentage ?? null) ||

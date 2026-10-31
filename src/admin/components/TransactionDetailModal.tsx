@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { X, Edit, Trash2, Check, AlertTriangle } from 'lucide-react';
 import type { Transaction, TransactionType, Equipment } from '../../types';
 import { formatAdminTimestamp } from '../../utils/dateFormat';
+import { getDeviceId } from '../../services/device';
 
 interface TransactionDetailModalProps {
   transaction: Transaction | null;
@@ -211,7 +212,13 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     setIsSubmitting(true);
     try {
       if (confirmAction === 'SAVE' && onUpdateTransaction) {
-        const updatedTx = buildUpdatedTransaction();
+        const editTimestamp = new Date().toISOString();
+        const editingDeviceId = getDeviceId() || 'Admin-Workstation';
+        const updatedTx: Transaction = {
+          ...buildUpdatedTransaction(),
+          transactionTimestamp: editTimestamp,
+          deviceId: editingDeviceId,
+        };
         await onUpdateTransaction(updatedTx);
       } else if (confirmAction === 'DELETE' && onDeleteTransaction) {
         await onDeleteTransaction(transaction.id);
