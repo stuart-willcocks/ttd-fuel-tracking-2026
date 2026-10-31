@@ -1141,6 +1141,33 @@ function getMoveEquipmentMapSrcDoc(
         if (!data || typeof data !== 'object') return;
         if (data.type === 'TTD_MOVE_MAP_RESOLVED') {
           setCandidateLocation(data.lat, data.lng, 'New: ' + data.formattedWords);
+          if (data.panTo) {
+            map.setView([data.lat, data.lng], data.zoom || 19, { animate: true });
+          }
+        } else if (data.type === 'TTD_MOVE_MAP_PAN_TO') {
+          if (Array.isArray(data.boundingbox) && data.boundingbox.length === 4) {
+            var s = parseFloat(data.boundingbox[0]);
+            var n = parseFloat(data.boundingbox[1]);
+            var w = parseFloat(data.boundingbox[2]);
+            var e = parseFloat(data.boundingbox[3]);
+            var latSpan = Math.abs(n - s);
+            var lngSpan = Math.abs(e - w);
+            if (
+              !isNaN(s) &&
+              !isNaN(n) &&
+              !isNaN(w) &&
+              !isNaN(e) &&
+              (latSpan > 0.0005 || lngSpan > 0.0005) &&
+              latSpan < 0.25 &&
+              lngSpan < 0.25
+            ) {
+              map.fitBounds([[s, w], [n, e]], { padding: [32, 32], maxZoom: 19, animate: true });
+            } else {
+              map.setView([data.lat, data.lng], data.zoom || 18, { animate: true });
+            }
+          } else {
+            map.setView([data.lat, data.lng], data.zoom || 18, { animate: true });
+          }
         } else if (data.type === 'TTD_MOVE_MAP_CLEAR') {
           clearCandidateLocation();
         }
@@ -1267,6 +1294,119 @@ export function openMoveEquipmentModal(
   titleWrap.appendChild(titleText);
   titleWrap.appendChild(currentW3wBadge);
   titleWrap.appendChild(coordsBadge);
+
+  // Search Box for location names and what3words addresses
+  const headerRightWrap = document.createElement('div');
+  Object.assign(headerRightWrap.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    flexShrink: '0',
+  });
+
+  const searchContainer = document.createElement('div');
+  Object.assign(searchContainer.style, {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    width: 'min(370px, 44vw)',
+  });
+
+  const searchForm = document.createElement('form');
+  Object.assign(searchForm.style, {
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    border: '1px solid #CBD5E1',
+    borderRadius: '7px',
+    overflow: 'hidden',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)',
+  });
+
+  const searchIconSpan = document.createElement('span');
+  searchIconSpan.innerHTML =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+  Object.assign(searchIconSpan.style, {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: '10px',
+    paddingRight: '6px',
+    flexShrink: '0',
+  });
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Search place name or ///what3words...';
+  searchInput.autocomplete = 'off';
+  searchInput.spellcheck = false;
+  Object.assign(searchInput.style, {
+    flex: '1',
+    minWidth: '0',
+    border: 'none',
+    outline: 'none',
+    padding: '6px 4px',
+    fontSize: '0.8rem',
+    color: '#0F172A',
+    backgroundColor: 'transparent',
+    fontFamily: "'Inter', system-ui, sans-serif",
+  });
+
+  const searchClearBtn = document.createElement('button');
+  searchClearBtn.type = 'button';
+  searchClearBtn.innerHTML = '&#10005;';
+  searchClearBtn.title = 'Clear search';
+  Object.assign(searchClearBtn.style, {
+    display: 'none',
+    border: 'none',
+    background: 'transparent',
+    color: '#94A3B8',
+    fontSize: '11px',
+    fontWeight: '700',
+    padding: '0 6px',
+    cursor: 'pointer',
+    lineHeight: '1',
+  });
+
+  const searchSubmitBtn = document.createElement('button');
+  searchSubmitBtn.type = 'submit';
+  searchSubmitBtn.textContent = 'Search';
+  Object.assign(searchSubmitBtn.style, {
+    border: 'none',
+    borderLeft: '1px solid #E2E8F0',
+    backgroundColor: '#F1F5F9',
+    color: '#1E293B',
+    fontSize: '0.76rem',
+    fontWeight: '700',
+    padding: '6px 11px',
+    cursor: 'pointer',
+    flexShrink: '0',
+  });
+
+  searchForm.appendChild(searchIconSpan);
+  searchForm.appendChild(searchInput);
+  searchForm.appendChild(searchClearBtn);
+  searchForm.appendChild(searchSubmitBtn);
+
+  const searchDropdown = document.createElement('div');
+  Object.assign(searchDropdown.style, {
+    position: 'absolute',
+    top: 'calc(100% + 5px)',
+    left: '0',
+    right: '0',
+    backgroundColor: '#FFFFFF',
+    border: '1px solid #CBD5E1',
+    borderRadius: '8px',
+    boxShadow: '0 12px 28px rgba(15, 23, 42, 0.25)',
+    zIndex: '3000',
+    maxHeight: '280px',
+    overflowY: 'auto',
+    display: 'none',
+  });
+
+  searchContainer.appendChild(searchForm);
+  searchContainer.appendChild(searchDropdown);
 
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
@@ -1500,6 +1640,399 @@ export function openMoveEquipmentModal(
 
   setBannerInstructionMode();
 
+  // Search logic for both what3words addresses and place/location names
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let searchReqSeq = 0;
+
+  const hideSearchDropdown = () => {
+    searchDropdown.style.display = 'none';
+    searchDropdown.innerHTML = '';
+  };
+
+  const selectWhat3WordsFromSearch = async (rawWords: string) => {
+    const cleanW = normalizeWhat3Words(rawWords);
+    if (!isValidWhat3WordsFormat(cleanW)) return;
+    hideSearchDropdown();
+    searchInput.value = `///${cleanW}`;
+    searchClearBtn.style.display = 'inline-block';
+
+    const seq = ++lookupSeq;
+    Object.assign(actionBanner.style, {
+      backgroundColor: '#FEFCE8',
+      borderBottom: '1px solid #FDE047',
+      color: '#854D0E',
+    });
+    bannerMessage.innerHTML = '';
+    const loadingSpan = document.createElement('span');
+    loadingSpan.textContent = `Resolving coordinates for ///${cleanW}...`;
+    bannerMessage.appendChild(loadingSpan);
+    bannerActions.innerHTML = '';
+
+    const coords = await convertWhat3WordsToCoordinates(cleanW);
+    if (!document.body.contains(backdrop) || seq !== lookupSeq) return;
+    if (!coords) {
+      setBannerErrorMode(`Could not find what3words location "///${cleanW}". Please check the spelling.`);
+      return;
+    }
+
+    const resolved: W3WReverseResult = {
+      words: cleanW,
+      formattedWords: `///${cleanW}`,
+      lat: coords.lat,
+      lng: coords.lng,
+    };
+
+    activeIframe?.contentWindow?.postMessage(
+      {
+        type: 'TTD_MOVE_MAP_RESOLVED',
+        formattedWords: resolved.formattedWords,
+        lat: resolved.lat,
+        lng: resolved.lng,
+        panTo: true,
+        zoom: 19,
+      },
+      '*'
+    );
+    setBannerConfirmMode(resolved);
+  };
+
+  const selectPlaceFromSearch = (place: {
+    displayName: string;
+    lat: number;
+    lng: number;
+    boundingbox?: string[];
+  }) => {
+    hideSearchDropdown();
+    const shortLabel = place.displayName.split(',')[0]?.trim() || place.displayName;
+    searchInput.value = shortLabel;
+    searchClearBtn.style.display = 'inline-block';
+
+    activeIframe?.contentWindow?.postMessage(
+      {
+        type: 'TTD_MOVE_MAP_PAN_TO',
+        lat: place.lat,
+        lng: place.lng,
+        boundingbox: place.boundingbox,
+        zoom: 18,
+      },
+      '*'
+    );
+
+    if (!pendingSelection) {
+      Object.assign(actionBanner.style, {
+        backgroundColor: '#EFF6FF',
+        borderBottom: '1px solid #BFDBFE',
+        color: '#1E3A8A',
+      });
+      bannerMessage.innerHTML = '';
+      const textSpan = document.createElement('span');
+      textSpan.textContent = `Map centered on "${shortLabel}". Double-click on the map to select the exact new location for ${asset.equipmentId}.`;
+      bannerMessage.appendChild(textSpan);
+      bannerActions.innerHTML = '';
+    }
+  };
+
+  const looksLikeW3wQuery = (raw: string): boolean => {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('/')) return true;
+    return /^[a-zA-Z]+\.[a-zA-Z]+(\.[a-zA-Z]*)?$/.test(trimmed);
+  };
+
+  const parseCoordinatePair = (raw: string): W3WCoordinates | null => {
+    const m = raw.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+    if (!m) return null;
+    const lat = parseFloat(m[1]);
+    const lng = parseFloat(m[2]);
+    if (Number.isNaN(lat) || Number.isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      return null;
+    }
+    return { lat, lng };
+  };
+
+  const executeSearchQuery = async (rawQuery: string, isAutoSuggest: boolean) => {
+    const q = rawQuery.trim();
+    if (!q) {
+      hideSearchDropdown();
+      return;
+    }
+
+    const reqId = ++searchReqSeq;
+
+    // 1. Check for direct coordinate pair "lat, lng"
+    const coordPair = parseCoordinatePair(q);
+    if (coordPair && !isAutoSuggest) {
+      hideSearchDropdown();
+      activeIframe?.contentWindow?.postMessage(
+        {
+          type: 'TTD_MOVE_MAP_PAN_TO',
+          lat: coordPair.lat,
+          lng: coordPair.lng,
+          zoom: 19,
+        },
+        '*'
+      );
+      const seq = ++lookupSeq;
+      setBannerResolvingMode(coordPair.lat, coordPair.lng);
+      const resolved = await convertCoordinatesToWhat3Words(coordPair.lat, coordPair.lng);
+      if (!document.body.contains(backdrop) || seq !== lookupSeq) return;
+      if (resolved) {
+        activeIframe?.contentWindow?.postMessage(
+          {
+            type: 'TTD_MOVE_MAP_RESOLVED',
+            formattedWords: resolved.formattedWords,
+            lat: resolved.lat,
+            lng: resolved.lng,
+            panTo: true,
+            zoom: 19,
+          },
+          '*'
+        );
+        setBannerConfirmMode(resolved);
+      }
+      return;
+    }
+
+    // 2. If user submitted a full valid what3words address directly via Enter/Search button
+    const cleanW3wCandidate = normalizeWhat3Words(q);
+    if (!isAutoSuggest && looksLikeW3wQuery(q) && isValidWhat3WordsFormat(cleanW3wCandidate)) {
+      await selectWhat3WordsFromSearch(cleanW3wCandidate);
+      return;
+    }
+
+    searchDropdown.style.display = 'block';
+    searchDropdown.innerHTML = '';
+    const loadingRow = document.createElement('div');
+    loadingRow.textContent = 'Searching...';
+    Object.assign(loadingRow.style, {
+      padding: '10px 12px',
+      fontSize: '0.78rem',
+      color: '#64748B',
+      fontWeight: '600',
+    });
+    searchDropdown.appendChild(loadingRow);
+
+    try {
+      const w3wSuggestions: Array<{ words: string; nearestPlace: string; country: string }> = [];
+      const placeResults: Array<{ displayName: string; lat: number; lng: number; boundingbox?: string[] }> = [];
+
+      const promises: Promise<void>[] = [];
+
+      if (looksLikeW3wQuery(q) && cleanW3wCandidate.split('.').length >= 2) {
+        const apiKey = getWhat3WordsApiKey();
+        const focusCoords = initialCoords || getCachedWhat3WordsCoordinates(clean);
+        const focusParam = focusCoords
+          ? `&focus=${encodeURIComponent(`${focusCoords.lat},${focusCoords.lng}`)}`
+          : '';
+        const w3wUrl = `https://api.what3words.com/v3/autosuggest?input=${encodeURIComponent(cleanW3wCandidate)}${focusParam}&key=${encodeURIComponent(apiKey)}`;
+        promises.push(
+          fetch(w3wUrl)
+            .then((r) => r.json())
+            .then((data) => {
+              if (Array.isArray(data?.suggestions)) {
+                for (const s of data.suggestions.slice(0, 5)) {
+                  if (s && typeof s.words === 'string') {
+                    w3wSuggestions.push({
+                      words: normalizeWhat3Words(s.words),
+                      nearestPlace: s.nearestPlace || '',
+                      country: s.country || '',
+                    });
+                  }
+                }
+              }
+            })
+            .catch(() => {})
+        );
+      }
+
+      if (!q.trim().startsWith('/')) {
+        const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${encodeURIComponent(q)}`;
+        promises.push(
+          fetch(nomUrl, { headers: { Accept: 'application/json' } })
+            .then((r) => r.json())
+            .then((rows) => {
+              if (Array.isArray(rows)) {
+                for (const item of rows.slice(0, 5)) {
+                  const lat = parseFloat(item?.lat);
+                  const lng = parseFloat(item?.lon);
+                  if (!Number.isNaN(lat) && !Number.isNaN(lng) && typeof item?.display_name === 'string') {
+                    placeResults.push({
+                      displayName: item.display_name,
+                      lat,
+                      lng,
+                      boundingbox: Array.isArray(item.boundingbox) ? item.boundingbox : undefined,
+                    });
+                  }
+                }
+              }
+            })
+            .catch(() => {})
+        );
+      }
+
+      await Promise.all(promises);
+      if (!document.body.contains(backdrop) || reqId !== searchReqSeq) return;
+
+      // If user pressed Enter/Search on a location name and we have a top result, jump straight to it if not auto-suggesting
+      if (!isAutoSuggest && w3wSuggestions.length === 1 && placeResults.length === 0) {
+        await selectWhat3WordsFromSearch(w3wSuggestions[0].words);
+        return;
+      }
+      if (!isAutoSuggest && placeResults.length > 0 && w3wSuggestions.length === 0) {
+        selectPlaceFromSearch(placeResults[0]);
+        return;
+      }
+
+      searchDropdown.innerHTML = '';
+
+      if (w3wSuggestions.length === 0 && placeResults.length === 0) {
+        const emptyRow = document.createElement('div');
+        emptyRow.textContent = 'No matching locations or what3words addresses found.';
+        Object.assign(emptyRow.style, {
+          padding: '10px 12px',
+          fontSize: '0.78rem',
+          color: '#64748B',
+        });
+        searchDropdown.appendChild(emptyRow);
+        return;
+      }
+
+      for (const s of w3wSuggestions) {
+        const itemBtn = document.createElement('button');
+        itemBtn.type = 'button';
+        Object.assign(itemBtn.style, {
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          width: '100%',
+          padding: '8px 12px',
+          border: 'none',
+          borderBottom: '1px solid #F1F5F9',
+          backgroundColor: '#FFFFFF',
+          cursor: 'pointer',
+          textAlign: 'left',
+        });
+        itemBtn.onmouseenter = () => {
+          itemBtn.style.backgroundColor = '#EFF6FF';
+        };
+        itemBtn.onmouseleave = () => {
+          itemBtn.style.backgroundColor = '#FFFFFF';
+        };
+
+        const topLine = document.createElement('div');
+        topLine.textContent = `///${s.words}`;
+        Object.assign(topLine.style, {
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: '0.8rem',
+          fontWeight: '800',
+          color: '#2563EB',
+        });
+
+        const subLine = document.createElement('div');
+        subLine.textContent = s.nearestPlace
+          ? `Near ${s.nearestPlace}${s.country ? ` (${s.country})` : ''}`
+          : 'what3words address';
+        Object.assign(subLine.style, {
+          fontSize: '0.72rem',
+          color: '#64748B',
+          marginTop: '2px',
+        });
+
+        itemBtn.appendChild(topLine);
+        itemBtn.appendChild(subLine);
+        itemBtn.onclick = () => {
+          selectWhat3WordsFromSearch(s.words);
+        };
+        searchDropdown.appendChild(itemBtn);
+      }
+
+      for (const p of placeResults) {
+        const itemBtn = document.createElement('button');
+        itemBtn.type = 'button';
+        Object.assign(itemBtn.style, {
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          width: '100%',
+          padding: '8px 12px',
+          border: 'none',
+          borderBottom: '1px solid #F1F5F9',
+          backgroundColor: '#FFFFFF',
+          cursor: 'pointer',
+          textAlign: 'left',
+        });
+        itemBtn.onmouseenter = () => {
+          itemBtn.style.backgroundColor = '#F8FAFC';
+        };
+        itemBtn.onmouseleave = () => {
+          itemBtn.style.backgroundColor = '#FFFFFF';
+        };
+
+        const parts = p.displayName.split(',');
+        const primary = parts[0]?.trim() || p.displayName;
+        const secondary = parts.slice(1).join(',').trim();
+
+        const topLine = document.createElement('div');
+        topLine.textContent = `📍 ${primary}`;
+        Object.assign(topLine.style, {
+          fontSize: '0.8rem',
+          fontWeight: '700',
+          color: '#0F172A',
+        });
+
+        itemBtn.appendChild(topLine);
+        if (secondary) {
+          const subLine = document.createElement('div');
+          subLine.textContent = secondary;
+          Object.assign(subLine.style, {
+            fontSize: '0.71rem',
+            color: '#64748B',
+            marginTop: '2px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
+          });
+          itemBtn.appendChild(subLine);
+        }
+
+        itemBtn.onclick = () => {
+          selectPlaceFromSearch(p);
+        };
+        searchDropdown.appendChild(itemBtn);
+      }
+    } catch {
+      if (reqId === searchReqSeq) {
+        hideSearchDropdown();
+      }
+    }
+  };
+
+  searchInput.addEventListener('input', () => {
+    const val = searchInput.value;
+    searchClearBtn.style.display = val.length > 0 ? 'inline-block' : 'none';
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    if (val.trim().length < 2) {
+      hideSearchDropdown();
+      return;
+    }
+    searchDebounceTimer = setTimeout(() => {
+      executeSearchQuery(val, true);
+    }, 280);
+  });
+
+  searchClearBtn.onclick = () => {
+    searchInput.value = '';
+    searchClearBtn.style.display = 'none';
+    hideSearchDropdown();
+    searchInput.focus();
+  };
+
+  searchForm.onsubmit = (ev) => {
+    ev.preventDefault();
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    executeSearchQuery(searchInput.value, false);
+  };
+
   const onMessage = (ev: MessageEvent) => {
     const data = ev?.data;
     if (!data || typeof data !== 'object') return;
@@ -1532,6 +2065,7 @@ export function openMoveEquipmentModal(
   };
 
   const cleanup = () => {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
     document.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('message', onMessage);
     backdrop.remove();
@@ -1551,8 +2085,10 @@ export function openMoveEquipmentModal(
     if (ev.target === backdrop && !isCommitting) cleanup();
   };
 
+  headerRightWrap.appendChild(searchContainer);
+  headerRightWrap.appendChild(closeBtn);
   header.appendChild(titleWrap);
-  header.appendChild(closeBtn);
+  header.appendChild(headerRightWrap);
   panel.appendChild(header);
   panel.appendChild(actionBanner);
   panel.appendChild(bodyWrap);
