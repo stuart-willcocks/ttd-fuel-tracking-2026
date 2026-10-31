@@ -18,6 +18,7 @@ import { formatPdaTimestamp } from '../../utils/dateFormat';
 import {
   getGoogleMapsExternalUrl,
   handleWhat3WordsLinkClick,
+  openMoveEquipmentModal,
   getCachedWhat3WordsCoordinates,
   convertWhat3WordsToCoordinates,
   isValidWhat3WordsFormat,
@@ -40,6 +41,7 @@ interface AssetsViewProps {
   onOpenQRModal: (asset: Equipment) => void;
   onSelectAsset: (equipmentId: string) => void;
   onOpenDangerZone?: () => void;
+  onMoveAsset?: (updatedAsset: Equipment) => Promise<void>;
 }
 
 type TypeFilter = 'ALL' | 'GENERATOR' | 'TANK' | 'PLANT';
@@ -56,6 +58,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   onOpenQRModal,
   onSelectAsset,
   onOpenDangerZone,
+  onMoveAsset,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('ALL');
@@ -941,39 +944,77 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
                     {/* What3Words */}
                     <td>
-                      <a
-                        href={getGoogleMapsExternalUrl(asset.what3words, asset.latitude, asset.longitude)}
-                        onClick={(e) =>
-                          handleWhat3WordsLinkClick(
-                            e,
-                            asset.what3words,
-                            asset.latitude,
-                            asset.longitude,
-                            (coords) => {
-                              postRemoteEquipment({
-                                ...asset,
-                                latitude: coords.lat,
-                                longitude: coords.lng,
-                              }).catch(() => {});
-                            }
-                          )
-                        }
-                        target="_blank"
-                        rel="noreferrer"
-                        title="Open location in Google Maps"
+                      <div
                         style={{
-                          fontFamily: 'var(--adm-font-mono)',
-                          fontSize: '0.8rem',
-                          color: 'var(--adm-accent-yellow)',
-                          textDecoration: 'none',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px',
+                          gap: '8px',
+                          flexWrap: 'nowrap',
                         }}
                       >
-                        <MapPin size={12} />
-                        <span>{asset.what3words}</span>
-                      </a>
+                        <a
+                          href={getGoogleMapsExternalUrl(asset.what3words, asset.latitude, asset.longitude)}
+                          onClick={(e) =>
+                            handleWhat3WordsLinkClick(
+                              e,
+                              asset.what3words,
+                              asset.latitude,
+                              asset.longitude,
+                              (coords) => {
+                                postRemoteEquipment({
+                                  ...asset,
+                                  latitude: coords.lat,
+                                  longitude: coords.lng,
+                                }).catch(() => {});
+                              }
+                            )
+                          }
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Open location in Google Maps"
+                          style={{
+                            fontFamily: 'var(--adm-font-mono)',
+                            fontSize: '0.8rem',
+                            color: 'var(--adm-accent-yellow)',
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <MapPin size={12} />
+                          <span>{asset.what3words}</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openMoveEquipmentModal(asset, async (updatedAsset) => {
+                              if (onMoveAsset) {
+                                await onMoveAsset(updatedAsset);
+                              } else {
+                                await postRemoteEquipment(updatedAsset);
+                              }
+                            });
+                          }}
+                          title={`Move ${asset.equipmentId} to a new location on the map`}
+                          style={{
+                            padding: '2px 8px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            borderRadius: '4px',
+                            border: '1px solid var(--adm-border-medium)',
+                            background: 'var(--adm-surface-2)',
+                            color: 'var(--adm-text-primary)',
+                            cursor: 'pointer',
+                            lineHeight: 1.35,
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                        >
+                          Move
+                        </button>
+                      </div>
                     </td>
 
                     {/* Rental Serial */}

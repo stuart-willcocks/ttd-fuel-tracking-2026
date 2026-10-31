@@ -9,6 +9,13 @@ export interface W3WCoordinates {
   lng: number;
 }
 
+export interface W3WReverseResult {
+  words: string;
+  formattedWords: string;
+  lat: number;
+  lng: number;
+}
+
 const memoryCache = new Map<string, W3WCoordinates>();
 let cacheHydrated = false;
 
@@ -134,6 +141,60 @@ export async function convertWhat3WordsToCoordinates(rawW3w?: string | null): Pr
     }
   } catch (err) {
     console.warn('[what3words] Network error converting', clean, err);
+    return null;
+  }
+}
+
+/**
+ * Reverse-geocodes latitude & longitude coordinates into a what3words 3-word address
+ * using the what3words v3 `convert-to-3wa` endpoint, and primes the local coordinate cache.
+ */
+export async function convertCoordinatesToWhat3Words(
+  lat: number,
+  lng: number
+): Promise<W3WReverseResult | null> {
+  if (typeof lat !== 'number' || typeof lng !== 'number' || Number.isNaN(lat) || Number.isNaN(lng)) {
+    return null;
+  }
+  hydrateCache();
+
+  const apiKey = getWhat3WordsApiKey();
+  const coordsParam = `${lat.toFixed(7)},${lng.toFixed(7)}`;
+  const url = `https://api.what3words.com/v3/convert-to-3wa?coordinates=${encodeURIComponent(coordsParam)}&language=en&key=${encodeURIComponent(apiKey)}`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (res.ok && typeof data?.words === 'string' && isValidWhat3WordsFormat(data.words)) {
+      const clean = normalizeWhat3Words(data.words);
+      const resolvedLat =
+        typeof data?.coordinates?.lat === 'number' && !Number.isNaN(data.coordinates.lat)
+          ? data.coordinates.lat
+          : lat;
+      const resolvedLng =
+        typeof data?.coordinates?.lng === 'number' && !Number.isNaN(data.coordinates.lng)
+          ? data.coordinates.lng
+          : lng;
+
+      memoryCache.set(clean, { lat: resolvedLat, lng: resolvedLng });
+      persistCache();
+
+      return {
+        words: clean,
+        formattedWords: `///${clean}`,
+        lat: resolvedLat,
+        lng: resolvedLng,
+      };
+    } else {
+      console.warn(
+        '[what3words] Reverse conversion warning for',
+        coordsParam,
+        data?.error?.message || res.status
+      );
+      return null;
+    }
+  } catch (err) {
+    console.warn('[what3words] Network error reverse-converting', coordsParam, err);
     return null;
   }
 }
@@ -720,6 +781,757 @@ export async function handleWhat3WordsLinkClick(
   }
 
   openCleanGoogleMapsModal(w3w, null, onResolved);
+}
+
+/**
+ * Generates a self-contained HTML document (`srcDoc`) for the interactive Move Equipment map modal.
+ * Shows the equipment at its current location and allows the user to double-click anywhere on the map
+ * to select a new location.
+ */
+function getMoveEquipmentMapSrcDoc(
+  equipment: Equipment,
+  lat?: number | null,
+  lng?: number | null
+): string {
+  const clean = normalizeWhat3Words(equipment.what3words);
+  const cached =
+    typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)
+      ? { lat, lng }
+      : getCachedWhat3WordsCoordinates(clean);
+
+  const targetLat = cached ? cached.lat : 52.0733;
+  const targetLng = cached ? cached.lng : -1.0147;
+  const eqIdJson = JSON.stringify(equipment.equipmentId).replace(/</g, '\\u003c');
+  const eqTypeJson = JSON.stringify(equipment.type).replace(/</g, '\\u003c');
+  const eqW3wJson = JSON.stringify(`///${clean}`).replace(/</g, '\\u003c');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #0F172A;
+      overflow: hidden;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      cursor: crosshair;
+    }
+    .leaflet-grab {
+      cursor: crosshair !important;
+    }
+    .leaflet-dragging .leaflet-grab {
+      cursor: grabbing !important;
+    }
+    .leaflet-control-attribution {
+      font-size: 10px !important;
+      background: rgba(15, 23, 42, 0.65) !important;
+      color: #CBD5E1 !important;
+      padding: 2px 6px !important;
+      border-top-left-radius: 4px;
+    }
+    .leaflet-control-attribution a {
+      color: #93C5FD !important;
+    }
+    .map-bottom-controls {
+      position: absolute;
+      bottom: 24px;
+      right: 12px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .recenter-btn {
+      background: #FFFFFF;
+      color: #0F172A;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      user-select: none;
+    }
+    .recenter-btn:hover {
+      background: #F8FAFC;
+    }
+    .eq-move-marker {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translate(-50%, -16px);
+      user-select: none;
+      pointer-events: none;
+    }
+    .eq-move-disc {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #EC721E;
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .eq-move-disc-new {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #2563EB;
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.38), 0 4px 10px rgba(0, 0, 0, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .eq-move-label {
+      margin-top: 3px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(15, 23, 42, 0.9);
+      color: #FFFFFF;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+    }
+    .eq-move-label-new {
+      margin-top: 3px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #1D4ED8;
+      color: #FFFFFF;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 800;
+      white-space: nowrap;
+      border: 1px solid #93C5FD;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="map-bottom-controls">
+    <button type="button" class="recenter-btn" id="recenterBtn" title="Re-center on current equipment location">
+      <span>⌖ Current Location</span>
+    </button>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    (function() {
+      var target = [${targetLat}, ${targetLng}];
+      var eqId = ${eqIdJson};
+      var eqType = ${eqTypeJson};
+      var eqW3w = ${eqW3wJson};
+
+      var map = L.map('map', {
+        center: target,
+        zoom: 19,
+        maxZoom: 21,
+        minZoom: 3,
+        zoomControl: true,
+        doubleClickZoom: false
+      });
+
+      L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        maxZoom: 21,
+        maxNativeZoom: 20,
+        subdomains: ['0', '1', '2', '3'],
+        attribution: 'Map data &copy; Google Satellite'
+      }).addTo(map);
+
+      function getEquipmentSvg(type, color) {
+        if (type === 'GENERATOR') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<g transform="translate(-102)">' +
+            '<path d="m 106,6 c -1,0 -2,1 -2,2 v 9 c 0,1 1,2 2,2 h 16 c 1,0 2,-1 2,-2 V 8 c 0,-1 -1,-2 -2,-2 z M 118.69922,7.9003906 120.30078,9.099609 118.5,11.5 h 3 l -4.19922,5.599609 -1.60156,-1.199218 L 117.5,13.5 h -3 z M 106,8.5 h 7 v 2 h -7 z m 0,3 h 7 v 2 h -7 z m 0,3 h 7 v 2 h -7 z" fill="' + color + '" fill-rule="evenodd"/>' +
+            '<path d="m 107,4.5 h 3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 106,21 h 16" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="M 118,6 V 3 h 2" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
+            '</g></svg>';
+        }
+        if (type === 'TANK') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<g transform="translate(-136)">' +
+            '<rect x="139" y="5.5" width="15.5" height="8" rx="2.5" fill="' + color + '" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<circle cx="147" cy="18.5" r="2.5" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="m 143,3 h 3.5" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 151,16 h 7" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 143,16 h -3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '</g></svg>';
+        }
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+          '<path d="m 14,9.5 v -4 c 0,-0.6 0.4,-1 1,-1 h 4.5 c 0.6,0 1,0.4 1,1 v 7 h -12 v -3 z" fill="' + color + '"/>' +
+          '<path d="m 12.5,5 h -2 v 4.5" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
+          '<path d="M 8,9.5 4.5,6 2,8.5 3.5,11" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
+          '<rect x="6.5" y="15" width="14" height="4" rx="2" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<circle cx="9" cy="17" r="1" fill="' + color + '"/>' +
+          '<circle cx="13.5" cy="17" r="1" fill="' + color + '"/>' +
+          '<circle cx="18" cy="17" r="1" fill="' + color + '"/>' +
+          '</svg>';
+      }
+
+      var currentHtml = '<div class="eq-move-marker">' +
+        '<div class="eq-move-disc">' + getEquipmentSvg(eqType, '#FFFFFF') + '</div>' +
+        '<div class="eq-move-label">' + eqId + ' (Current: ' + eqW3w + ')</div>' +
+        '</div>';
+
+      var currentIcon = L.divIcon({
+        html: currentHtml,
+        className: '',
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+      });
+
+      L.marker(target, { icon: currentIcon, interactive: false }).addTo(map);
+
+      var candidateMarker = null;
+      var moveLine = null;
+
+      function buildNewMarkerIcon(labelText) {
+        var html = '<div class="eq-move-marker">' +
+          '<div class="eq-move-disc-new">' + getEquipmentSvg(eqType, '#FFFFFF') + '</div>' +
+          '<div class="eq-move-label-new">' + labelText + '</div>' +
+          '</div>';
+        return L.divIcon({
+          html: html,
+          className: '',
+          iconSize: [0, 0],
+          iconAnchor: [0, 0]
+        });
+      }
+
+      function setCandidateLocation(lat, lng, labelText) {
+        var pos = [lat, lng];
+        if (!candidateMarker) {
+          candidateMarker = L.marker(pos, {
+            icon: buildNewMarkerIcon(labelText),
+            zIndexOffset: 1000,
+            interactive: false
+          }).addTo(map);
+        } else {
+          candidateMarker.setLatLng(pos);
+          candidateMarker.setIcon(buildNewMarkerIcon(labelText));
+        }
+
+        if (!moveLine) {
+          moveLine = L.polyline([target, pos], {
+            color: '#60A5FA',
+            weight: 2.5,
+            dashArray: '6, 6',
+            opacity: 0.9
+          }).addTo(map);
+        } else {
+          moveLine.setLatLngs([target, pos]);
+        }
+      }
+
+      function clearCandidateLocation() {
+        if (candidateMarker) {
+          map.removeLayer(candidateMarker);
+          candidateMarker = null;
+        }
+        if (moveLine) {
+          map.removeLayer(moveLine);
+          moveLine = null;
+        }
+      }
+
+      map.on('dblclick', function(ev) {
+        if (!ev || !ev.latlng) return;
+        var lat = ev.latlng.lat;
+        var lng = ev.latlng.lng;
+        setCandidateLocation(lat, lng, 'New Location: Resolving...');
+        try {
+          window.parent.postMessage({
+            type: 'TTD_MOVE_MAP_SELECT',
+            lat: lat,
+            lng: lng
+          }, '*');
+        } catch (e) {}
+      });
+
+      window.addEventListener('message', function(ev) {
+        var data = ev && ev.data;
+        if (!data || typeof data !== 'object') return;
+        if (data.type === 'TTD_MOVE_MAP_RESOLVED') {
+          setCandidateLocation(data.lat, data.lng, 'New: ' + data.formattedWords);
+        } else if (data.type === 'TTD_MOVE_MAP_CLEAR') {
+          clearCandidateLocation();
+        }
+      });
+
+      document.getElementById('recenterBtn').addEventListener('click', function() {
+        map.setView(target, 19, { animate: true });
+      });
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+/**
+ * Opens an interactive satellite map modal for moving an equipment item to a new what3words location.
+ * - Shows the equipment at its current location.
+ * - Allows the user to double-click anywhere on the map to select a new location.
+ * - Resolves the new what3words 3-word address and asks for confirmation before committing.
+ * - Calls `onConfirmMove` with the updated Equipment record after confirmation.
+ */
+export function openMoveEquipmentModal(
+  asset: Equipment,
+  onConfirmMove: (updatedAsset: Equipment) => Promise<void>
+): void {
+  if (typeof document === 'undefined') return;
+
+  const clean = normalizeWhat3Words(asset.what3words);
+  const currentFormatted = `///${clean}`;
+
+  const existingModal = document.getElementById('ttd-w3w-move-modal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  const backdrop = document.createElement('div');
+  backdrop.id = 'ttd-w3w-move-modal';
+  Object.assign(backdrop.style, {
+    position: 'fixed',
+    inset: '0',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    backdropFilter: 'blur(3px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: '10000',
+    padding: '24px',
+  });
+
+  const panel = document.createElement('div');
+  Object.assign(panel.style, {
+    width: 'min(980px, 94vw)',
+    height: 'min(720px, 88vh)',
+    backgroundColor: '#FFFFFF',
+    borderRadius: '12px',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    border: '1px solid #E2E8F0',
+    fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+  });
+
+  const header = document.createElement('div');
+  Object.assign(header.style, {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px 18px',
+    backgroundColor: '#F8FAFC',
+    borderBottom: '1px solid #E2E8F0',
+    gap: '12px',
+  });
+
+  const titleWrap = document.createElement('div');
+  Object.assign(titleWrap.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    flexWrap: 'wrap',
+  });
+
+  const titleText = document.createElement('span');
+  titleText.textContent = `Move Equipment: ${asset.equipmentId}`;
+  Object.assign(titleText.style, {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontWeight: '800',
+    fontSize: '1rem',
+    color: '#0F172A',
+  });
+
+  const currentW3wBadge = document.createElement('span');
+  currentW3wBadge.textContent = `Current: ${currentFormatted}`;
+  Object.assign(currentW3wBadge.style, {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: '0.78rem',
+    fontWeight: '700',
+    color: '#1E293B',
+    backgroundColor: '#E2E8F0',
+    padding: '3px 8px',
+    borderRadius: '6px',
+  });
+
+  const coordsBadge = document.createElement('span');
+  Object.assign(coordsBadge.style, {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    color: '#64748B',
+  });
+
+  const initialCoords: W3WCoordinates | null =
+    typeof asset.latitude === 'number' &&
+    typeof asset.longitude === 'number' &&
+    !Number.isNaN(asset.latitude) &&
+    !Number.isNaN(asset.longitude)
+      ? { lat: asset.latitude, lng: asset.longitude }
+      : getCachedWhat3WordsCoordinates(clean);
+
+  coordsBadge.textContent = initialCoords
+    ? `(${initialCoords.lat.toFixed(5)}, ${initialCoords.lng.toFixed(5)})`
+    : 'Resolving current coordinates...';
+
+  titleWrap.appendChild(titleText);
+  titleWrap.appendChild(currentW3wBadge);
+  titleWrap.appendChild(coordsBadge);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.innerHTML = '&#10005;';
+  closeBtn.title = 'Close Map (Esc)';
+  Object.assign(closeBtn.style, {
+    width: '32px',
+    height: '32px',
+    borderRadius: '6px',
+    border: '1px solid #CBD5E1',
+    backgroundColor: '#FFFFFF',
+    color: '#334155',
+    fontSize: '14px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: '0',
+  });
+
+  // Instruction & Confirmation Bar
+  const actionBanner = document.createElement('div');
+  Object.assign(actionBanner.style, {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    padding: '10px 18px',
+    backgroundColor: '#EFF6FF',
+    borderBottom: '1px solid #BFDBFE',
+    fontSize: '0.84rem',
+    color: '#1E3A8A',
+    minHeight: '48px',
+    boxSizing: 'border-box',
+  });
+
+  const bannerMessage = document.createElement('div');
+  Object.assign(bannerMessage.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap',
+    fontWeight: '600',
+  });
+
+  const bannerActions = document.createElement('div');
+  Object.assign(bannerActions.style, {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexShrink: '0',
+  });
+
+  actionBanner.appendChild(bannerMessage);
+  actionBanner.appendChild(bannerActions);
+
+  const bodyWrap = document.createElement('div');
+  Object.assign(bodyWrap.style, {
+    flex: '1',
+    position: 'relative',
+    backgroundColor: '#0F172A',
+  });
+
+  let activeIframe: HTMLIFrameElement | null = null;
+  let pendingSelection: W3WReverseResult | null = null;
+  let isCommitting = false;
+  let lookupSeq = 0;
+
+  const setBannerInstructionMode = () => {
+    pendingSelection = null;
+    Object.assign(actionBanner.style, {
+      backgroundColor: '#EFF6FF',
+      borderBottom: '1px solid #BFDBFE',
+      color: '#1E3A8A',
+    });
+    bannerMessage.innerHTML = '';
+    const textSpan = document.createElement('span');
+    textSpan.textContent = `Double-click anywhere on the map to select a new location for ${asset.equipmentId}.`;
+    bannerMessage.appendChild(textSpan);
+    bannerActions.innerHTML = '';
+  };
+
+  const setBannerResolvingMode = (lat: number, lng: number) => {
+    pendingSelection = null;
+    Object.assign(actionBanner.style, {
+      backgroundColor: '#FEFCE8',
+      borderBottom: '1px solid #FDE047',
+      color: '#854D0E',
+    });
+    bannerMessage.innerHTML = '';
+    const textSpan = document.createElement('span');
+    textSpan.textContent = `Resolving what3words address for (${lat.toFixed(5)}, ${lng.toFixed(5)})...`;
+    bannerMessage.appendChild(textSpan);
+    bannerActions.innerHTML = '';
+  };
+
+  const setBannerErrorMode = (errMsg: string) => {
+    Object.assign(actionBanner.style, {
+      backgroundColor: '#FEF2F2',
+      borderBottom: '1px solid #FECACA',
+      color: '#991B1B',
+    });
+    bannerMessage.innerHTML = '';
+    const textSpan = document.createElement('span');
+    textSpan.textContent = errMsg;
+    bannerMessage.appendChild(textSpan);
+    bannerActions.innerHTML = '';
+
+    const retryCancelBtn = document.createElement('button');
+    retryCancelBtn.type = 'button';
+    retryCancelBtn.textContent = 'Reset';
+    Object.assign(retryCancelBtn.style, {
+      padding: '5px 12px',
+      fontSize: '0.78rem',
+      fontWeight: '700',
+      borderRadius: '6px',
+      border: '1px solid #FCA5A5',
+      backgroundColor: '#FFFFFF',
+      color: '#991B1B',
+      cursor: 'pointer',
+    });
+    retryCancelBtn.onclick = () => {
+      activeIframe?.contentWindow?.postMessage({ type: 'TTD_MOVE_MAP_CLEAR' }, '*');
+      setBannerInstructionMode();
+    };
+    bannerActions.appendChild(retryCancelBtn);
+  };
+
+  const setBannerConfirmMode = (resolved: W3WReverseResult) => {
+    pendingSelection = resolved;
+    Object.assign(actionBanner.style, {
+      backgroundColor: '#F0FDF4',
+      borderBottom: '1px solid #86EFAC',
+      color: '#14532D',
+    });
+
+    bannerMessage.innerHTML = '';
+    const promptText = document.createElement('span');
+    promptText.textContent = `Confirm moving ${asset.equipmentId} from ${currentFormatted} to `;
+
+    const newW3wSpan = document.createElement('span');
+    newW3wSpan.textContent = resolved.formattedWords;
+    Object.assign(newW3wSpan.style, {
+      fontFamily: "'JetBrains Mono', monospace",
+      fontWeight: '800',
+      color: '#1D4ED8',
+      backgroundColor: '#DBEAFE',
+      padding: '2px 6px',
+      borderRadius: '4px',
+    });
+
+    const coordsText = document.createElement('span');
+    coordsText.textContent = ` (${resolved.lat.toFixed(5)}, ${resolved.lng.toFixed(5)})?`;
+    Object.assign(coordsText.style, {
+      fontFamily: "'JetBrains Mono', monospace",
+      fontSize: '0.76rem',
+      color: '#166534',
+    });
+
+    bannerMessage.appendChild(promptText);
+    bannerMessage.appendChild(newW3wSpan);
+    bannerMessage.appendChild(coordsText);
+
+    bannerActions.innerHTML = '';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = 'Cancel';
+    Object.assign(cancelBtn.style, {
+      padding: '6px 12px',
+      fontSize: '0.78rem',
+      fontWeight: '700',
+      borderRadius: '6px',
+      border: '1px solid #CBD5E1',
+      backgroundColor: '#FFFFFF',
+      color: '#334155',
+      cursor: 'pointer',
+    });
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.type = 'button';
+    confirmBtn.textContent = 'Confirm Move';
+    Object.assign(confirmBtn.style, {
+      padding: '6px 14px',
+      fontSize: '0.78rem',
+      fontWeight: '700',
+      borderRadius: '6px',
+      border: '1px solid #16A34A',
+      backgroundColor: '#16A34A',
+      color: '#FFFFFF',
+      cursor: 'pointer',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.15)',
+    });
+
+    cancelBtn.onclick = () => {
+      if (isCommitting) return;
+      activeIframe?.contentWindow?.postMessage({ type: 'TTD_MOVE_MAP_CLEAR' }, '*');
+      setBannerInstructionMode();
+    };
+
+    confirmBtn.onclick = async () => {
+      if (isCommitting || !pendingSelection) return;
+      isCommitting = true;
+      confirmBtn.disabled = true;
+      cancelBtn.disabled = true;
+      confirmBtn.textContent = 'Saving...';
+      confirmBtn.style.opacity = '0.75';
+
+      const updatedAsset: Equipment = {
+        ...asset,
+        what3words: pendingSelection.formattedWords,
+        latitude: pendingSelection.lat,
+        longitude: pendingSelection.lng,
+        updatedAt: new Date().toISOString(),
+      };
+
+      try {
+        await onConfirmMove(updatedAsset);
+        cleanup();
+      } catch (err: unknown) {
+        isCommitting = false;
+        const msg = err instanceof Error ? err.message : String(err);
+        setBannerErrorMode(`Failed to save new location: ${msg}`);
+      }
+    };
+
+    bannerActions.appendChild(cancelBtn);
+    bannerActions.appendChild(confirmBtn);
+  };
+
+  setBannerInstructionMode();
+
+  const onMessage = (ev: MessageEvent) => {
+    const data = ev?.data;
+    if (!data || typeof data !== 'object') return;
+    if (
+      data.type === 'TTD_MOVE_MAP_SELECT' &&
+      typeof data.lat === 'number' &&
+      typeof data.lng === 'number'
+    ) {
+      if (isCommitting) return;
+      const seq = ++lookupSeq;
+      setBannerResolvingMode(data.lat, data.lng);
+      convertCoordinatesToWhat3Words(data.lat, data.lng).then((resolved) => {
+        if (!document.body.contains(backdrop) || seq !== lookupSeq) return;
+        if (!resolved) {
+          setBannerErrorMode('Could not resolve a what3words address for that spot. Please double-click again.');
+          return;
+        }
+        activeIframe?.contentWindow?.postMessage(
+          {
+            type: 'TTD_MOVE_MAP_RESOLVED',
+            formattedWords: resolved.formattedWords,
+            lat: resolved.lat,
+            lng: resolved.lng,
+          },
+          '*'
+        );
+        setBannerConfirmMode(resolved);
+      });
+    }
+  };
+
+  const cleanup = () => {
+    document.removeEventListener('keydown', onKeyDown);
+    window.removeEventListener('message', onMessage);
+    backdrop.remove();
+  };
+
+  const onKeyDown = (ev: KeyboardEvent) => {
+    if (ev.key === 'Escape' && !isCommitting) cleanup();
+  };
+
+  document.addEventListener('keydown', onKeyDown);
+  window.addEventListener('message', onMessage);
+
+  closeBtn.onclick = () => {
+    if (!isCommitting) cleanup();
+  };
+  backdrop.onclick = (ev) => {
+    if (ev.target === backdrop && !isCommitting) cleanup();
+  };
+
+  header.appendChild(titleWrap);
+  header.appendChild(closeBtn);
+  panel.appendChild(header);
+  panel.appendChild(actionBanner);
+  panel.appendChild(bodyWrap);
+  backdrop.appendChild(panel);
+  document.body.appendChild(backdrop);
+
+  const renderIframe = (coords: W3WCoordinates | null) => {
+    bodyWrap.innerHTML = '';
+    const iframe = document.createElement('iframe');
+    iframe.srcdoc = getMoveEquipmentMapSrcDoc(asset, coords?.lat, coords?.lng);
+    iframe.title = `Move Equipment Map for ${asset.equipmentId}`;
+    Object.assign(iframe.style, {
+      width: '100%',
+      height: '100%',
+      border: '0',
+      display: 'block',
+    });
+    activeIframe = iframe;
+    bodyWrap.appendChild(iframe);
+  };
+
+  if (initialCoords) {
+    renderIframe(initialCoords);
+  } else {
+    const loadingEl = document.createElement('div');
+    loadingEl.textContent = `Loading satellite map for ${asset.equipmentId} (${currentFormatted})...`;
+    Object.assign(loadingEl.style, {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100%',
+      color: '#F8FAFC',
+      fontFamily: "'Inter', system-ui, sans-serif",
+      fontSize: '0.92rem',
+      fontWeight: '600',
+    });
+    bodyWrap.appendChild(loadingEl);
+
+    convertWhat3WordsToCoordinates(clean).then((resolved) => {
+      if (!document.body.contains(backdrop)) return;
+      if (resolved) {
+        coordsBadge.textContent = `(${resolved.lat.toFixed(5)}, ${resolved.lng.toFixed(5)})`;
+        renderIframe(resolved);
+      } else {
+        coordsBadge.textContent = '(Default coordinates)';
+        renderIframe(null);
+      }
+    });
+  }
 }
 
 export interface FleetMapTransactionItem {

@@ -235,6 +235,12 @@ export async function saveEquipmentToSupabase(equipment: Equipment, previousW3wH
 
   const { error } = await client.from('equipment_list').upsert(payload, { onConflict: 'equipment_id' });
   if (error) throw error;
+
+  try {
+    await db.equipments.put(resolvedEq);
+  } catch {
+    // Ignore local db put error
+  }
 }
 
 /**

@@ -387,6 +387,28 @@ export const AdminApp: React.FC = () => {
     }
   };
 
+  // Move Asset Location Handler
+  const handleMoveAsset = async (movedAsset: Equipment) => {
+    try {
+      await postRemoteEquipment(movedAsset);
+      setAssets((prevAssets) =>
+        reconcileEquipmentPowerStates(
+          prevAssets.map((a) => (a.equipmentId === movedAsset.equipmentId ? movedAsset : a)),
+          transactionsRef.current
+        )
+      );
+      await loadFleetData(true, { equipment: true, transactions: false, devices: false });
+      showToast(
+        `Moved "${movedAsset.equipmentId}" to ${movedAsset.what3words}`,
+        'success'
+      );
+    } catch (err: unknown) {
+      const msg = formatErrorMessage(err);
+      showToast(`Failed to move asset: ${msg}`, 'error');
+      throw err;
+    }
+  };
+
   // Delete Asset Handler
   const handleDeleteAsset = async (equipmentId: string) => {
     try {
@@ -692,6 +714,7 @@ export const AdminApp: React.FC = () => {
                 onOpenEditModal={(asset) => setEditingAsset(asset)}
                 onOpenQRModal={(asset) => setQrAsset(asset)}
                 onOpenDangerZone={() => setIsDangerZoneOpen(true)}
+                onMoveAsset={handleMoveAsset}
                 onSelectAsset={(id) => {
                   setSelectedAssetId(id);
                   setCurrentView('TRANSACTIONS');
