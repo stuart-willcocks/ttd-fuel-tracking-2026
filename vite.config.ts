@@ -94,6 +94,7 @@ export default defineConfig({
           {
             urlPattern: ({ request, url }: { request: Request; url: URL }) =>
               request.mode === 'navigate' &&
+              !url.searchParams.has('v') &&
               !url.pathname.startsWith('/admin') &&
               !url.pathname.startsWith('/stress-test') &&
               !url.pathname.startsWith('/api'),

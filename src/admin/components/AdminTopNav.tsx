@@ -7,7 +7,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { APP_VERSION, getIsStaging } from '../../version';
-import { checkRemoteAppVersion, performAppUpdate } from '../../services/appUpdate';
+import { checkRemoteAppVersion, performAppUpdate, verifyPostUpdateBuild } from '../../services/appUpdate';
 
 export type AdminViewType = 'ASSETS' | 'MAP' | 'TRANSACTIONS' | 'SETTINGS' | 'DEVICES';
 
@@ -39,6 +39,16 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
         const cleanSearch = url.searchParams.toString();
         window.history.replaceState({}, '', url.pathname + (cleanSearch ? `?${cleanSearch}` : '') + url.hash);
       } catch {}
+    }
+
+    // Verify post-update build handshake on boot
+    const verification = verifyPostUpdateBuild();
+    if (verification.status === 'verified') {
+      try {
+        sessionStorage.removeItem('ttd_admin_auto_update_target');
+      } catch {}
+    } else if (verification.status === 'retrying') {
+      return;
     }
 
     const checkVersion = async () => {

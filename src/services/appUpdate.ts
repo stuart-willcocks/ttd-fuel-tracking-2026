@@ -56,16 +56,6 @@ export async function checkRemoteAppVersion(): Promise<VersionCheckResult> {
     (window.location.pathname.startsWith('/admin') ||
       window.location.pathname.startsWith('/stress-test'));
 
-  // When a newer build is detected on a field PDA, also prompt the Service Worker registration to check for /sw.js updates
-  if (result.hasUpdate && !isDesktopPortal && 'serviceWorker' in navigator) {
-    try {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg) {
-        reg.update().catch(() => {});
-      }
-    } catch {}
-  }
-
   // Fallback: only if /version.json could not be fetched on a field PDA, check if a service worker is waiting
   if (result.remoteBuild === null && !isDesktopPortal && 'serviceWorker' in navigator) {
     try {
@@ -84,13 +74,80 @@ export async function checkRemoteAppVersion(): Promise<VersionCheckResult> {
 }
 
 /**
+ * Verifies after an update reload that the running bundle actually reached the target version.
+ * Returns:
+ * - 'verified': The app just updated and is confirmed running the target build (or newer).
+ * - 'retrying': The browser served a stale bundle (< targetVersion); a retry update has been scheduled.
+ * - 'none': No pending post-update verification state was present.
+ */
+export function verifyPostUpdateBuild(): {
+  status: 'verified' | 'retrying' | 'none';
+  targetVersion: string | null;
+} {
+  if (typeof window === 'undefined') {
+    return { status: 'none', targetVersion: null };
+  }
+
+  try {
+    const justUpdatedVersion = sessionStorage.getItem('ttd_just_updated_to');
+    if (!justUpdatedVersion) {
+      return { status: 'none', targetVersion: null };
+    }
+
+    const targetBuildNum = Number(justUpdatedVersion);
+    const isUpToDate =
+      (!Number.isNaN(targetBuildNum) && targetBuildNum > 0 && BUILD_NUMBER >= targetBuildNum) ||
+      APP_VERSION === justUpdatedVersion;
+
+    if (isUpToDate) {
+      sessionStorage.removeItem('ttd_just_updated_to');
+      sessionStorage.removeItem('ttd_update_verify_retry');
+      return { status: 'verified', targetVersion: justUpdatedVersion };
+    }
+
+    // Running bundle is still older than targetVersion (e.g. stale browser/edge cache on first reload).
+    // Allow up to 2 automatic cache-busted retry reloads for this target version.
+    let retryCount = 0;
+    try {
+      const rawRetry = sessionStorage.getItem('ttd_update_verify_retry');
+      if (rawRetry) {
+        const parsed = JSON.parse(rawRetry) as { version?: string; count?: number };
+        if (parsed.version === justUpdatedVersion && typeof parsed.count === 'number') {
+          retryCount = parsed.count;
+        }
+      }
+    } catch {}
+
+    if (retryCount < 2) {
+      sessionStorage.setItem(
+        'ttd_update_verify_retry',
+        JSON.stringify({ version: justUpdatedVersion, count: retryCount + 1 })
+      );
+      console.warn(
+        `[AppUpdate] Post-reload build mismatch (running V${APP_VERSION}, expected V${justUpdatedVersion}). Scheduling retry #${retryCount + 1}...`
+      );
+      setTimeout(() => {
+        performAppUpdate(justUpdatedVersion);
+      }, 1200);
+      return { status: 'retrying', targetVersion: justUpdatedVersion };
+    }
+
+    // Retries exhausted; clear flags so the user is not stuck in a reload loop
+    sessionStorage.removeItem('ttd_just_updated_to');
+    sessionStorage.removeItem('ttd_update_verify_retry');
+    return { status: 'none', targetVersion: justUpdatedVersion };
+  } catch {
+    return { status: 'none', targetVersion: null };
+  }
+}
+
+/**
  * Executes a complete, guaranteed app update:
  * 1. Stores target version in sessionStorage.
  * 2. Unregisters active service workers BEFORE purging CacheStorage so Workbox's
- *    NavigationRoute (createHandlerBoundToURL('index.html')) never hits an emptied precache
- *    (which otherwise causes Chrome Android to fail with ERR_FAILED / "This site can't be reached").
+ *    navigation handler never serves an emptied or stale precache.
  * 3. Purges all browser CacheStorage caches to remove stale chunks.
- * 4. Revalidates index.html over the network and reloads cleanly.
+ * 4. Pre-warms both the clean path and the cache-busted URL over the network and navigates cleanly.
  */
 export async function performAppUpdate(targetVersion?: string): Promise<void> {
   if (isCurrentlyUpdating) return;
@@ -99,7 +156,7 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
   console.log(`[AppUpdate] Applying update${targetVersion ? ` to version ${targetVersion}` : ''}...`);
 
   try {
-    // 1. Mark update completed in sessionStorage first before any navigation/reload event
+    // 1. Mark update target in sessionStorage first before any navigation/reload event
     try {
       sessionStorage.removeItem('ttd_initial_view');
       if (targetVersion) {
@@ -138,8 +195,8 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
       }
     }
 
-    // 3. Clear all browser CacheStorage caches after unregistering SW so any stale precached index.html is purged
-    if (typeof window !== 'undefined' && 'caches' in window && !isAdminPage) {
+    // 3. Clear all browser CacheStorage caches on both PDA and Admin pages
+    if (typeof window !== 'undefined' && 'caches' in window) {
       try {
         const cacheKeys = await caches.keys();
         await Promise.all(cacheKeys.map((key) => caches.delete(key)));
@@ -148,9 +205,13 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
       }
     }
 
-    // 4. Prime the HTTP cache with fresh HTML from the network, then navigate with cache-busting query param while preserving pda_window=1
+    // 4. Prime the HTTP cache with fresh HTML from the network (including the exact bustUrl),
+    // then navigate with the cache-busting query param while preserving pda_window=1
+    const bustUrl = new URL(window.location.href);
+    bustUrl.searchParams.set('v', String(Date.now()));
+
     const cleanUrl = window.location.origin + window.location.pathname;
-    const urlsToRevalidate = [cleanUrl, `${window.location.origin}/index.html`];
+    const urlsToRevalidate = [cleanUrl, `${window.location.origin}/index.html`, bustUrl.toString()];
     if (window.location.pathname.startsWith('/admin')) {
       urlsToRevalidate.push(`${window.location.origin}/admin`, `${window.location.origin}/admin.html`);
     }
@@ -170,8 +231,6 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
       // Ignore network pre-fetch error and proceed to reload
     }
 
-    const bustUrl = new URL(window.location.href);
-    bustUrl.searchParams.set('v', String(Date.now()));
     window.location.replace(bustUrl.toString());
   } catch (err) {
     console.error('[AppUpdate] Update execution failed, falling back to reload:', err);
@@ -180,20 +239,10 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
 }
 
 /**
- * Registers a listener on navigator.serviceWorker 'controllerchange'
- * so that when a new service worker claims an already-controlled page, it reloads to pick up new bundles.
+ * Retained for backwards compatibility.
+ * Reloads are now exclusively coordinated via performAppUpdate() to prevent
+ * un-busted controllerchange reloads from racing with cache-busted navigation.
  */
 export function setupServiceWorkerAutoReload(): void {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
-
-  const hadControllerOnBoot = Boolean(navigator.serviceWorker.controller);
-  let isReloading = false;
-
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (isCurrentlyUpdating || isReloading || !hadControllerOnBoot) return;
-    if (!navigator.serviceWorker.controller) return;
-    isReloading = true;
-    console.log('[AppUpdate] Service worker controller changed. Reloading page...');
-    window.location.reload();
-  });
+  // No-op by design: performAppUpdate() is the single authority for update reloads.
 }

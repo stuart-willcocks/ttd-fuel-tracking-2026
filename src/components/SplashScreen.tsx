@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { getDeviceId } from '../services/device';
 import { APP_VERSION, BUILD_NUMBER, getIsStaging } from '../version';
-import { checkRemoteAppVersion, performAppUpdate } from '../services/appUpdate';
+import { checkRemoteAppVersion, performAppUpdate, verifyPostUpdateBuild } from '../services/appUpdate';
 import { reportDeviceAppVersionImmediately } from '../services/telemetry';
 
 interface SplashScreenProps {
@@ -30,18 +30,19 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onContinue }) => {
           window.history.replaceState({}, '', url.pathname + (cleanSearch ? `?${cleanSearch}` : '') + url.hash);
         } catch {}
       }
-      try {
-        const justUpdatedVersion = sessionStorage.getItem('ttd_just_updated_to');
-        if (justUpdatedVersion) {
-          sessionStorage.removeItem('ttd_just_updated_to');
-          setVersionText(`Updated to version ${justUpdatedVersion}${stagingSuffix}`);
-          setIsContinueEnabled(true);
-          isCheckingRef.current = false;
-          reportDeviceAppVersionImmediately(APP_VERSION).catch(() => {});
-          return;
-        }
-      } catch {
-        // Ignore sessionStorage error
+      const verification = verifyPostUpdateBuild();
+      if (verification.status === 'verified') {
+        setVersionText(`Updated to version ${APP_VERSION}${stagingSuffix}`);
+        setIsContinueEnabled(true);
+        isCheckingRef.current = false;
+        reportDeviceAppVersionImmediately(APP_VERSION).catch(() => {});
+        return;
+      }
+      if (verification.status === 'retrying') {
+        setVersionText(`Applying update to version ${verification.targetVersion || APP_VERSION}...`);
+        setIsContinueEnabled(false);
+        isCheckingRef.current = false;
+        return;
       }
     }
 

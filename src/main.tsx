@@ -1,7 +1,5 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { registerSW } from 'virtual:pwa-register';
-import { setupServiceWorkerAutoReload } from './services/appUpdate';
 import { isMobileDevice } from './utils/deviceDetector';
 import './index.css';
 import App from './App.tsx';
@@ -24,21 +22,19 @@ if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admi
 }
 
 // Only register offline PWA Service Worker on dedicated mobile/Zebra handheld devices.
+// We register /sw.js directly without virtual:pwa-register's automatic controllerchange reload
+// so that performAppUpdate() is the single authority for cache-busted update reloads.
 // On desktop workstations, actively unregister any Service Worker so /admin and /stress-test are never intercepted.
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   if (isMobileDevice()) {
-    setupServiceWorkerAutoReload();
-    const updateSW = registerSW({
-      immediate: true,
-      onNeedRefresh() {
-        console.log('New app version available, activating...');
-        updateSW(true);
-      },
-      onOfflineReady() {
-        console.log('App ready to work offline');
-      },
+    window.addEventListener('load', () => {
+      navigator.serviceWorker
+        .register('/sw.js', { scope: '/' })
+        .catch((err) => {
+          console.warn('[PWA] Service worker registration skipped:', err);
+        });
     });
-  } else if ('serviceWorker' in navigator) {
+  } else {
     navigator.serviceWorker
       .getRegistrations()
       .then((regs) => Promise.all(regs.map((r) => r.unregister().catch(() => {}))))
