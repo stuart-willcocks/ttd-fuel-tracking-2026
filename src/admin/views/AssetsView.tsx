@@ -99,6 +99,17 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   } | null>(null);
   const [isSavingMove, setIsSavingMove] = useState(false);
   const moveLookupSeqRef = useRef(0);
+  const movingAssetIdRef = useRef<string | null>(null);
+  const moveCandidateRef = useRef<{
+    lat: number;
+    lng: number;
+    words?: string;
+    formattedWords?: string;
+    resolving: boolean;
+    error?: string;
+  } | null>(null);
+  const isSavingMoveRef = useRef(false);
+  const pendingAutoConfirmRef = useRef(false);
 
   // Fleet Map Search State (location names, GPS coordinates, what3words locations)
   const [mapSearchInput, setMapSearchInput] = useState('');
@@ -289,27 +300,34 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
   const handleCancelInMapMove = () => {
     moveLookupSeqRef.current += 1;
+    pendingAutoConfirmRef.current = false;
+    movingAssetIdRef.current = null;
+    moveCandidateRef.current = null;
+    isSavingMoveRef.current = false;
     setMovingAssetId(null);
     setMoveCandidate(null);
     setIsSavingMove(false);
     mapIframeRef.current?.contentWindow?.postMessage({ type: 'TTD_MAP_MOVE_END' }, '*');
   };
 
-  const handleConfirmInMapMove = async () => {
-    if (!movingAssetId || !moveCandidate || !moveCandidate.words || isSavingMove) return;
-    const targetAsset = assets.find((a) => a.equipmentId === movingAssetId);
+  const commitInMapMove = async (
+    eqId: string,
+    candidate: { lat: number; lng: number; words: string }
+  ) => {
+    const targetAsset = assets.find((a) => a.equipmentId === eqId);
     if (!targetAsset) {
       handleCancelInMapMove();
       return;
     }
 
+    isSavingMoveRef.current = true;
     setIsSavingMove(true);
     try {
       const updatedAsset: Equipment = {
         ...targetAsset,
-        what3words: moveCandidate.words,
-        latitude: moveCandidate.lat,
-        longitude: moveCandidate.lng,
+        what3words: candidate.words,
+        latitude: candidate.lat,
+        longitude: candidate.lng,
         updatedAt: new Date().toISOString(),
       };
       if (onMoveAsset) {
@@ -320,16 +338,46 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       setCoordResolveTick((prev) => prev + 1);
       handleCancelInMapMove();
     } catch {
+      isSavingMoveRef.current = false;
       setIsSavingMove(false);
-      setMoveCandidate((prev) =>
-        prev
+      setMoveCandidate((prev) => {
+        const next = prev
           ? {
               ...prev,
               error: 'Failed to save new location to database. Please try again.',
             }
-          : prev
+          : prev;
+        moveCandidateRef.current = next;
+        return next;
+      });
+      mapIframeRef.current?.contentWindow?.postMessage(
+        {
+          type: 'TTD_MAP_MOVE_SAVE_ERROR',
+          error: 'Failed to save location. Try again.',
+        },
+        '*'
       );
     }
+  };
+
+  const handleConfirmInMapMove = async () => {
+    const currentEqId = movingAssetIdRef.current || movingAssetId;
+    const currentCand = moveCandidateRef.current || moveCandidate;
+    if (!currentEqId || !currentCand || isSavingMoveRef.current) return;
+
+    if (currentCand.resolving && !currentCand.words) {
+      pendingAutoConfirmRef.current = true;
+      isSavingMoveRef.current = true;
+      setIsSavingMove(true);
+      return;
+    }
+
+    if (!currentCand.words) return;
+    await commitInMapMove(currentEqId, {
+      lat: currentCand.lat,
+      lng: currentCand.lng,
+      words: currentCand.words,
+    });
   };
 
   // Close map search dropdown when clicking outside
@@ -543,6 +591,10 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         }
       } else if (e.data.type === 'TTD_MAP_START_MOVE' && typeof e.data.equipmentId === 'string') {
         moveLookupSeqRef.current += 1;
+        pendingAutoConfirmRef.current = false;
+        movingAssetIdRef.current = e.data.equipmentId;
+        moveCandidateRef.current = null;
+        isSavingMoveRef.current = false;
         setMovingAssetId(e.data.equipmentId);
         setMoveCandidate(null);
         setIsSavingMove(false);
@@ -552,33 +604,54 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         typeof e.data.lat === 'number' &&
         typeof e.data.lng === 'number'
       ) {
+        const pickedEqId = e.data.equipmentId;
         const pickedLat = e.data.lat;
         const pickedLng = e.data.lng;
         const seq = ++moveLookupSeqRef.current;
-        setMovingAssetId(e.data.equipmentId);
-        setMoveCandidate({
+        pendingAutoConfirmRef.current = false;
+        isSavingMoveRef.current = false;
+        setIsSavingMove(false);
+        movingAssetIdRef.current = pickedEqId;
+        setMovingAssetId(pickedEqId);
+        const initialCand = {
           lat: pickedLat,
           lng: pickedLng,
           resolving: true,
-        });
+        };
+        moveCandidateRef.current = initialCand;
+        setMoveCandidate(initialCand);
         convertCoordinatesToWhat3Words(pickedLat, pickedLng).then((resolved) => {
           if (seq !== moveLookupSeqRef.current) return;
           if (!resolved) {
-            setMoveCandidate({
+            pendingAutoConfirmRef.current = false;
+            isSavingMoveRef.current = false;
+            setIsSavingMove(false);
+            const errCand = {
               lat: pickedLat,
               lng: pickedLng,
               resolving: false,
               error: 'Unable to resolve a what3words address for that point. Please double-click again.',
-            });
+            };
+            moveCandidateRef.current = errCand;
+            setMoveCandidate(errCand);
+            mapIframeRef.current?.contentWindow?.postMessage(
+              {
+                type: 'TTD_MAP_MOVE_SAVE_ERROR',
+                error: 'Unable to resolve what3words. Double-click again.',
+              },
+              '*'
+            );
             return;
           }
-          setMoveCandidate({
+          const resolvedCand = {
             lat: resolved.lat,
             lng: resolved.lng,
             words: resolved.words,
             formattedWords: resolved.formattedWords,
             resolving: false,
-          });
+          };
+          moveCandidateRef.current = resolvedCand;
+          setMoveCandidate(resolvedCand);
           mapIframeRef.current?.contentWindow?.postMessage(
             {
               type: 'TTD_MAP_MOVE_RESOLVED',
@@ -588,7 +661,19 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             },
             '*'
           );
+          if (pendingAutoConfirmRef.current) {
+            pendingAutoConfirmRef.current = false;
+            commitInMapMove(pickedEqId, {
+              lat: resolved.lat,
+              lng: resolved.lng,
+              words: resolved.words,
+            });
+          }
         });
+      } else if (e.data.type === 'TTD_MAP_MOVE_CONFIRM') {
+        handleConfirmInMapMove();
+      } else if (e.data.type === 'TTD_MAP_MOVE_CANCEL') {
+        handleCancelInMapMove();
       } else if (e.data.type === 'TTD_MAP_EDIT_ASSET' && typeof e.data.equipmentId === 'string') {
         const found = assets.find((a) => a.equipmentId === e.data.equipmentId);
         if (found) onOpenEditModal(found);
@@ -1520,7 +1605,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                       cursor: isSavingMove ? 'wait' : 'pointer',
                     }}
                   >
-                    {isSavingMove ? 'Saving...' : 'Confirm Move'}
+                    {isSavingMove ? 'Saving...' : 'Confirm new location'}
                   </button>
                 )}
                 <button
