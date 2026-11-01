@@ -273,6 +273,8 @@ export async function deleteEquipmentFromSupabase(equipmentId: string): Promise<
 
   const { error } = await client.from('equipment_list').delete().eq('equipment_id', equipmentId);
   if (error) throw error;
+
+  broadcastEquipmentDelete(equipmentId);
 }
 
 /**
@@ -546,6 +548,65 @@ export function broadcastEquipmentUpdate(rowPayload: Record<string, unknown>): v
 }
 
 /**
+ * Broadcasts an instant single-equipment deletion over both local BroadcastChannel
+ * and the shared Supabase Realtime WebSocket channel.
+ */
+export function broadcastEquipmentDelete(equipmentId: string): void {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    try {
+      const bc = new BroadcastChannel(FLEET_SYNC_BROADCAST_CHANNEL);
+      bc.postMessage({ type: 'EQUIPMENT_DELETE', equipmentId });
+      bc.close();
+    } catch {
+      // Ignore BroadcastChannel errors
+    }
+  }
+
+  if (activeRealtimeChannel) {
+    try {
+      activeRealtimeChannel
+        .send({
+          type: 'broadcast',
+          event: 'ttd_equipment_delete',
+          payload: { equipment_id: equipmentId },
+        })
+        .catch(() => {});
+    } catch {
+      // Ignore Realtime send errors
+    }
+  }
+}
+
+/**
+ * Broadcasts a fleet resync notification after bulk equipment or transaction imports.
+ */
+export function broadcastFleetResync(): void {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    try {
+      const bc = new BroadcastChannel(FLEET_SYNC_BROADCAST_CHANNEL);
+      bc.postMessage({ type: 'FLEET_RESYNC' });
+      bc.close();
+    } catch {
+      // Ignore BroadcastChannel errors
+    }
+  }
+
+  if (activeRealtimeChannel) {
+    try {
+      activeRealtimeChannel
+        .send({
+          type: 'broadcast',
+          event: 'ttd_fleet_resync',
+          payload: { timestamp: Date.now() },
+        })
+        .catch(() => {});
+    } catch {
+      // Ignore Realtime send errors
+    }
+  }
+}
+
+/**
  * Broadcasts an instant bulk-delete notification over both local BroadcastChannel
  * and the shared Supabase Realtime WebSocket channel so PDAs update in <30ms
  * without waiting for hundreds of individual PostgreSQL WAL DELETE events.
@@ -726,6 +787,7 @@ export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]):
     if (error) throw error;
   }
 
+  broadcastFleetResync();
   return dedupedList.length;
 }
 
@@ -762,6 +824,7 @@ export async function bulkImportTransactionsToSupabase(transactions: Transaction
     if (error) throw error;
   }
 
+  broadcastFleetResync();
   return transactions.length;
 }
 
@@ -1601,6 +1664,10 @@ export function subscribeToCloudChanges(
           onDataChange('transactions', 'BULK_DELETE', { old: ev.data });
         } else if (ev.data && ev.data.type === 'EQUIPMENT_UPDATE' && ev.data.row) {
           onDataChange('equipment_list', 'UPDATE', { new: ev.data.row });
+        } else if (ev.data && ev.data.type === 'EQUIPMENT_DELETE' && typeof ev.data.equipmentId === 'string') {
+          onDataChange('equipment_list', 'DELETE', { old: { equipment_id: ev.data.equipmentId } });
+        } else if (ev.data && ev.data.type === 'FLEET_RESYNC') {
+          onReconnect?.();
         } else if (ev.data && ev.data.type === 'TRANSACTION_UPSERT' && ev.data.row) {
           recordRecentTxUpsert(ev.data.row);
           onDataChange('transactions', 'UPDATE', { new: ev.data.row });
@@ -1756,6 +1823,35 @@ export function subscribeToCloudChanges(
       (msg) => {
         const data = (msg?.payload || {}) as Record<string, unknown>;
         onDataChange('authorized_devices', 'AUTH_CHANGE', { old: data });
+      }
+    )
+    .on(
+      'broadcast',
+      { event: 'ttd_equipment_delete' },
+      (msg) => {
+        const data = (msg?.payload || {}) as Record<string, unknown>;
+        const delEqId = typeof data?.equipment_id === 'string' ? data.equipment_id : null;
+        if (!delEqId) return;
+        client
+          .from('equipment_list')
+          .select('equipment_id')
+          .eq('equipment_id', delEqId)
+          .maybeSingle()
+          .then(
+            ({ data: existingRow, error }) => {
+              if (!error && !existingRow) {
+                onDataChange('equipment_list', 'DELETE', { old: { equipment_id: delEqId } });
+              }
+            },
+            () => {}
+          );
+      }
+    )
+    .on(
+      'broadcast',
+      { event: 'ttd_fleet_resync' },
+      () => {
+        onReconnect?.();
       }
     )
     .on(
@@ -2480,6 +2576,151 @@ $$;
 GRANT EXECUTE ON FUNCTION public.update_pda_telemetry(
   text, text, text, smallint, boolean, double precision, double precision, real, timestamp with time zone
 ) TO anon, authenticated;
+
+NOTIFY pgrst, 'reload schema';
+`;
+
+export const PHASE3_STRICT_RLS_SQL = `-- TTD Fuel Tracking: Phase 3 Security Hardening (Enforce Strict RLS Policies)
+-- Prerequisite: All active PDAs are running Build 208+
+-- Paste and run in Supabase Dashboard -> SQL Editor
+
+-- 1. Ensure Phase 2 SECURITY DEFINER functions exist
+CREATE INDEX IF NOT EXISTS idx_authorized_devices_auth_token
+  ON public.authorized_devices(auth_token);
+
+CREATE OR REPLACE FUNCTION public.is_authorized_pda()
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_headers json;
+  v_token text;
+BEGIN
+  IF auth.role() = 'authenticated' THEN
+    RETURN true;
+  END IF;
+
+  BEGIN
+    v_headers := current_setting('request.headers', true)::json;
+    v_token := nullif(trim(coalesce(v_headers->>'x-device-token', '')), '');
+  EXCEPTION WHEN OTHERS THEN
+    v_token := NULL;
+  END;
+
+  IF v_token IS NULL THEN
+    RETURN false;
+  END IF;
+
+  RETURN EXISTS (
+    SELECT 1
+    FROM public.authorized_devices
+    WHERE auth_token = v_token
+      AND status = 'active'
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_authorized_pda() TO anon, authenticated;
+
+-- 2. Lock down public.authorized_devices (Authenticated Admins Only; PDAs use SECURITY DEFINER RPCs)
+ALTER TABLE public.authorized_devices ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow read authorized_devices for anon" ON public.authorized_devices;
+DROP POLICY IF EXISTS "Allow upsert authorized_devices for anon" ON public.authorized_devices;
+DROP POLICY IF EXISTS "Allow delete authorized_devices for anon" ON public.authorized_devices;
+DROP POLICY IF EXISTS "Allow delete authorized_devices for authenticated admins" ON public.authorized_devices;
+DROP POLICY IF EXISTS "Allow select authorized_devices for authenticated admins" ON public.authorized_devices;
+DROP POLICY IF EXISTS "Allow insert authorized_devices for authenticated admins" ON public.authorized_devices;
+DROP POLICY IF EXISTS "Allow update authorized_devices for authenticated admins" ON public.authorized_devices;
+
+CREATE POLICY "Allow select authorized_devices for authenticated admins"
+  ON public.authorized_devices FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "Allow insert authorized_devices for authenticated admins"
+  ON public.authorized_devices FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Allow update authorized_devices for authenticated admins"
+  ON public.authorized_devices FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY "Allow delete authorized_devices for authenticated admins"
+  ON public.authorized_devices FOR DELETE
+  TO authenticated
+  USING (true);
+
+-- 3. Lock down public.equipment_list (Enrolled Active PDAs & Authenticated Admins)
+ALTER TABLE public.equipment_list ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow read equipment for anon" ON public.equipment_list;
+DROP POLICY IF EXISTS "Allow upsert equipment for anon" ON public.equipment_list;
+DROP POLICY IF EXISTS "Allow insert equipment for all" ON public.equipment_list;
+DROP POLICY IF EXISTS "Allow update equipment for all" ON public.equipment_list;
+DROP POLICY IF EXISTS "Allow delete equipment for authenticated admins" ON public.equipment_list;
+DROP POLICY IF EXISTS "Allow select equipment for authorized pda or admin" ON public.equipment_list;
+DROP POLICY IF EXISTS "Allow insert equipment for authorized pda or admin" ON public.equipment_list;
+DROP POLICY IF EXISTS "Allow update equipment for authorized pda or admin" ON public.equipment_list;
+
+CREATE POLICY "Allow select equipment for authorized pda or admin"
+  ON public.equipment_list FOR SELECT
+  TO anon, authenticated
+  USING (public.is_authorized_pda());
+
+CREATE POLICY "Allow insert equipment for authorized pda or admin"
+  ON public.equipment_list FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (public.is_authorized_pda());
+
+CREATE POLICY "Allow update equipment for authorized pda or admin"
+  ON public.equipment_list FOR UPDATE
+  TO anon, authenticated
+  USING (public.is_authorized_pda())
+  WITH CHECK (public.is_authorized_pda());
+
+CREATE POLICY "Allow delete equipment for authenticated admins"
+  ON public.equipment_list FOR DELETE
+  TO authenticated
+  USING (true);
+
+-- 4. Lock down public.transactions (Enrolled Active PDAs & Authenticated Admins)
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow read transactions for anon" ON public.transactions;
+DROP POLICY IF EXISTS "Allow insert/upsert transactions for anon" ON public.transactions;
+DROP POLICY IF EXISTS "Allow update transactions for anon" ON public.transactions;
+DROP POLICY IF EXISTS "Allow delete transactions for anon" ON public.transactions;
+DROP POLICY IF EXISTS "Allow select transactions for authorized pda or admin" ON public.transactions;
+DROP POLICY IF EXISTS "Allow insert transactions for authorized pda or admin" ON public.transactions;
+DROP POLICY IF EXISTS "Allow update transactions for authorized pda or admin" ON public.transactions;
+DROP POLICY IF EXISTS "Allow delete transactions for authorized pda or admin" ON public.transactions;
+
+CREATE POLICY "Allow select transactions for authorized pda or admin"
+  ON public.transactions FOR SELECT
+  TO anon, authenticated
+  USING (public.is_authorized_pda());
+
+CREATE POLICY "Allow insert transactions for authorized pda or admin"
+  ON public.transactions FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (public.is_authorized_pda());
+
+CREATE POLICY "Allow update transactions for authorized pda or admin"
+  ON public.transactions FOR UPDATE
+  TO anon, authenticated
+  USING (public.is_authorized_pda())
+  WITH CHECK (public.is_authorized_pda());
+
+CREATE POLICY "Allow delete transactions for authorized pda or admin"
+  ON public.transactions FOR DELETE
+  TO anon, authenticated
+  USING (public.is_authorized_pda());
 
 NOTIFY pgrst, 'reload schema';
 `;

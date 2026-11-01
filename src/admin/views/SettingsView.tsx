@@ -19,6 +19,7 @@ import {
   getSupabaseClient,
   SUPABASE_SQL_SCHEMA,
   PHASE2_DEVICE_AUTH_RPC_SQL,
+  PHASE3_STRICT_RLS_SQL,
 } from '../../services/supabase';
 import { parseCSV, mapRowToEquipment, mapRowToTransactions } from '../../utils/csvParser';
 import { wipeAndImportFleet } from '../../services/api';
@@ -39,6 +40,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedPhase2Sql, setCopiedPhase2Sql] = useState(false);
+  const [copiedPhase3Sql, setCopiedPhase3Sql] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
   // CSV Import State
@@ -102,6 +104,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     navigator.clipboard.writeText(PHASE2_DEVICE_AUTH_RPC_SQL);
     setCopiedPhase2Sql(true);
     setTimeout(() => setCopiedPhase2Sql(false), 2500);
+  };
+
+  const handleCopyPhase3Sql = () => {
+    navigator.clipboard.writeText(PHASE3_STRICT_RLS_SQL);
+    setCopiedPhase3Sql(true);
+    setTimeout(() => setCopiedPhase3Sql(false), 2500);
   };
 
   const handleSyncNow = async () => {
@@ -446,6 +454,40 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Phase 3 Strict RLS Enforcement Migration */}
+      <div className="admin-card" style={{ marginTop: '10px' }}>
+        <div className="admin-card-header">
+          <div>
+            <h2 className="admin-card-title">
+              <span>Phase 3 Security Migration (Enforce Strict RLS Policies)</span>
+            </h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--adm-text-secondary)', marginTop: '2px' }}>
+              Drops permissive anon policies and enforces x-device-token header &amp; Admin JWT verification across all tables
+            </p>
+          </div>
+          <button onClick={handleCopyPhase3Sql} className="admin-btn admin-btn-outline admin-btn-sm">
+            {copiedPhase3Sql ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+            <span>{copiedPhase3Sql ? 'Copied Phase 3 SQL!' : 'Copy Phase 3 SQL'}</span>
+          </button>
+        </div>
+
+        <pre
+          style={{
+            padding: '16px',
+            background: '#04070d',
+            borderRadius: 'var(--adm-radius-md)',
+            border: '1px solid var(--adm-border-subtle)',
+            fontSize: '0.78rem',
+            fontFamily: 'var(--adm-font-mono)',
+            color: '#f59e0b',
+            overflowX: 'auto',
+            maxHeight: '220px',
+          }}
+        >
+          {PHASE3_STRICT_RLS_SQL}
+        </pre>
       </div>
 
       {/* Phase 2 Security Hardening RPC Migration */}
