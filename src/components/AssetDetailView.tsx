@@ -538,7 +538,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
               ) : (
                 <iframe
                   ref={mapIframeRef}
-                  srcDoc={getGoogleSatelliteMapSrcDoc(cleanW3w, resolvedCoords?.lat, resolvedCoords?.lng)}
+                  srcDoc={getGoogleSatelliteMapSrcDoc(cleanW3w, resolvedCoords?.lat, resolvedCoords?.lng, asset.type)}
                   title={`Google Map for ${cleanW3w}`}
                   className="w3w-map-iframe"
                   allow="geolocation"

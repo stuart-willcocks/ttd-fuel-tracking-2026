@@ -531,7 +531,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                           latitude: coords.lat,
                           longitude: coords.lng,
                         }).catch(() => {});
-                      }
+                      },
+                      currentAsset.type
                     )
                   }
                   target="_blank"

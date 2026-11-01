@@ -1383,7 +1383,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                                   latitude: coords.lat,
                                   longitude: coords.lng,
                                 }).catch(() => {});
-                              }
+                              },
+                              asset.type
                             )
                           }
                           target="_blank"

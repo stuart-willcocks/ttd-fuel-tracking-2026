@@ -267,7 +267,8 @@ export function getGoogleMapsExternalUrl(w3w?: string | null, lat?: number | nul
 export function getGoogleSatelliteMapSrcDoc(
   w3w?: string | null,
   lat?: number | null,
-  lng?: number | null
+  lng?: number | null,
+  equipmentType?: Equipment['type'] | null
 ): string {
   const clean = normalizeWhat3Words(w3w);
   const cached =
@@ -277,6 +278,7 @@ export function getGoogleSatelliteMapSrcDoc(
 
   const targetLat = cached ? cached.lat : 52.0733;
   const targetLng = cached ? cached.lng : -1.0147;
+  const eqTypeJson = JSON.stringify(equipmentType || 'GENERATOR').replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -379,6 +381,16 @@ export function getGoogleSatelliteMapSrcDoc(
       justify-content: center;
       color: #FFFFFF;
     }
+    .eq-map-icon-box {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
   </style>
 </head>
 <body>
@@ -415,22 +427,56 @@ export function getGoogleSatelliteMapSrcDoc(
         attribution: 'Map data &copy; Google Satellite'
       }).addTo(map);
 
-      var pinSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 34 44">' +
-        '<defs><filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">' +
-        '<feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.55"/>' +
-        '</filter></defs>' +
-        '<path filter="url(#shadow)" d="M17 2C9.27 2 3 8.27 3 16c0 10.5 14 25 14 25s14-14.5 14-25c0-7.73-6.27-14-14-14z" fill="#EA4335" stroke="#FFFFFF" stroke-width="2"/>' +
-        '<circle cx="17" cy="16" r="5.5" fill="#960A0A"/>' +
-        '</svg>';
+      var eqType = ${eqTypeJson};
 
-      var pinIcon = L.divIcon({
-        html: pinSvg,
+      function getIconDiscColor(type) {
+        return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : '#16A34A';
+      }
+
+      function getEquipmentSvg(type, color) {
+        if (type === 'GENERATOR') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<g transform="translate(-102)">' +
+            '<path d="m 106,6 c -1,0 -2,1 -2,2 v 9 c 0,1 1,2 2,2 h 16 c 1,0 2,-1 2,-2 V 8 c 0,-1 -1,-2 -2,-2 z M 118.69922,7.9003906 120.30078,9.099609 118.5,11.5 h 3 l -4.19922,5.599609 -1.60156,-1.199218 L 117.5,13.5 h -3 z M 106,8.5 h 7 v 2 h -7 z m 0,3 h 7 v 2 h -7 z m 0,3 h 7 v 2 h -7 z" fill="' + color + '" fill-rule="evenodd"/>' +
+            '<path d="m 107,4.5 h 3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 106,21 h 16" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="M 118,6 V 3 h 2" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
+            '</g></svg>';
+        }
+        if (type === 'TANK') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<g transform="translate(-136)">' +
+            '<rect x="139" y="5.5" width="15.5" height="8" rx="2.5" fill="' + color + '" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<circle cx="147" cy="18.5" r="2.5" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="m 143,3 h 3.5" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 151,16 h 7" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 143,16 h -3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '</g></svg>';
+        }
+        // PLANT (Forklift / Plant)
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+          '<g transform="translate(-170)">' +
+          '<circle cx="175.82" cy="20.11" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+          '<circle cx="184.72" cy="20.16" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+          '<path d="M 172.72,19.70 172.5,11.5 176,11 176.5,5.5 182,5 l 1,0.5 1.5,8.5 h 3.5" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="m 172.72,19.20 1.5,-2 h 3.5 l 1,2 h 3 l 2,-2" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="m 192,21.5 h -4 V 2" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '</g></svg>';
+      }
+
+      var discColor = getIconDiscColor(eqType);
+      var eqMarkerHtml = '<div class="eq-map-icon-box" style="background:' + discColor + '">' +
+        getEquipmentSvg(eqType, '#FFFFFF') +
+        '</div>';
+
+      var eqMarkerIcon = L.divIcon({
+        html: eqMarkerHtml,
         className: '',
-        iconSize: [34, 44],
-        iconAnchor: [17, 41]
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
       });
 
-      L.marker(target, { icon: pinIcon }).addTo(map);
+      L.marker(target, { icon: eqMarkerIcon }).addTo(map);
 
       var deviceLocBtn = document.getElementById('deviceLocBtn');
       var deviceLocLabel = document.getElementById('deviceLocLabel');
@@ -587,7 +633,8 @@ export function getGoogleSatelliteMapSrcDoc(
 function openCleanGoogleMapsModal(
   rawW3w: string,
   initialCoords?: W3WCoordinates | null,
-  onResolved?: (coords: W3WCoordinates) => void
+  onResolved?: (coords: W3WCoordinates) => void,
+  equipmentType?: Equipment['type'] | null
 ) {
   if (typeof document === 'undefined') return;
 
@@ -719,7 +766,7 @@ function openCleanGoogleMapsModal(
   const renderIframe = (coords: W3WCoordinates | null) => {
     bodyWrap.innerHTML = '';
     const iframe = document.createElement('iframe');
-    iframe.srcdoc = getGoogleSatelliteMapSrcDoc(clean, coords?.lat, coords?.lng);
+    iframe.srcdoc = getGoogleSatelliteMapSrcDoc(clean, coords?.lat, coords?.lng, equipmentType);
     iframe.title = `Satellite Map for ///${clean}`;
     iframe.setAttribute('allow', 'geolocation');
     Object.assign(iframe.style, {
@@ -771,24 +818,25 @@ export async function handleWhat3WordsLinkClick(
   w3w: string,
   lat?: number,
   lng?: number,
-  onResolved?: (coords: W3WCoordinates) => void
+  onResolved?: (coords: W3WCoordinates) => void,
+  equipmentType?: Equipment['type'] | null
 ): Promise<void> {
   e.preventDefault();
   e.stopPropagation();
 
   if (typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)) {
-    openCleanGoogleMapsModal(w3w, { lat, lng }, onResolved);
+    openCleanGoogleMapsModal(w3w, { lat, lng }, onResolved, equipmentType);
     return;
   }
 
   const cached = getCachedWhat3WordsCoordinates(w3w);
   if (cached) {
     onResolved?.(cached);
-    openCleanGoogleMapsModal(w3w, cached, onResolved);
+    openCleanGoogleMapsModal(w3w, cached, onResolved, equipmentType);
     return;
   }
 
-  openCleanGoogleMapsModal(w3w, null, onResolved);
+  openCleanGoogleMapsModal(w3w, null, onResolved, equipmentType);
 }
 
 /**
