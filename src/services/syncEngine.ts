@@ -129,6 +129,10 @@ class SyncEngine {
           subscribeToCloudChanges(
             (table, eventType, payload) => {
               if (table === 'authorized_devices') {
+                if (eventType === 'AUTH_CHANGE') {
+                  this.verifyDeviceAuthorization(true);
+                  return;
+                }
                 const myId = getDeviceId();
                 const myToken = getDeviceToken();
                 const newRow = payload?.new as { device_id?: string; auth_token?: string; status?: string } | undefined;

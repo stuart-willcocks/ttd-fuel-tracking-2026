@@ -18,6 +18,7 @@ import {
   isSupabaseConfigured,
   getSupabaseClient,
   SUPABASE_SQL_SCHEMA,
+  PHASE2_DEVICE_AUTH_RPC_SQL,
 } from '../../services/supabase';
 import { parseCSV, mapRowToEquipment, mapRowToTransactions } from '../../utils/csvParser';
 import { wipeAndImportFleet } from '../../services/api';
@@ -37,6 +38,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [copiedPhase2Sql, setCopiedPhase2Sql] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
   // CSV Import State
@@ -94,6 +96,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 2500);
+  };
+
+  const handleCopyPhase2Sql = () => {
+    navigator.clipboard.writeText(PHASE2_DEVICE_AUTH_RPC_SQL);
+    setCopiedPhase2Sql(true);
+    setTimeout(() => setCopiedPhase2Sql(false), 2500);
   };
 
   const handleSyncNow = async () => {
@@ -438,6 +446,40 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Phase 2 Security Hardening RPC Migration */}
+      <div className="admin-card" style={{ marginTop: '10px' }}>
+        <div className="admin-card-header">
+          <div>
+            <h2 className="admin-card-title">
+              <span>Phase 2 Security Migration (PDA Header Auth &amp; RPC Functions)</span>
+            </h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--adm-text-secondary)', marginTop: '2px' }}>
+              Non-breaking SQL migration: adds SECURITY DEFINER PDA verification, registration, and telemetry RPCs
+            </p>
+          </div>
+          <button onClick={handleCopyPhase2Sql} className="admin-btn admin-btn-outline admin-btn-sm">
+            {copiedPhase2Sql ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+            <span>{copiedPhase2Sql ? 'Copied Phase 2 SQL!' : 'Copy Phase 2 SQL'}</span>
+          </button>
+        </div>
+
+        <pre
+          style={{
+            padding: '16px',
+            background: '#04070d',
+            borderRadius: 'var(--adm-radius-md)',
+            border: '1px solid var(--adm-border-subtle)',
+            fontSize: '0.78rem',
+            fontFamily: 'var(--adm-font-mono)',
+            color: '#38bdf8',
+            overflowX: 'auto',
+            maxHeight: '220px',
+          }}
+        >
+          {PHASE2_DEVICE_AUTH_RPC_SQL}
+        </pre>
       </div>
 
       {/* Database Schema SQL Documentation */}

@@ -119,7 +119,24 @@ export function getSupabaseClient(): SupabaseClient | null {
   if (!url || !anonKey || !url.startsWith('http')) return null;
 
   try {
-    cachedClient = createClient(url, anonKey);
+    cachedClient = createClient(url, anonKey, {
+      global: {
+        fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+          const headers = new Headers(
+            init?.headers || (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined)
+          );
+          try {
+            const devId = getDeviceId();
+            const devToken = getDeviceToken();
+            if (devId) headers.set('x-device-id', devId);
+            if (devToken) headers.set('x-device-token', devToken);
+          } catch {
+            // Ignore localStorage access errors
+          }
+          return fetch(input, { ...init, headers });
+        },
+      },
+    });
     return cachedClient;
   } catch (err) {
     console.error('Failed to create Supabase client:', err);
@@ -1107,6 +1124,36 @@ export async function saveAuthorizedDeviceToSupabase(device: AuthorizedDevice): 
   }
 }
 
+function isMissingRpcError(err: any, fnName: string): boolean {
+  if (!err) return false;
+  const code = String(err.code || '');
+  const msg = String(err.message || err.details || '');
+  return (
+    code === 'PGRST202' ||
+    code === '42883' ||
+    (msg.includes(fnName) && (msg.includes('Could not find') || msg.includes('does not exist')))
+  );
+}
+
+export function broadcastDeviceAuthChange(deviceId: string, assignedDeviceId?: string): void {
+  if (activeRealtimeChannel) {
+    try {
+      activeRealtimeChannel
+        .send({
+          type: 'broadcast',
+          event: 'ttd_device_auth_change',
+          payload: {
+            deviceId: deviceId.trim().toUpperCase(),
+            assignedDeviceId: assignedDeviceId ? assignedDeviceId.trim().toUpperCase() : undefined,
+          },
+        })
+        .catch(() => {});
+    } catch {
+      // Ignore Realtime send errors
+    }
+  }
+}
+
 /**
  * Updates live telemetry (battery percentage, charging state, GPS coordinates, and running app version) for a PDA
  */
@@ -1118,12 +1165,39 @@ export async function updateDeviceTelemetryInSupabase(
   if (!client) throw new Error('Supabase not configured');
 
   const cleanId = deviceId.trim().toUpperCase();
+  const cleanToken = getDeviceToken();
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
   lastSeenWriteByDevice.set(cleanId, now);
 
   const runningVersion = getReportedAppVersion(telemetry.appVersion);
 
+  // 1. Try Phase 2 SECURITY DEFINER RPC first (works even after Phase 3 revokes direct table UPDATE for anon)
+  if (cleanToken) {
+    const { data: rpcData, error: rpcError } = await client.rpc('update_pda_telemetry', {
+      p_device_id: cleanId,
+      p_auth_token: cleanToken,
+      p_app_version: runningVersion,
+      p_battery_level: typeof telemetry.batteryLevel === 'number' ? Math.round(telemetry.batteryLevel) : null,
+      p_is_charging: typeof telemetry.isCharging === 'boolean' ? telemetry.isCharging : null,
+      p_latitude: typeof telemetry.latitude === 'number' ? telemetry.latitude : null,
+      p_longitude: typeof telemetry.longitude === 'number' ? telemetry.longitude : null,
+      p_location_accuracy: typeof telemetry.locationAccuracy === 'number' ? telemetry.locationAccuracy : null,
+      p_last_telemetry_at: telemetry.lastTelemetryAt || nowIso,
+    });
+
+    if (!rpcError && rpcData && typeof rpcData === 'object') {
+      const resObj = rpcData as { updated?: boolean; status?: string; device_id?: string };
+      return { updated: Boolean(resObj.updated) };
+    }
+
+    if (rpcError && !isMissingRpcError(rpcError, 'update_pda_telemetry')) {
+      console.debug('[Supabase] Telemetry RPC warning:', rpcError);
+      return { updated: true };
+    }
+  }
+
+  // 2. Fallback to direct table UPDATE if Phase 2 SQL migration has not been run yet
   const telemetryPayload: Record<string, unknown> = {
     app_version: runningVersion,
     last_seen_at: nowIso,
@@ -1208,6 +1282,7 @@ export async function updateDeviceStatusInSupabase(
     if (deleteError) {
       console.warn('[Supabase] Failed to delete old temporary device ID row:', deleteError);
     }
+    broadcastDeviceAuthChange(cleanId, cleanAssignedId);
     return;
   }
 
@@ -1224,6 +1299,8 @@ export async function updateDeviceStatusInSupabase(
     }
     throw new Error(error.message || error.details || error.hint || `Supabase error (${error.code || 'unknown'})`);
   }
+
+  broadcastDeviceAuthChange(cleanId);
 }
 
 /**
@@ -1248,6 +1325,8 @@ export async function deleteAuthorizedDeviceFromSupabase(deviceId: string): Prom
     }
     throw new Error(error.message || error.details || error.hint || `Supabase error (${error.code || 'unknown'})`);
   }
+
+  broadcastDeviceAuthChange(cleanId);
 }
 
 // Throttle last_seen_at database writes to once every 15 minutes per device (since telemetry already updates last_seen_at every 5 min)
@@ -1284,6 +1363,62 @@ export async function verifyDeviceTokenWithSupabase(
     };
   }
 
+  const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.includes('admin');
+  const reportedVer = getReportedAppVersion();
+
+  // 1. Try Phase 2 SECURITY DEFINER RPC first (works without exposing authorized_devices SELECT to anon)
+  const { data: rpcData, error: rpcError } = await client.rpc('verify_pda_token', {
+    p_device_id: cleanId,
+    p_auth_token: cleanToken,
+    p_app_version: isAdminRoute ? null : reportedVer,
+  });
+
+  if (!rpcError && rpcData && typeof rpcData === 'object') {
+    const rpcRes = rpcData as {
+      valid?: boolean;
+      status?: DeviceStatus;
+      device_id?: string;
+      auth_token?: string;
+    };
+    const isActiveRpc = Boolean(rpcRes.valid) && rpcRes.status === 'active';
+    const resolvedIdRpc = String(rpcRes.device_id || cleanId).trim().toUpperCase();
+    const resolvedTokRpc = rpcRes.auth_token || cleanToken;
+
+    if (isActiveRpc) {
+      if (!isAdminRoute && resolvedIdRpc !== cleanId) {
+        saveDeviceEnrollment({
+          deviceId: resolvedIdRpc,
+          authToken: resolvedTokRpc,
+          status: 'active',
+        });
+      }
+      cachedDeviceTokenAuth = {
+        deviceId: resolvedIdRpc,
+        token: cleanToken,
+        valid: true,
+        status: 'active',
+        authToken: resolvedTokRpc,
+        checkedAt: now,
+      };
+      lastSeenWriteByDevice.set(resolvedIdRpc, now);
+    } else {
+      invalidateDeviceTokenCache();
+    }
+
+    return {
+      valid: isActiveRpc,
+      status: isActiveRpc ? 'active' : rpcRes.status === 'pending' ? 'pending' : 'revoked',
+      deviceId: resolvedIdRpc,
+      authToken: isActiveRpc ? resolvedTokRpc : undefined,
+    };
+  }
+
+  if (rpcError && !isMissingRpcError(rpcError, 'verify_pda_token')) {
+    console.warn('[Supabase] verify_pda_token RPC error:', rpcError);
+    throw new Error(rpcError.message || rpcError.details || rpcError.hint || `Supabase RPC error (${rpcError.code || 'unknown'})`);
+  }
+
+  // 2. Fallback to direct table SELECT if Phase 2 SQL migration has not been run yet
   let { data, error } = await client
     .from('authorized_devices')
     .select('device_id, auth_token, status, app_version')
@@ -1335,7 +1470,6 @@ export async function verifyDeviceTokenWithSupabase(
   if (isActive) {
     // If the Admin assigned a persistent Device ID different from the PDA's temporary ID,
     // immediately write the persistent Device ID back to the PDA's localStorage.
-    const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.includes('admin');
     if (!isAdminRoute && resolvedDeviceId !== cleanId) {
       saveDeviceEnrollment({
         deviceId: resolvedDeviceId,
@@ -1354,7 +1488,6 @@ export async function verifyDeviceTokenWithSupabase(
     };
 
     const lastWrite = lastSeenWriteByDevice.get(resolvedDeviceId) || 0;
-    const reportedVer = getReportedAppVersion();
     const versionMismatch = !isAdminRoute && storedVersion !== reportedVer;
 
     // Only write last_seen_at if appVersion changed or if no telemetry write occurred in the last 15 minutes
@@ -1401,6 +1534,23 @@ export async function registerDeviceRequestToSupabase(
   const now = new Date().toISOString();
   const reportedVer = getReportedAppVersion();
 
+  // 1. Try Phase 2 SECURITY DEFINER RPC first (prevents overwriting active devices and works without direct table INSERT/UPDATE for anon)
+  const { error: rpcError } = await client.rpc('register_pda_request', {
+    p_device_id: cleanId,
+    p_auth_token: token,
+    p_app_version: reportedVer,
+  });
+
+  if (!rpcError) {
+    broadcastDeviceAuthChange(cleanId);
+    return { status: 'pending', token };
+  }
+
+  if (!isMissingRpcError(rpcError, 'register_pda_request')) {
+    throw rpcError;
+  }
+
+  // 2. Fallback to direct table upsert if Phase 2 SQL migration has not been run yet
   const { error } = await client.from('authorized_devices').upsert(
     {
       device_id: cleanId,
@@ -1414,6 +1564,7 @@ export async function registerDeviceRequestToSupabase(
   );
 
   if (error) throw error;
+  broadcastDeviceAuthChange(cleanId);
   return { status: 'pending', token };
 }
 
@@ -1597,6 +1748,14 @@ export function subscribeToCloudChanges(
             },
             () => {}
           );
+      }
+    )
+    .on(
+      'broadcast',
+      { event: 'ttd_device_auth_change' },
+      (msg) => {
+        const data = (msg?.payload || {}) as Record<string, unknown>;
+        onDataChange('authorized_devices', 'AUTH_CHANGE', { old: data });
       }
     )
     .on(
@@ -2073,3 +2232,254 @@ CREATE INDEX IF NOT EXISTS idx_tx_eq_timestamp ON public.transactions(equipment_
 `;
 
 
+export const PHASE2_DEVICE_AUTH_RPC_SQL = `-- TTD Fuel Tracking: Phase 2 Security Hardening (Non-Breaking RPCs & Header Auth)
+-- Paste and run in Supabase Dashboard -> SQL Editor
+
+CREATE INDEX IF NOT EXISTS idx_authorized_devices_auth_token
+  ON public.authorized_devices(auth_token);
+
+CREATE OR REPLACE FUNCTION public.is_authorized_pda()
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_headers json;
+  v_token text;
+BEGIN
+  IF auth.role() = 'authenticated' THEN
+    RETURN true;
+  END IF;
+
+  BEGIN
+    v_headers := current_setting('request.headers', true)::json;
+    v_token := nullif(trim(coalesce(v_headers->>'x-device-token', '')), '');
+  EXCEPTION WHEN OTHERS THEN
+    v_token := NULL;
+  END;
+
+  IF v_token IS NULL THEN
+    RETURN false;
+  END IF;
+
+  RETURN EXISTS (
+    SELECT 1
+    FROM public.authorized_devices
+    WHERE auth_token = v_token
+      AND status = 'active'
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_authorized_pda() TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.verify_pda_token(
+  p_device_id text,
+  p_auth_token text,
+  p_app_version text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_clean_id text := upper(trim(coalesce(p_device_id, '')));
+  v_clean_token text := trim(coalesce(p_auth_token, ''));
+  v_clean_ver text := nullif(trim(coalesce(p_app_version, '')), '');
+  v_row public.authorized_devices%ROWTYPE;
+  v_found boolean := false;
+BEGIN
+  IF v_clean_id = '' OR v_clean_token = '' THEN
+    RETURN jsonb_build_object('valid', false, 'status', 'revoked');
+  END IF;
+
+  SELECT * INTO v_row
+  FROM public.authorized_devices
+  WHERE device_id = v_clean_id
+  LIMIT 1;
+
+  IF FOUND THEN
+    v_found := true;
+  ELSE
+    SELECT * INTO v_row
+    FROM public.authorized_devices
+    WHERE auth_token = v_clean_token
+    ORDER BY last_seen_at DESC
+    LIMIT 1;
+    IF FOUND THEN
+      v_found := true;
+    END IF;
+  END IF;
+
+  IF NOT v_found OR v_row.auth_token IS DISTINCT FROM v_clean_token THEN
+    RETURN jsonb_build_object('valid', false, 'status', 'revoked');
+  END IF;
+
+  IF v_row.status = 'active' THEN
+    IF (v_clean_ver IS NOT NULL AND v_row.app_version IS DISTINCT FROM v_clean_ver)
+       OR (v_row.last_seen_at IS NULL OR v_row.last_seen_at < (now() - interval '15 minutes')) THEN
+      UPDATE public.authorized_devices
+      SET last_seen_at = timezone('utc'::text, now()),
+          app_version = coalesce(v_clean_ver, app_version)
+      WHERE device_id = v_row.device_id;
+    END IF;
+
+    RETURN jsonb_build_object(
+      'valid', true,
+      'status', 'active',
+      'device_id', v_row.device_id,
+      'auth_token', v_row.auth_token
+    );
+  ELSIF v_row.status = 'pending' THEN
+    RETURN jsonb_build_object(
+      'valid', false,
+      'status', 'pending',
+      'device_id', v_row.device_id
+    );
+  ELSE
+    RETURN jsonb_build_object('valid', false, 'status', 'revoked');
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.verify_pda_token(text, text, text) TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.register_pda_request(
+  p_device_id text,
+  p_auth_token text,
+  p_app_version text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_clean_id text := upper(trim(coalesce(p_device_id, '')));
+  v_clean_token text := trim(coalesce(p_auth_token, ''));
+  v_clean_ver text := nullif(trim(coalesce(p_app_version, '')), '');
+  v_existing public.authorized_devices%ROWTYPE;
+  v_now timestamptz := timezone('utc'::text, now());
+BEGIN
+  IF v_clean_id = '' OR v_clean_token = '' THEN
+    RAISE EXCEPTION 'Device ID and authentication token are required';
+  END IF;
+
+  SELECT * INTO v_existing
+  FROM public.authorized_devices
+  WHERE device_id = v_clean_id
+  LIMIT 1;
+
+  IF FOUND AND v_existing.status = 'active' AND v_existing.auth_token IS DISTINCT FROM v_clean_token THEN
+    RAISE EXCEPTION 'Device ID % is already enrolled and active', v_clean_id;
+  END IF;
+
+  INSERT INTO public.authorized_devices (
+    device_id,
+    auth_token,
+    status,
+    app_version,
+    registered_at,
+    last_seen_at
+  ) VALUES (
+    v_clean_id,
+    v_clean_token,
+    'pending',
+    v_clean_ver,
+    v_now,
+    v_now
+  )
+  ON CONFLICT (device_id) DO UPDATE
+  SET auth_token = EXCLUDED.auth_token,
+      status = 'pending',
+      app_version = coalesce(EXCLUDED.app_version, public.authorized_devices.app_version),
+      registered_at = EXCLUDED.registered_at,
+      last_seen_at = EXCLUDED.last_seen_at;
+
+  RETURN jsonb_build_object(
+    'status', 'pending',
+    'device_id', v_clean_id
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.register_pda_request(text, text, text) TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.update_pda_telemetry(
+  p_device_id text,
+  p_auth_token text,
+  p_app_version text DEFAULT NULL,
+  p_battery_level smallint DEFAULT NULL,
+  p_is_charging boolean DEFAULT NULL,
+  p_latitude double precision DEFAULT NULL,
+  p_longitude double precision DEFAULT NULL,
+  p_location_accuracy real DEFAULT NULL,
+  p_last_telemetry_at timestamp with time zone DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_clean_id text := upper(trim(coalesce(p_device_id, '')));
+  v_clean_token text := trim(coalesce(p_auth_token, ''));
+  v_clean_ver text := nullif(trim(coalesce(p_app_version, '')), '');
+  v_now timestamptz := timezone('utc'::text, now());
+  v_row public.authorized_devices%ROWTYPE;
+  v_found boolean := false;
+BEGIN
+  IF v_clean_id = '' OR v_clean_token = '' THEN
+    RETURN jsonb_build_object('updated', false, 'status', 'revoked');
+  END IF;
+
+  SELECT * INTO v_row
+  FROM public.authorized_devices
+  WHERE device_id = v_clean_id
+    AND auth_token = v_clean_token
+  LIMIT 1;
+
+  IF FOUND THEN
+    v_found := true;
+  ELSE
+    SELECT * INTO v_row
+    FROM public.authorized_devices
+    WHERE auth_token = v_clean_token
+    ORDER BY last_seen_at DESC
+    LIMIT 1;
+    IF FOUND THEN
+      v_found := true;
+    END IF;
+  END IF;
+
+  IF NOT v_found THEN
+    RETURN jsonb_build_object('updated', false, 'status', 'revoked');
+  END IF;
+
+  UPDATE public.authorized_devices
+  SET app_version = coalesce(v_clean_ver, app_version),
+      battery_level = coalesce(p_battery_level, battery_level),
+      is_charging = coalesce(p_is_charging, is_charging),
+      latitude = coalesce(p_latitude, latitude),
+      longitude = coalesce(p_longitude, longitude),
+      location_accuracy = coalesce(p_location_accuracy, location_accuracy),
+      last_telemetry_at = coalesce(p_last_telemetry_at, v_now),
+      last_seen_at = v_now
+  WHERE device_id = v_row.device_id;
+
+  RETURN jsonb_build_object(
+    'updated', (v_row.status = 'active'),
+    'status', v_row.status,
+    'device_id', v_row.device_id
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.update_pda_telemetry(
+  text, text, text, smallint, boolean, double precision, double precision, real, timestamp with time zone
+) TO anon, authenticated;
+
+NOTIFY pgrst, 'reload schema';
+`;
