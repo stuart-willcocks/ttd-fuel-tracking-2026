@@ -403,8 +403,8 @@ export function getGoogleSatelliteMapSrcDoc(
       </svg>
       <span id="deviceLocLabel">My Location</span>
     </button>
-    <button type="button" class="recenter-btn" id="recenterBtn" title="Re-center on pin">
-      <span>⌖ Center Pin</span>
+    <button type="button" class="recenter-btn" id="recenterBtn" title="Re-centre on equipment">
+      <span>⌖ Centre equipment</span>
     </button>
   </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
