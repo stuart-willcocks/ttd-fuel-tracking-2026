@@ -820,6 +820,9 @@ function getMoveEquipmentMapSrcDoc(
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
+    html, body, #map, #map *, .leaflet-grab, .leaflet-interactive, .leaflet-dragging .leaflet-grab {
+      cursor: crosshair !important;
+    }
     html, body, #map {
       width: 100%;
       height: 100%;
@@ -828,13 +831,6 @@ function getMoveEquipmentMapSrcDoc(
       background: #0F172A;
       overflow: hidden;
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      cursor: crosshair;
-    }
-    .leaflet-grab {
-      cursor: crosshair !important;
-    }
-    .leaflet-dragging .leaflet-grab {
-      cursor: grabbing !important;
     }
     .leaflet-control-attribution {
       font-size: 10px !important;
@@ -938,10 +934,14 @@ function getMoveEquipmentMapSrcDoc(
       border: 1px solid #93C5FD;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
     }
-    .leaflet-marker-icon.eq-move-interactive-wrapper {
+    .leaflet-marker-icon.eq-move-interactive-wrapper,
+    .leaflet-marker-icon.eq-move-interactive-wrapper .eq-move-marker,
+    .leaflet-marker-icon.eq-move-interactive-wrapper .eq-move-disc-new,
+    .leaflet-marker-icon.eq-move-interactive-wrapper .eq-move-label-new {
       background: transparent !important;
       border: none !important;
       pointer-events: none !important;
+      cursor: crosshair !important;
     }
     .eq-move-confirm-box {
       margin-top: 6px;
@@ -1244,7 +1244,8 @@ function getMoveEquipmentMapSrcDoc(
             color: '#60A5FA',
             weight: 2.5,
             dashArray: '6, 6',
-            opacity: 0.9
+            opacity: 0.9,
+            interactive: false
           }).addTo(map);
         } else {
           moveLine.setLatLngs([target, pos]);
@@ -2746,14 +2747,26 @@ export function getFleetSatelliteMapSrcDoc(
       margin-top: 3px;
     }
     #map.move-aiming-mode,
+    #map.move-aiming-mode *,
     #map.move-aiming-mode .leaflet-grab,
-    #map.move-aiming-mode .eq-map-marker {
+    #map.move-aiming-mode .leaflet-interactive,
+    #map.move-aiming-mode .leaflet-dragging .leaflet-grab,
+    #map.move-aiming-mode .eq-map-marker,
+    #map.move-aiming-mode .eq-map-icon-box,
+    #map.move-aiming-mode .eq-map-label {
       cursor: crosshair !important;
     }
     .leaflet-marker-icon.eq-move-candidate-wrapper {
       background: transparent !important;
       border: none !important;
       pointer-events: none !important;
+      cursor: crosshair !important;
+    }
+    .leaflet-marker-icon.eq-move-candidate-wrapper .eq-map-marker,
+    .leaflet-marker-icon.eq-move-candidate-wrapper .eq-map-icon-box,
+    .leaflet-marker-icon.eq-move-candidate-wrapper .eq-map-label {
+      pointer-events: none !important;
+      cursor: crosshair !important;
     }
     .eq-move-confirm-box {
       margin-top: 6px;
@@ -3177,7 +3190,8 @@ export function getFleetSatelliteMapSrcDoc(
             color: '#2563EB',
             weight: 3,
             dashArray: '6, 6',
-            opacity: 0.9
+            opacity: 0.9,
+            interactive: false
           }).addTo(map);
         }
       }
@@ -3186,11 +3200,6 @@ export function getFleetSatelliteMapSrcDoc(
         if (!movingEquipmentId) return;
         isMovePlaced = true;
         isMoveSaving = false;
-        var mapEl = document.getElementById('map');
-        if (mapEl) {
-          mapEl.style.cursor = '';
-          mapEl.classList.remove('move-aiming-mode');
-        }
         setMoveCandidateLocation(lat, lng, 'Resolving...', true);
         try {
           window.parent.postMessage({
