@@ -869,7 +869,11 @@ function getMoveEquipmentMapSrcDoc(
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
   <style>
-    html, body, #map, #map *, .leaflet-grab, .leaflet-interactive, .leaflet-dragging .leaflet-grab {
+    #map.move-aiming-mode,
+    #map.move-aiming-mode *,
+    #map.move-aiming-mode .leaflet-grab,
+    #map.move-aiming-mode .leaflet-interactive,
+    #map.move-aiming-mode .leaflet-dragging .leaflet-grab {
       cursor: crosshair !important;
     }
     html, body, #map {
@@ -990,7 +994,6 @@ function getMoveEquipmentMapSrcDoc(
       background: transparent !important;
       border: none !important;
       pointer-events: none !important;
-      cursor: crosshair !important;
     }
     .eq-move-confirm-box {
       margin-top: 6px;
@@ -1060,7 +1063,7 @@ function getMoveEquipmentMapSrcDoc(
   </style>
 </head>
 <body>
-  <div id="map"></div>
+  <div id="map" class="move-aiming-mode"></div>
   <div class="map-bottom-controls" id="mapBottomControls">
     <button type="button" class="recenter-btn" id="toggleLabelsBtn" title="Enable or disable Google Map labels">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1284,16 +1287,26 @@ function getMoveEquipmentMapSrcDoc(
           candidateMarker.setIcon(buildNewMarkerIcon(lat, lng, labelText, placed));
         }
 
+        var mapEl = document.getElementById('map');
+        if (mapEl) {
+          if (placed) {
+            mapEl.style.cursor = '';
+            mapEl.classList.remove('move-aiming-mode');
+          } else {
+            mapEl.style.cursor = 'crosshair';
+            mapEl.classList.add('move-aiming-mode');
+          }
+        }
+
         if (placed) {
           attachConfirmBoxHandlers();
         }
 
         if (!moveLine) {
           moveLine = L.polyline([target, pos], {
-            color: '#60A5FA',
-            weight: 2.5,
-            dashArray: '6, 6',
-            opacity: 0.9,
+            color: '#EC721E',
+            weight: 3,
+            opacity: 0.95,
             interactive: false
           }).addTo(map);
         } else {
@@ -1304,6 +1317,11 @@ function getMoveEquipmentMapSrcDoc(
       function clearCandidateLocation() {
         isMovePlaced = false;
         isMoveSaving = false;
+        var mapEl = document.getElementById('map');
+        if (mapEl) {
+          mapEl.style.cursor = 'crosshair';
+          mapEl.classList.add('move-aiming-mode');
+        }
         if (candidateMarker) {
           map.removeLayer(candidateMarker);
           candidateMarker = null;
@@ -2811,13 +2829,11 @@ export function getFleetSatelliteMapSrcDoc(
       background: transparent !important;
       border: none !important;
       pointer-events: none !important;
-      cursor: crosshair !important;
     }
     .leaflet-marker-icon.eq-move-candidate-wrapper .eq-map-marker,
     .leaflet-marker-icon.eq-move-candidate-wrapper .eq-map-icon-box,
     .leaflet-marker-icon.eq-move-candidate-wrapper .eq-map-label {
       pointer-events: none !important;
-      cursor: crosshair !important;
     }
     .eq-move-confirm-box {
       margin-top: 6px;
@@ -3230,6 +3246,17 @@ export function getFleetSatelliteMapSrcDoc(
           }).addTo(map);
         }
 
+        var mapEl = document.getElementById('map');
+        if (mapEl) {
+          if (placed) {
+            mapEl.style.cursor = '';
+            mapEl.classList.remove('move-aiming-mode');
+          } else {
+            mapEl.style.cursor = 'crosshair';
+            mapEl.classList.add('move-aiming-mode');
+          }
+        }
+
         if (placed) {
           attachFleetMoveConfirmHandlers();
         }
@@ -3238,10 +3265,9 @@ export function getFleetSatelliteMapSrcDoc(
           moveCandidateLine.setLatLngs([origPt, [lat, lng]]);
         } else {
           moveCandidateLine = L.polyline([origPt, [lat, lng]], {
-            color: '#2563EB',
+            color: '#EC721E',
             weight: 3,
-            dashArray: '6, 6',
-            opacity: 0.9,
+            opacity: 0.95,
             interactive: false
           }).addTo(map);
         }
