@@ -117,6 +117,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
     };
 
     const handleMapMessage = (ev: MessageEvent) => {
+      if (mapIframeRef.current?.contentWindow && ev.source !== mapIframeRef.current.contentWindow) return;
       const data = ev.data;
       if (!data || data.type !== 'TTD_PDA_LOCATION_TOGGLE') return;
 

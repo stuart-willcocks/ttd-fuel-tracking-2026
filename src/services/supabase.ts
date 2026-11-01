@@ -1487,7 +1487,48 @@ export function subscribeToCloudChanges(
       { event: 'ttd_bulk_tx_delete' },
       (msg) => {
         const data = (msg?.payload || {}) as Record<string, unknown>;
-        onDataChange('transactions', 'BULK_DELETE', { old: data });
+        const eqId = typeof data.equipmentId === 'string' ? data.equipmentId : null;
+        const wipeAll = Boolean(data.all);
+        const wipeEquipment = Boolean(data.wipeEquipment);
+        if (!wipeAll && !eqId) return;
+
+        // Verify against PostgreSQL before applying any destructive bulk delete from a WebSocket broadcast
+        const verifyAndApplyBulkDelete = async (retryOnNonZero: boolean) => {
+          try {
+            let query = client.from('transactions').select('id', { count: 'exact', head: true });
+            if (eqId) {
+              query = query.eq('equipment_id', eqId);
+            }
+            const { count, error } = await query;
+            if (error) return;
+            if ((count ?? 0) > 0) {
+              if (retryOnNonZero) {
+                setTimeout(() => {
+                  verifyAndApplyBulkDelete(false);
+                }, 400);
+              }
+              return;
+            }
+            if (wipeAll && wipeEquipment) {
+              const { count: eqCount, error: eqErr } = await client
+                .from('equipment_list')
+                .select('equipment_id', { count: 'exact', head: true });
+              if (eqErr || (eqCount ?? 0) > 0) {
+                if (retryOnNonZero) {
+                  setTimeout(() => {
+                    verifyAndApplyBulkDelete(false);
+                  }, 400);
+                }
+                return;
+              }
+            }
+            onDataChange('transactions', 'BULK_DELETE', { old: data });
+          } catch {
+            // Ignore verification errors on unverified broadcasts
+          }
+        };
+
+        verifyAndApplyBulkDelete(true);
       }
     )
     .on(
@@ -1495,9 +1536,21 @@ export function subscribeToCloudChanges(
       { event: 'ttd_equipment_update' },
       (msg) => {
         const data = (msg?.payload || {}) as Record<string, unknown>;
-        if (data && data.equipment_id) {
-          onDataChange('equipment_list', 'UPDATE', { new: data });
-        }
+        const eqId = typeof data?.equipment_id === 'string' ? data.equipment_id : null;
+        if (!eqId) return;
+        client
+          .from('equipment_list')
+          .select('*')
+          .eq('equipment_id', eqId)
+          .maybeSingle()
+          .then(
+            ({ data: verifiedRow }) => {
+              if (verifiedRow && verifiedRow.equipment_id) {
+                onDataChange('equipment_list', 'UPDATE', { new: verifiedRow as Record<string, unknown> });
+              }
+            },
+            () => {}
+          );
       }
     )
     .on(
@@ -1505,10 +1558,22 @@ export function subscribeToCloudChanges(
       { event: 'ttd_tx_upsert' },
       (msg) => {
         const data = (msg?.payload || {}) as Record<string, unknown>;
-        if (data && typeof data.id === 'string') {
-          recordRecentTxUpsert(data);
-          onDataChange('transactions', 'UPDATE', { new: data });
-        }
+        const txId = typeof data?.id === 'string' ? data.id : null;
+        if (!txId) return;
+        client
+          .from('transactions')
+          .select('*')
+          .eq('id', txId)
+          .maybeSingle()
+          .then(
+            ({ data: verifiedRow }) => {
+              if (verifiedRow && verifiedRow.id) {
+                recordRecentTxUpsert(verifiedRow as Record<string, unknown>);
+                onDataChange('transactions', 'UPDATE', { new: verifiedRow as Record<string, unknown> });
+              }
+            },
+            () => {}
+          );
       }
     )
     .on(
@@ -1516,10 +1581,22 @@ export function subscribeToCloudChanges(
       { event: 'ttd_tx_delete' },
       (msg) => {
         const data = (msg?.payload || {}) as Record<string, unknown>;
-        if (data && typeof data.id === 'string') {
-          recentlyUpsertedTxRows.delete(data.id);
-          onDataChange('transactions', 'DELETE', { old: { id: data.id } });
-        }
+        const delId = typeof data?.id === 'string' ? data.id : null;
+        if (!delId) return;
+        client
+          .from('transactions')
+          .select('id')
+          .eq('id', delId)
+          .maybeSingle()
+          .then(
+            ({ data: existingRow, error }) => {
+              if (!error && !existingRow) {
+                recentlyUpsertedTxRows.delete(delId);
+                onDataChange('transactions', 'DELETE', { old: { id: delId } });
+              }
+            },
+            () => {}
+          );
       }
     )
     .on(

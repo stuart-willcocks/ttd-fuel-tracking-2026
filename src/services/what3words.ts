@@ -285,7 +285,7 @@ export function getGoogleSatelliteMapSrcDoc(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
   <style>
     html, body, #map {
       width: 100%;
@@ -407,7 +407,7 @@ export function getGoogleSatelliteMapSrcDoc(
       <span>⌖ Centre equipment</span>
     </button>
   </div>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
   <script>
     (function() {
       var target = [${targetLat}, ${targetLng}];
@@ -610,6 +610,7 @@ export function getGoogleSatelliteMapSrcDoc(
       });
 
       window.addEventListener('message', function(ev) {
+        if (ev.source !== window.parent) return;
         var data = ev && ev.data;
         if (data && data.type === 'TTD_PDA_LOCATION_UPDATE') {
           updateDeviceMarker(data.lat, data.lng);
@@ -866,7 +867,7 @@ function getMoveEquipmentMapSrcDoc(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
   <style>
     html, body, #map, #map *, .leaflet-grab, .leaflet-interactive, .leaflet-dragging .leaflet-grab {
       cursor: crosshair !important;
@@ -1072,7 +1073,7 @@ function getMoveEquipmentMapSrcDoc(
       <span>⌖ Current Location</span>
     </button>
   </div>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
   <script>
     (function() {
       var target = [${targetLat}, ${targetLng}];
@@ -1335,6 +1336,7 @@ function getMoveEquipmentMapSrcDoc(
       });
 
       window.addEventListener('message', function(ev) {
+        if (ev.source !== window.parent) return;
         var data = ev && ev.data;
         if (!data || typeof data !== 'object') return;
         if (data.type === 'TTD_MOVE_MAP_RESOLVED') {
@@ -2246,6 +2248,7 @@ export function openMoveEquipmentModal(
   };
 
   const onMessage = (ev: MessageEvent) => {
+    if (activeIframe?.contentWindow && ev.source !== activeIframe.contentWindow) return;
     const data = ev?.data;
     if (!data || typeof data !== 'object') return;
     if (
@@ -2468,7 +2471,7 @@ export function getFleetSatelliteMapSrcDoc(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
   <style>
     html, body, #map {
       width: 100%;
@@ -2894,7 +2897,7 @@ export function getFleetSatelliteMapSrcDoc(
       <span>⌖ Fit All Equipment</span>
     </button>
   </div>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
   <script>
     (function() {
       var items = ${markersJson};
@@ -3855,6 +3858,7 @@ export function getFleetSatelliteMapSrcDoc(
       renderOrUpdateMarkers(items);
 
       window.addEventListener('message', function(e) {
+        if (e.source !== window.parent) return;
         if (!e.data || typeof e.data !== 'object') return;
         if (e.data.type === 'TTD_MAP_UPDATE_MARKERS' && Array.isArray(e.data.markers)) {
           renderOrUpdateMarkers(e.data.markers);

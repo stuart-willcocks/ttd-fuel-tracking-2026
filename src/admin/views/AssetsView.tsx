@@ -574,6 +574,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   useEffect(() => {
     if (viewMode !== 'MAP') return;
     const handleMessage = (e: MessageEvent) => {
+      if (mapIframeRef.current?.contentWindow && e.source !== mapIframeRef.current.contentWindow) return;
       if (!e.data || typeof e.data !== 'object') return;
       if (e.data.type === 'TTD_MAP_SELECT_ASSET' && typeof e.data.equipmentId === 'string') {
         onSelectAsset(e.data.equipmentId);
