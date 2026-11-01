@@ -18,7 +18,6 @@ let cachedLocation: { latitude: number; longitude: number; locationAccuracy: num
 })();
 let lastLocationTime = cachedLocation ? Date.now() : 0;
 let lastLocationError: string | null = null;
-let isWatchingPosition = false;
 
 /**
  * Reads battery level and charging state via W3C Battery Status API.
@@ -100,7 +99,7 @@ function fetchPositionOnce(highAccuracy: boolean, timeoutMs: number): Promise<{
         {
           enableHighAccuracy: highAccuracy,
           timeout: timeoutMs,
-          maximumAge: 120000, // 2 minutes cache
+          maximumAge: 30000, // 30 seconds cache
         }
       );
     } catch (e: any) {
@@ -127,8 +126,14 @@ export async function getCurrentLocation(): Promise<{
   locationAccuracy: number;
 } | null> {
   const now = Date.now();
-  // When watchPosition has already populated cachedLocation or cachedLocation is fresh (< 3 min), return it immediately
-  if (cachedLocation && (isWatchingPosition || now - lastLocationTime < 180000)) {
+  // When running in background with screen off, Android suspends new GPS hardware locks;
+  // return cachedLocation immediately so background battery + location heartbeats never block.
+  if (typeof document !== 'undefined' && document.hidden && cachedLocation) {
+    return cachedLocation;
+  }
+
+  // When watchPosition has recently populated cachedLocation (< 45s), return it immediately
+  if (cachedLocation && now - lastLocationTime < 45000) {
     return cachedLocation;
   }
 
@@ -276,17 +281,17 @@ function shouldSendTelemetry(newTel: DeviceTelemetry, force: boolean): boolean {
   if (newTel.appVersion && newTel.appVersion !== lastSentTelemetry.appVersion) return true;
 
   const now = Date.now();
-  // Always send if at least 5 minutes have passed since last upload
-  if (now - lastSentTime > 300000) return true;
+  // Always send if at least 60 seconds have passed since last upload
+  if (now - lastSentTime >= 60000) return true;
 
   // Send immediately if charging status changed
   if (newTel.isCharging !== lastSentTelemetry.isCharging) return true;
 
-  // Send immediately if battery changed by 3% or more
+  // Send immediately if battery changed by 1% or more
   if (
     typeof newTel.batteryLevel === 'number' &&
     typeof lastSentTelemetry.batteryLevel === 'number' &&
-    Math.abs(newTel.batteryLevel - lastSentTelemetry.batteryLevel) >= 3
+    Math.abs(newTel.batteryLevel - lastSentTelemetry.batteryLevel) >= 1
   ) {
     return true;
   }
@@ -301,8 +306,9 @@ function shouldSendTelemetry(newTel: DeviceTelemetry, force: boolean): boolean {
     return true;
   }
 
-  // Send if location shifted significantly (> 0.0005 degrees ≈ 55 meters)
+  // Send if location shifted by ~12 meters (> 0.00012 degrees), throttled to at most once every 15 seconds while moving
   if (
+    now - lastSentTime >= 15000 &&
     typeof newTel.latitude === 'number' &&
     typeof lastSentTelemetry.latitude === 'number' &&
     typeof newTel.longitude === 'number' &&
@@ -310,7 +316,7 @@ function shouldSendTelemetry(newTel: DeviceTelemetry, force: boolean): boolean {
   ) {
     const latDiff = Math.abs(newTel.latitude - lastSentTelemetry.latitude);
     const lonDiff = Math.abs(newTel.longitude - lastSentTelemetry.longitude);
-    if (latDiff > 0.0005 || lonDiff > 0.0005) {
+    if (latDiff > 0.00012 || lonDiff > 0.00012) {
       return true;
     }
   }
@@ -366,7 +372,6 @@ export function startTelemetryMonitoring(): () => void {
   let watchId: number | null = null;
   if (typeof navigator !== 'undefined' && navigator.geolocation) {
     try {
-      isWatchingPosition = true;
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           const fix = {
@@ -410,12 +415,11 @@ export function startTelemetryMonitoring(): () => void {
         },
         {
           enableHighAccuracy: true,
-          timeout: 20000,
-          maximumAge: 60000,
+          timeout: 15000,
+          maximumAge: 15000,
         }
       );
     } catch (err) {
-      isWatchingPosition = false;
       console.warn('[Telemetry] Failed to start geolocation watcher:', err);
     }
   }
@@ -423,11 +427,21 @@ export function startTelemetryMonitoring(): () => void {
   // Full collection on boot (acquires GPS fix if uncached and transmits complete telemetry)
   pushDeviceTelemetry(true);
 
-  // Periodic heartbeat every 5 minutes (low-frequency to protect free tier quotas)
+  // Periodic heartbeat every 60 seconds (continues even when document.hidden so background/charging PDAs still report)
   const intervalId = setInterval(() => {
-    if (typeof document !== 'undefined' && document.hidden) return;
     pushDeviceTelemetry(false);
-  }, 300000);
+  }, 60000);
+
+  // Immediate telemetry push when PDA screen wakes up, regains focus, or reconnects to network
+  const handleWakeOrOnline = () => {
+    if (typeof document === 'undefined' || !document.hidden) {
+      lastLocationTime = 0; // Force fresh GPS check on wake
+      pushDeviceTelemetry(true);
+    }
+  };
+  document.addEventListener('visibilitychange', handleWakeOrOnline);
+  window.addEventListener('focus', handleWakeOrOnline);
+  window.addEventListener('online', handleWakeOrOnline);
 
   // Battery status change listener
   const nav = navigator as unknown as {
@@ -458,7 +472,9 @@ export function startTelemetryMonitoring(): () => void {
 
   return () => {
     clearInterval(intervalId);
-    isWatchingPosition = false;
+    document.removeEventListener('visibilitychange', handleWakeOrOnline);
+    window.removeEventListener('focus', handleWakeOrOnline);
+    window.removeEventListener('online', handleWakeOrOnline);
     if (watchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
       try {
         navigator.geolocation.clearWatch(watchId);
