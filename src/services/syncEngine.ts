@@ -666,7 +666,20 @@ class SyncEngine {
 
     if (table === 'equipment_list') {
       if ((eventType === 'INSERT' || eventType === 'UPDATE') && payload?.new && payload.new.equipment_id) {
-        const incomingEq = mapSupabaseRowToEquipment(payload.new);
+        const rawEq = mapSupabaseRowToEquipment(payload.new);
+        const existingEq = await db.equipments.get(rawEq.equipmentId);
+        const incomingEq: typeof rawEq = existingEq
+          ? {
+              ...existingEq,
+              ...rawEq,
+              area: rawEq.area || existingEq.area,
+              location: rawEq.location || existingEq.location,
+              what3words: rawEq.what3words || existingEq.what3words,
+              type: (payload.new.type as typeof rawEq.type) || existingEq.type,
+              capacity: rawEq.capacity !== undefined ? rawEq.capacity : existingEq.capacity,
+              rentalSerialNumber: rawEq.rentalSerialNumber || existingEq.rentalSerialNumber,
+            }
+          : rawEq;
         if (incomingEq.type === 'GENERATOR') {
           const allTxForEq = await db.transactions.where('equipmentId').equals(incomingEq.equipmentId).toArray();
           const powerState = getGeneratorPowerState(incomingEq.equipmentId, allTxForEq);

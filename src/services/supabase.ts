@@ -153,10 +153,12 @@ export function mapSupabaseRowToEquipment(row: any): Equipment {
   let longitude: number | undefined =
     typeof row.longitude === 'number' && !Number.isNaN(row.longitude) ? row.longitude : undefined;
 
+  const rawW3w = typeof row.what3words === 'string' ? row.what3words : '';
+
   if ((latitude === undefined || longitude === undefined) && typeof row.device_id === 'string' && row.device_id.startsWith('{')) {
     try {
       const parsed = JSON.parse(row.device_id);
-      const cleanRowW3w = normalizeWhat3Words(row.what3words);
+      const cleanRowW3w = normalizeWhat3Words(rawW3w);
       if (
         typeof parsed.lat === 'number' &&
         typeof parsed.lng === 'number' &&
@@ -170,20 +172,20 @@ export function mapSupabaseRowToEquipment(row: any): Equipment {
     }
   }
 
-  if (latitude !== undefined && longitude !== undefined) {
-    primeWhat3WordsCache(row.what3words, latitude, longitude);
+  if (latitude !== undefined && longitude !== undefined && rawW3w) {
+    primeWhat3WordsCache(rawW3w, latitude, longitude);
   }
 
   return {
-    equipmentId: row.equipment_id,
-    area: row.area,
-    location: row.location,
-    what3words: row.what3words,
+    equipmentId: String(row.equipment_id ?? ''),
+    area: String(row.area ?? ''),
+    location: String(row.location ?? ''),
+    what3words: rawW3w,
     latitude,
     longitude,
-    type: row.type,
+    type: (row.type as Equipment['type']) || 'GENERATOR',
     capacity: row.capacity ?? undefined,
-    rentalSerialNumber: row.rental_serial_number,
+    rentalSerialNumber: String(row.rental_serial_number ?? ''),
     poweredUpTimestamp: row.powered_up_timestamp ?? undefined,
     poweredDownTimestamp: row.powered_down_timestamp ?? undefined,
     updatedAt: row.updated_at,
@@ -1056,31 +1058,35 @@ export async function uploadTransactionToCloud(
 
     // Step 3: Update equipment power state in Supabase if PoweredUp / PoweredDown
     if (tx.transactionType === 'PoweredUp') {
-      const { error: pwrErr } = await client
+      const { data: updatedEqRow, error: pwrErr } = await client
         .from('equipment_list')
         .update({
           powered_up_timestamp: tx.transactionTimestamp,
           powered_down_timestamp: null,
           updated_at: new Date().toISOString(),
         })
-        .eq('equipment_id', tx.equipmentId);
+        .eq('equipment_id', tx.equipmentId)
+        .select('*')
+        .maybeSingle();
       if (pwrErr) {
         console.warn('Supabase equipment PoweredUp update warning:', pwrErr);
-      } else {
-        broadcastEquipmentUpdate({ equipment_id: tx.equipmentId });
+      } else if (updatedEqRow && updatedEqRow.equipment_id) {
+        broadcastEquipmentUpdate(updatedEqRow as Record<string, unknown>);
       }
     } else if (tx.transactionType === 'PoweredDown') {
-      const { error: pwrErr } = await client
+      const { data: updatedEqRow, error: pwrErr } = await client
         .from('equipment_list')
         .update({
           powered_down_timestamp: tx.transactionTimestamp,
           updated_at: new Date().toISOString(),
         })
-        .eq('equipment_id', tx.equipmentId);
+        .eq('equipment_id', tx.equipmentId)
+        .select('*')
+        .maybeSingle();
       if (pwrErr) {
         console.warn('Supabase equipment PoweredDown update warning:', pwrErr);
-      } else {
-        broadcastEquipmentUpdate({ equipment_id: tx.equipmentId });
+      } else if (updatedEqRow && updatedEqRow.equipment_id) {
+        broadcastEquipmentUpdate(updatedEqRow as Record<string, unknown>);
       }
     }
 
@@ -1671,7 +1677,24 @@ export function subscribeToCloudChanges(
         if (ev.data && ev.data.type === 'BULK_DELETE') {
           onDataChange('transactions', 'BULK_DELETE', { old: ev.data });
         } else if (ev.data && ev.data.type === 'EQUIPMENT_UPDATE' && ev.data.row) {
-          onDataChange('equipment_list', 'UPDATE', { new: ev.data.row });
+          const rowObj = ev.data.row as Record<string, unknown>;
+          if (typeof rowObj.type === 'string' && typeof rowObj.what3words === 'string') {
+            onDataChange('equipment_list', 'UPDATE', { new: rowObj });
+          } else if (typeof rowObj.equipment_id === 'string') {
+            client
+              .from('equipment_list')
+              .select('*')
+              .eq('equipment_id', rowObj.equipment_id)
+              .maybeSingle()
+              .then(
+                ({ data: verifiedRow }) => {
+                  if (verifiedRow && verifiedRow.equipment_id) {
+                    onDataChange('equipment_list', 'UPDATE', { new: verifiedRow as Record<string, unknown> });
+                  }
+                },
+                () => {}
+              );
+          }
         } else if (ev.data && ev.data.type === 'EQUIPMENT_DELETE' && typeof ev.data.equipmentId === 'string') {
           onDataChange('equipment_list', 'DELETE', { old: { equipment_id: ev.data.equipmentId } });
         } else if (ev.data && ev.data.type === 'FLEET_RESYNC') {

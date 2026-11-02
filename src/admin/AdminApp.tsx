@@ -254,48 +254,49 @@ export const AdminApp: React.FC = () => {
         if (table === 'transactions') {
           if ((eventType === 'INSERT' || eventType === 'UPDATE') && newRec && newRec.id) {
             const mappedTx = mapSupabaseRowToTransaction(newRec);
-            setTransactions((prevTxs) => {
-              const exists = prevTxs.some((t) => t.id === mappedTx.id);
-              const nextTxs = exists
-                ? prevTxs.map((t) => (t.id === mappedTx.id ? mappedTx : t))
-                : [mappedTx, ...prevTxs];
-              nextTxs.sort(
-                (a, b) =>
-                  new Date(b.transactionTimestamp).getTime() -
-                  new Date(a.transactionTimestamp).getTime()
-              );
-              setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, nextTxs));
-              return nextTxs;
-            });
+            const prevTxs = transactionsRef.current;
+            const exists = prevTxs.some((t) => t.id === mappedTx.id);
+            const nextTxs = exists
+              ? prevTxs.map((t) => (t.id === mappedTx.id ? mappedTx : t))
+              : [mappedTx, ...prevTxs];
+            nextTxs.sort(
+              (a, b) =>
+                new Date(b.transactionTimestamp).getTime() -
+                new Date(a.transactionTimestamp).getTime()
+            );
+            transactionsRef.current = nextTxs;
+            setTransactions(nextTxs);
+            setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, nextTxs));
             return;
           }
           if (eventType === 'BULK_DELETE' && oldRec) {
             const eqId = oldRec.equipmentId ? String(oldRec.equipmentId) : null;
             const wipeAll = Boolean(oldRec.all);
             if (wipeAll) {
+              transactionsRef.current = [];
               setTransactions([]);
               setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, []));
               return;
             }
             if (eqId) {
-              setTransactions((prevTxs) => {
-                if (!prevTxs.some((t) => t.equipmentId === eqId)) return prevTxs;
-                const nextTxs = prevTxs.filter((t) => t.equipmentId !== eqId);
-                setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, nextTxs));
-                return nextTxs;
-              });
+              const prevTxs = transactionsRef.current;
+              if (!prevTxs.some((t) => t.equipmentId === eqId)) return;
+              const nextTxs = prevTxs.filter((t) => t.equipmentId !== eqId);
+              transactionsRef.current = nextTxs;
+              setTransactions(nextTxs);
+              setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, nextTxs));
               return;
             }
             return;
           }
           if (eventType === 'DELETE' && oldRec && oldRec.id) {
             const delId = String(oldRec.id);
-            setTransactions((prevTxs) => {
-              if (!prevTxs.some((t) => t.id === delId)) return prevTxs;
-              const nextTxs = prevTxs.filter((t) => t.id !== delId);
-              setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, nextTxs));
-              return nextTxs;
-            });
+            const prevTxs = transactionsRef.current;
+            if (!prevTxs.some((t) => t.id === delId)) return;
+            const nextTxs = prevTxs.filter((t) => t.id !== delId);
+            transactionsRef.current = nextTxs;
+            setTransactions(nextTxs);
+            setAssets((prevAssets) => reconcileEquipmentPowerStates(prevAssets, nextTxs));
             return;
           }
         }
@@ -306,7 +307,19 @@ export const AdminApp: React.FC = () => {
             setAssets((prevAssets) => {
               const exists = prevAssets.some((a) => a.equipmentId === mappedEq.equipmentId);
               const nextAssets = exists
-                ? prevAssets.map((a) => (a.equipmentId === mappedEq.equipmentId ? mappedEq : a))
+                ? prevAssets.map((a) => {
+                    if (a.equipmentId !== mappedEq.equipmentId) return a;
+                    return {
+                      ...a,
+                      ...mappedEq,
+                      area: mappedEq.area || a.area,
+                      location: mappedEq.location || a.location,
+                      what3words: mappedEq.what3words || a.what3words,
+                      type: (newRec.type as Equipment['type']) || a.type,
+                      capacity: mappedEq.capacity !== undefined ? mappedEq.capacity : a.capacity,
+                      rentalSerialNumber: mappedEq.rentalSerialNumber || a.rentalSerialNumber,
+                    };
+                  })
                 : [...prevAssets, mappedEq];
               return reconcileEquipmentPowerStates(nextAssets, transactionsRef.current);
             });
