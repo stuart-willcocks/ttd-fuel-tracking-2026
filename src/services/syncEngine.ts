@@ -56,6 +56,7 @@ class SyncEngine {
     equipment: false,
     transactions: false,
   };
+  private pendingFollowUpSync: { equipment: boolean; transactions: boolean } | null = null;
   private lastAuthCheckResult: boolean = false;
   private lastAuthCheckTime: number = 0;
 
@@ -83,6 +84,12 @@ class SyncEngine {
           this.syncWithRemote();
         }
       });
+      window.addEventListener('focus', () => {
+        if ((typeof document === 'undefined' || !document.hidden) && this.isEffectivelyOnline()) {
+          this.verifyDeviceAuthorization(true);
+          this.syncWithRemote();
+        }
+      });
 
       // 1-minute local outbox check (0 bytes of network traffic unless local pending transactions exist)
       this.outboxTimer = setInterval(async () => {
@@ -96,13 +103,13 @@ class SyncEngine {
         }
       }, 60000);
 
-      // Deep 60-minute safety fallback poll (Supabase Realtime + reconnect handler handle instant updates)
+      // 20-second active sync poll while awake & online (ensures PDAs stay in sync even if a broadcast packet was missed)
       this.syncTimer = setInterval(() => {
         if (typeof document !== 'undefined' && document.hidden) return;
-        if (this.isEffectivelyOnline() && !this.isSyncing) {
+        if (this.isEffectivelyOnline() && !this.isSyncing && isDeviceEnrolled()) {
           this.syncWithRemote();
         }
-      }, 3600000);
+      }, 20000);
 
       // Periodic 15-second safety check for device authorization status (ensures immediate lockdown if Realtime WebSocket is blocked or delayed)
       this.authTimer = setInterval(() => {
@@ -788,10 +795,18 @@ class SyncEngine {
    * 2. Pull remote transactions and/or equipment from the central server and update local IndexedDB.
    */
   public async syncWithRemote(options?: { equipment?: boolean; transactions?: boolean }): Promise<void> {
-    if (!this.isEffectivelyOnline() || this.isSyncing) return;
+    if (!this.isEffectivelyOnline()) return;
 
     const fetchEq = options?.equipment ?? true;
     const fetchTx = options?.transactions ?? true;
+
+    if (this.isSyncing) {
+      this.pendingFollowUpSync = {
+        equipment: (this.pendingFollowUpSync?.equipment ?? false) || fetchEq,
+        transactions: (this.pendingFollowUpSync?.transactions ?? false) || fetchTx,
+      };
+      return;
+    }
 
     // Lock isSyncing synchronously BEFORE any await so concurrent 'online' + 'visibilitychange' events cannot race
     this.isSyncing = true;
@@ -1015,6 +1030,11 @@ class SyncEngine {
     } finally {
       this.isSyncing = false;
       await this.notify();
+      if (this.pendingFollowUpSync && this.isEffectivelyOnline()) {
+        const nextSync = this.pendingFollowUpSync;
+        this.pendingFollowUpSync = null;
+        this.syncWithRemote(nextSync);
+      }
     }
   }
 

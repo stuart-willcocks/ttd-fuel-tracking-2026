@@ -1064,7 +1064,11 @@ export async function uploadTransactionToCloud(
           updated_at: new Date().toISOString(),
         })
         .eq('equipment_id', tx.equipmentId);
-      if (pwrErr) console.warn('Supabase equipment PoweredUp update warning:', pwrErr);
+      if (pwrErr) {
+        console.warn('Supabase equipment PoweredUp update warning:', pwrErr);
+      } else {
+        broadcastEquipmentUpdate({ equipment_id: tx.equipmentId });
+      }
     } else if (tx.transactionType === 'PoweredDown') {
       const { error: pwrErr } = await client
         .from('equipment_list')
@@ -1073,7 +1077,11 @@ export async function uploadTransactionToCloud(
           updated_at: new Date().toISOString(),
         })
         .eq('equipment_id', tx.equipmentId);
-      if (pwrErr) console.warn('Supabase equipment PoweredDown update warning:', pwrErr);
+      if (pwrErr) {
+        console.warn('Supabase equipment PoweredDown update warning:', pwrErr);
+      } else {
+        broadcastEquipmentUpdate({ equipment_id: tx.equipmentId });
+      }
     }
 
     return { success: true, uploadTimestamp };

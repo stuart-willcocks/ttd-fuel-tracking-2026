@@ -453,6 +453,9 @@ export const App: React.FC = () => {
     setActiveAction(null);
     await loadAssetDetails(equipmentId);
     setCurrentView('ASSET_DETAIL_VIEW');
+    if (syncEngine.isEffectivelyOnline()) {
+      syncEngine.syncWithRemote({ equipment: false, transactions: true }).catch(() => {});
+    }
   };
 
   const handleBackToScanner = () => {

@@ -29,7 +29,10 @@ import {
   onAdminAuthStateChange,
   signOutAdmin,
   getInitialAuthUrlInfo,
+  subscribeToCloudChanges,
+  broadcastFleetResync,
 } from '../services/supabase';
+import { checkRemoteAppVersion, performAppUpdate, verifyPostUpdateBuild } from '../services/appUpdate';
 import { APP_VERSION, getIsStaging } from '../version';
 
 const ALLOWED_STRESS_TEST_EMAIL = 'design@stuartwillcocks.co.uk';
@@ -83,10 +86,85 @@ export const StressTestApp: React.FC = () => {
   const [errorCount, setErrorCount] = useState<number>(0);
   const [logs, setLogs] = useState<ExecutionLogEntry[]>([]);
   const abortRef = useRef<boolean>(false);
+  const [hasNewVersion, setHasNewVersion] = useState<boolean>(false);
+  const [newVersionTag, setNewVersionTag] = useState<string | null>(null);
 
   const isStaging = getIsStaging();
   const userEmail = adminSession?.user?.email?.trim().toLowerCase() || '';
   const isAuthorizedUser = userEmail === ALLOWED_STRESS_TEST_EMAIL;
+
+  // Automatic version check & cache-busted reload (matches AdminTopNav)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('v=')) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('v');
+        const cleanSearch = url.searchParams.toString();
+        window.history.replaceState({}, '', url.pathname + (cleanSearch ? `?${cleanSearch}` : '') + url.hash);
+      } catch {}
+    }
+
+    const verification = verifyPostUpdateBuild();
+    if (verification.status === 'verified') {
+      try {
+        sessionStorage.removeItem('ttd_stress_auto_update_target');
+      } catch {}
+    } else if (verification.status === 'retrying') {
+      return;
+    }
+
+    const checkVersion = async () => {
+      if (isRunning) return;
+      const res = await checkRemoteAppVersion();
+      if (res.hasUpdate && res.remoteBuild && res.remoteBuild > res.currentBuild) {
+        setHasNewVersion(true);
+        if (res.remoteVersion) setNewVersionTag(res.remoteVersion);
+        if (res.remoteVersion) {
+          try {
+            const rawAttempt = sessionStorage.getItem('ttd_stress_auto_update_target');
+            let shouldAutoUpdate = true;
+            if (rawAttempt) {
+              try {
+                const parsed = JSON.parse(rawAttempt) as { version?: string; ts?: number };
+                if (parsed.version === res.remoteVersion && parsed.ts && Date.now() - parsed.ts < 12000) {
+                  shouldAutoUpdate = false;
+                }
+              } catch {}
+            }
+            if (shouldAutoUpdate) {
+              sessionStorage.setItem(
+                'ttd_stress_auto_update_target',
+                JSON.stringify({ version: res.remoteVersion, ts: Date.now() })
+              );
+              performAppUpdate(res.remoteVersion);
+              return;
+            }
+          } catch {}
+        }
+      } else {
+        setHasNewVersion(false);
+        try {
+          sessionStorage.removeItem('ttd_stress_auto_update_target');
+        } catch {}
+      }
+    };
+
+    const initTimer = setTimeout(() => checkVersion(), 1500);
+    const interval = setInterval(() => checkVersion(), 15000);
+    const onFocusOrVisible = () => {
+      if (typeof document === 'undefined' || !document.hidden) {
+        checkVersion();
+      }
+    };
+    window.addEventListener('focus', onFocusOrVisible);
+    document.addEventListener('visibilitychange', onFocusOrVisible);
+    return () => {
+      clearTimeout(initTimer);
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocusOrVisible);
+      document.removeEventListener('visibilitychange', onFocusOrVisible);
+    };
+  }, [isRunning]);
 
   // Auth Session Check
   useEffect(() => {
@@ -148,9 +226,14 @@ export const StressTestApp: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isAuthorizedUser) {
-      loadEquipment();
-    }
+    if (!isAuthorizedUser) return;
+    loadEquipment();
+    const unsubRealtime = isSupabaseConfigured()
+      ? subscribeToCloudChanges(() => {})
+      : () => {};
+    return () => {
+      unsubRealtime();
+    };
   }, [isAuthorizedUser]);
 
   const selectedAsset = useMemo(
@@ -432,6 +515,7 @@ export const StressTestApp: React.FC = () => {
       }
     }
 
+    broadcastFleetResync();
     setIsRunning(false);
   };
 
@@ -600,6 +684,16 @@ export const StressTestApp: React.FC = () => {
                 STRESS TEST SIMULATOR
               </span>
               <span
+                onClick={() => {
+                  if (hasNewVersion) {
+                    performAppUpdate(newVersionTag || undefined);
+                  }
+                }}
+                title={
+                  hasNewVersion
+                    ? `Update to V${newVersionTag || ''} available. Click to reload with latest version.`
+                    : undefined
+                }
                 style={{
                   background: 'rgba(0,0,0,0.25)',
                   color: '#FFFFFF',
@@ -608,9 +702,18 @@ export const StressTestApp: React.FC = () => {
                   padding: '3px 8px',
                   borderRadius: '4px',
                   fontFamily: 'monospace',
+                  cursor: hasNewVersion ? 'pointer' : 'default',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
                 }}
               >
-                V{APP_VERSION}{isStaging ? ' (STAGING)' : ''}
+                <span>V{APP_VERSION}{isStaging ? ' (STAGING)' : ''}</span>
+                {hasNewVersion && (
+                  <span className="admin-version-alert-mark" title="A new app version is available. Click to update now.">
+                    !
+                  </span>
+                )}
               </span>
             </div>
             <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600, marginTop: '2px' }}>

@@ -41,13 +41,92 @@
     </style>
     <script>
       (function() {
+        // Clean cache-busting ?v= parameter from URL bar after page load completes
+        window.addEventListener('load', function() {
+          try {
+            if (window.location.search.indexOf('v=') !== -1) {
+              var u = new URL(window.location.href);
+              u.searchParams.delete('v');
+              var q = u.searchParams.toString();
+              window.history.replaceState({}, '', u.pathname + (q ? '?' + q : '') + u.hash);
+            }
+          } catch (e) {}
+        });
+
+        var hadControllerOnBoot = false;
         try {
           if ('serviceWorker' in navigator) {
+            hadControllerOnBoot = Boolean(navigator.serviceWorker.controller);
             navigator.serviceWorker.getRegistrations().then(function(regs) {
               return Promise.all(regs.map(function(r) { return r.unregister().catch(function() {}); }));
+            }).then(function() {
+              if ('caches' in window) {
+                caches.keys().then(function(keys) {
+                  keys.forEach(function(k) {
+                    if (k.indexOf('ttd-hashed-assets-cache') !== -1 || k.indexOf('workbox') !== -1) {
+                      caches.delete(k).catch(function() {});
+                    }
+                  });
+                }).catch(function() {});
+              }
             }).catch(function() {});
           }
         } catch (e) {}
+
+        var triggerStressSelfHeal = function() {
+          try {
+            var lastHealTs = Number(sessionStorage.getItem('ttd_stress_sw_heal_ts') || '0');
+            if (Date.now() - lastHealTs < 8000) return;
+            sessionStorage.setItem('ttd_stress_sw_heal_ts', String(Date.now()));
+          } catch (e) {}
+
+          var finishReload = function() {
+            var bust = new URL(window.location.origin + window.location.pathname + window.location.hash);
+            bust.searchParams.set('v', String(Date.now()));
+            window.location.replace(bust.toString());
+          };
+
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              return Promise.all(regs.map(function(r) { return r.unregister().catch(function() {}); }));
+            }).then(function() {
+              if ('caches' in window) {
+                return caches.keys().then(function(keys) {
+                  return Promise.all(keys.map(function(k) { return caches.delete(k).catch(function() {}); }));
+                });
+              }
+            }).finally(finishReload);
+          } else {
+            finishReload();
+          }
+        };
+
+        window.addEventListener('error', function(ev) {
+          var t = ev && ev.target;
+          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+            triggerStressSelfHeal();
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(ev) {
+          var reason = ev && ev.reason ? String(ev.reason.message || ev.reason) : '';
+          if (
+            reason.indexOf('Failed to fetch dynamically imported module') !== -1 ||
+            reason.indexOf('Importing a module script failed') !== -1 ||
+            reason.indexOf('error loading dynamically imported module') !== -1
+          ) {
+            triggerStressSelfHeal();
+          }
+        });
+
+        if (hadControllerOnBoot) {
+          setTimeout(function() {
+            var root = document.getElementById('stress-test-root');
+            if (root && root.childNodes.length === 0) {
+              triggerStressSelfHeal();
+            }
+          }, 3500);
+        }
       })();
     </script>
   </head>

@@ -173,7 +173,7 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
         {/* Link to Stress Test App (visible only to design@stuartwillcocks.co.uk) */}
         {adminEmail?.trim().toLowerCase() === 'design@stuartwillcocks.co.uk' && (
           <a
-            href="/stress-test"
+            href={`/stress-test?v=${APP_VERSION}`}
             target="_blank"
             rel="noreferrer"
             className="admin-top-tool-btn"
