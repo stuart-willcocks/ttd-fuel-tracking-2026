@@ -149,6 +149,8 @@ export default defineConfig({
             req.url = '/admin.html' + query;
           } else if (url === '/stress-test' || url === '/stress-test/') {
             req.url = '/stress-test.html' + query;
+          } else if (url === '/pda' || url === '/pda/') {
+            req.url = '/index.html' + query;
           }
           next();
         });
@@ -162,6 +164,8 @@ export default defineConfig({
             req.url = '/admin.html' + query;
           } else if (url === '/stress-test' || url === '/stress-test/') {
             req.url = '/stress-test.html' + query;
+          } else if (url === '/pda' || url === '/pda/') {
+            req.url = '/index.html' + query;
           }
           next();
         });

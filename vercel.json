@@ -68,6 +68,24 @@
       ]
     },
     {
+      "source": "/pda",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/pda/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate, max-age=0"
+        }
+      ]
+    },
+    {
       "source": "/admin",
       "headers": [
         {
@@ -178,6 +196,14 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/pda",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/pda/(.*)",
+      "destination": "/index.html"
+    },
     {
       "source": "/admin",
       "destination": "/admin.html"

@@ -212,6 +212,9 @@ export async function performAppUpdate(targetVersion?: string): Promise<void> {
 
     const cleanUrl = window.location.origin + window.location.pathname;
     const urlsToRevalidate = [cleanUrl, `${window.location.origin}/index.html`, bustUrl.toString()];
+    if (window.location.pathname.startsWith('/pda')) {
+      urlsToRevalidate.push(`${window.location.origin}/pda`);
+    }
     if (window.location.pathname.startsWith('/admin')) {
       urlsToRevalidate.push(`${window.location.origin}/admin`, `${window.location.origin}/admin.html`);
     }

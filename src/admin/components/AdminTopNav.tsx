@@ -187,7 +187,7 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
 
         {/* Link to Zebra Handheld Field Web App */}
         <a
-          href="/"
+          href="/pda"
           target="_blank"
           rel="noreferrer"
           className="admin-top-tool-btn"
