@@ -34,6 +34,56 @@ function normalizeKey(str: string): string {
     .replace(/[^a-z0-9]/g, '');
 }
 
+const EMPTY_PLACEHOLDER_TOKENS = new Set([
+  'none',
+  'nil',
+  'null',
+  'n/a',
+  'na',
+  'n.a',
+  'n.a.',
+  'empty',
+  'blank',
+  'unspecified',
+  'unknown',
+  'tbc',
+  'tbd',
+  'not used',
+  'not applicable',
+  'not available',
+  'not known',
+  'no value',
+  'serial.none',
+  'what.three.words',
+]);
+
+/**
+ * Returns true if a cell value represents a blank or "(none)"-style placeholder
+ */
+function isEmptyPlaceholderValue(raw: unknown): boolean {
+  if (raw === null || raw === undefined) return true;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return true;
+  if (/^[-–—_?/\\]+$/.test(trimmed)) return true;
+
+  // Strip leading slashes (e.g. ///what.three.words) and surrounding brackets/parentheses/quotes
+  const stripped = trimmed
+    .replace(/^\/+/, '')
+    .replace(/^[\(\[\{<"']+|[\)\]\}>"']+$/g, '')
+    .trim()
+    .toLowerCase();
+
+  if (!stripped) return true;
+  if (EMPTY_PLACEHOLDER_TOKENS.has(stripped)) return true;
+  if (/^\(?none\)?$/i.test(stripped) || /\.none$/i.test(stripped)) return true;
+  return false;
+}
+
+function cleanCellString(raw: unknown): string {
+  if (isEmptyPlaceholderValue(raw)) return '';
+  return String(raw ?? '').trim();
+}
+
 /**
  * Validates and parses an .xlsx or .csv equipment file before applying it to the database.
  * Verifies that all expected column headings are present and that every data row is valid.
@@ -134,18 +184,35 @@ export async function validateAndParseEquipmentFile(
         return '';
       };
 
-      const rawId = String(getVal(['equipmentid']) ?? '').trim();
-      const rawArea = String(getVal(['area']) ?? '').trim();
-      const rawLocation = String(getVal(['location']) ?? '').trim();
-      const rawW3w = String(getVal(['what3words', 'w3w']) ?? '').trim();
-      const rawType = String(getVal(['type', 'equipmenttype', 'assettype']) ?? '').trim();
+      const rawIdCell = String(getVal(['equipmentid']) ?? '').trim();
+      const rawAreaCell = String(getVal(['area']) ?? '').trim();
+      const rawLocationCell = String(getVal(['location']) ?? '').trim();
+      const rawW3wCell = String(getVal(['what3words', 'w3w']) ?? '').trim();
+      const rawTypeCell = String(getVal(['type', 'equipmenttype', 'assettype']) ?? '').trim();
       const rawSize = getVal(['size', 'capacity']);
-      const rawSerial = String(getVal(['serialnumber', 'rentalserialnumber', 'rentalserial']) ?? '').trim();
+      const rawSizeCell = String(rawSize ?? '').trim();
+      const rawSerialCell = String(getVal(['serialnumber', 'rentalserialnumber', 'rentalserial']) ?? '').trim();
 
       // Skip completely blank rows
-      if (!rawId && !rawArea && !rawLocation && !rawW3w && !rawType && (rawSize === '' || rawSize === undefined) && !rawSerial) {
+      if (
+        !rawIdCell &&
+        !rawAreaCell &&
+        !rawLocationCell &&
+        !rawW3wCell &&
+        !rawTypeCell &&
+        !rawSizeCell &&
+        !rawSerialCell
+      ) {
         continue;
       }
+
+      const rawId = cleanCellString(rawIdCell);
+      const rawArea = cleanCellString(rawAreaCell);
+      const rawLocation = cleanCellString(rawLocationCell);
+      const rawW3w = cleanCellString(rawW3wCell);
+      const rawType = cleanCellString(rawTypeCell);
+      const sizeStr = cleanCellString(rawSizeCell);
+      const rawSerial = cleanCellString(rawSerialCell);
 
       nonBlankRowCount++;
       const rowLabel = rawId ? `Row ${rowNum} (${rawId})` : `Row ${rowNum}`;
@@ -162,14 +229,10 @@ export async function validateAndParseEquipmentFile(
         blankFields.push('Location');
       }
 
-      // Validate what3words (permit blank; convert placeholder what.three.words to empty field)
+      // Validate what3words (permit blank; placeholders like what.three.words or (none) are already cleaned to '')
       let formattedW3w = '';
-      const cleanW3wCandidate = rawW3w.replace(/^\/+/, '').trim().toLowerCase();
       if (!rawW3w) {
         blankFields.push('what3words');
-      } else if (cleanW3wCandidate === 'what.three.words') {
-        formattedW3w = '';
-        blankFields.push('what3words (was "what.three.words")');
       } else {
         formattedW3w = rawW3w.startsWith('///') ? rawW3w : `///${rawW3w.replace(/^\/+/, '')}`;
         if (!isValidWhat3WordsFormat(formattedW3w)) {
@@ -206,7 +269,6 @@ export async function validateAndParseEquipmentFile(
 
       // Validate Size / Capacity (permit blank or 0)
       let capacity: number | undefined = undefined;
-      const sizeStr = String(rawSize ?? '').trim();
       if (!sizeStr) {
         if (resolvedType !== 'PLANT') {
           blankFields.push('Size');
@@ -222,6 +284,8 @@ export async function validateAndParseEquipmentFile(
           );
         } else if (parsedNum > 0) {
           capacity = Math.round(parsedNum);
+        } else {
+          blankFields.push('Size');
         }
       }
 
