@@ -25,11 +25,15 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    const rawW3w = what3words.trim();
+    const cleanW3w = rawW3w.replace(/^\/+/, '').trim();
+    const formattedW3w =
+      cleanW3w && cleanW3w.toLowerCase() !== 'what.three.words' ? `///${cleanW3w}` : '';
     onSave({
       ...asset,
       area: area.trim(),
       location: location.trim(),
-      what3words: what3words.trim().startsWith('///') ? what3words.trim() : `///${what3words.trim()}`,
+      what3words: formattedW3w,
       rentalSerialNumber: serial.trim(),
       updatedAt: new Date().toISOString(),
     });
@@ -52,7 +56,6 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
               className="text-input"
               value={area}
               onChange={(e) => setArea(e.target.value)}
-              required
             />
           </div>
 
@@ -63,7 +66,6 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
               className="text-input"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              required
             />
           </div>
 
@@ -75,7 +77,6 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
               placeholder="///filled.count.soap"
               value={what3words}
               onChange={(e) => setWhat3words(e.target.value)}
-              required
             />
           </div>
 
@@ -86,7 +87,6 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
               className="text-input"
               value={serial}
               onChange={(e) => setSerial(e.target.value)}
-              required
             />
           </div>
 

@@ -1,4 +1,4 @@
-export type AssetType = 'GENERATOR' | 'TANK' | 'PLANT';
+export type AssetType = 'GENERATOR' | 'TANK' | 'PLANT' | '';
 
 export type TransactionType =
   // Generator

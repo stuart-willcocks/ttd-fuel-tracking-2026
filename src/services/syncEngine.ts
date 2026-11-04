@@ -672,12 +672,15 @@ class SyncEngine {
           ? {
               ...existingEq,
               ...rawEq,
-              area: rawEq.area || existingEq.area,
-              location: rawEq.location || existingEq.location,
-              what3words: rawEq.what3words || existingEq.what3words,
-              type: (payload.new.type as typeof rawEq.type) || existingEq.type,
-              capacity: rawEq.capacity !== undefined ? rawEq.capacity : existingEq.capacity,
-              rentalSerialNumber: rawEq.rentalSerialNumber || existingEq.rentalSerialNumber,
+              area: payload.new.area !== undefined ? rawEq.area : existingEq.area,
+              location: payload.new.location !== undefined ? rawEq.location : existingEq.location,
+              what3words: payload.new.what3words !== undefined ? rawEq.what3words : existingEq.what3words,
+              type: payload.new.type !== undefined ? rawEq.type : existingEq.type,
+              capacity: 'capacity' in payload.new ? rawEq.capacity : existingEq.capacity,
+              rentalSerialNumber:
+                payload.new.rental_serial_number !== undefined
+                  ? rawEq.rentalSerialNumber
+                  : existingEq.rentalSerialNumber,
             }
           : rawEq;
         if (incomingEq.type === 'GENERATOR') {

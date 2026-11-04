@@ -312,12 +312,13 @@ export const AdminApp: React.FC = () => {
                     return {
                       ...a,
                       ...mappedEq,
-                      area: mappedEq.area || a.area,
-                      location: mappedEq.location || a.location,
-                      what3words: mappedEq.what3words || a.what3words,
-                      type: (newRec.type as Equipment['type']) || a.type,
-                      capacity: mappedEq.capacity !== undefined ? mappedEq.capacity : a.capacity,
-                      rentalSerialNumber: mappedEq.rentalSerialNumber || a.rentalSerialNumber,
+                      area: newRec.area !== undefined ? mappedEq.area : a.area,
+                      location: newRec.location !== undefined ? mappedEq.location : a.location,
+                      what3words: newRec.what3words !== undefined ? mappedEq.what3words : a.what3words,
+                      type: newRec.type !== undefined ? mappedEq.type : a.type,
+                      capacity: 'capacity' in newRec ? mappedEq.capacity : a.capacity,
+                      rentalSerialNumber:
+                        newRec.rental_serial_number !== undefined ? mappedEq.rentalSerialNumber : a.rentalSerialNumber,
                     };
                   })
                 : [...prevAssets, mappedEq];

@@ -621,7 +621,8 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                 </option>
                 {sortedAssets.map((eq) => (
                   <option key={eq.equipmentId} value={eq.equipmentId}>
-                    {eq.equipmentId} — {eq.type}
+                    {eq.equipmentId}
+                    {eq.type ? ` — ${eq.type}` : ''}
                     {eq.location ? ` (${eq.location})` : ''}
                   </option>
                 ))}
@@ -809,7 +810,7 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
             </div>
 
             {/* Validation Status Box */}
-            {validationResult.isValid ? (
+            {validationResult.isValid && (
               <div
                 style={{
                   padding: '14px 16px',
@@ -837,21 +838,47 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                   )}
                 </div>
               </div>
-            ) : (
+            )}
+
+            {/* Validation Errors and Warnings Box */}
+            {(validationResult.errors.length > 0 || validationResult.warnings.length > 0) && (
               <div
                 style={{
                   padding: '14px 16px',
                   borderRadius: '8px',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.4)',
-                  color: '#991b1b',
+                  background:
+                    validationResult.errors.length > 0
+                      ? 'rgba(239, 68, 68, 0.1)'
+                      : 'rgba(245, 158, 11, 0.12)',
+                  border:
+                    validationResult.errors.length > 0
+                      ? '1px solid rgba(239, 68, 68, 0.4)'
+                      : '1px solid rgba(245, 158, 11, 0.45)',
+                  color: validationResult.errors.length > 0 ? '#991b1b' : '#92400e',
                   fontSize: '0.88rem',
                   marginBottom: '14px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, marginBottom: '8px', color: '#dc2626' }}>
-                  <XCircle size={18} />
-                  <span>Validation errors found ({validationResult.errors.length}) — database was not modified:</span>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontWeight: 700,
+                    marginBottom: '8px',
+                    color: validationResult.errors.length > 0 ? '#dc2626' : '#b45309',
+                  }}
+                >
+                  {validationResult.errors.length > 0 ? (
+                    <XCircle size={18} />
+                  ) : (
+                    <AlertTriangle size={18} />
+                  )}
+                  <span>
+                    Validation errors and warnings (
+                    {validationResult.errors.length + validationResult.warnings.length})
+                    {validationResult.errors.length > 0 ? ' — database was not modified:' : ':'}
+                  </span>
                 </div>
                 <div
                   style={{
@@ -862,12 +889,33 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                     padding: '10px 12px',
                     fontSize: '0.82rem',
                     lineHeight: 1.5,
-                    color: '#fecaca',
+                    color: '#f8fafc',
                   }}
                 >
                   {validationResult.errors.map((err, idx) => (
-                    <div key={idx} style={{ marginBottom: idx < validationResult.errors.length - 1 ? '6px' : 0 }}>
-                      • {err}
+                    <div
+                      key={`err-${idx}`}
+                      style={{
+                        color: '#fecaca',
+                        marginBottom:
+                          idx < validationResult.errors.length - 1 ||
+                          validationResult.warnings.length > 0
+                            ? '6px'
+                            : 0,
+                      }}
+                    >
+                      • Error: {err}
+                    </div>
+                  ))}
+                  {validationResult.warnings.map((warn, idx) => (
+                    <div
+                      key={`warn-${idx}`}
+                      style={{
+                        color: '#fde68a',
+                        marginBottom: idx < validationResult.warnings.length - 1 ? '6px' : 0,
+                      }}
+                    >
+                      • Warning: {warn}
                     </div>
                   ))}
                 </div>
@@ -949,8 +997,12 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                           >
                             {eq.equipmentId}
                           </td>
-                          <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{eq.area}</td>
-                          <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{eq.location}</td>
+                          <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
+                            {eq.area || <span style={{ color: 'var(--adm-text-muted)' }}>—</span>}
+                          </td>
+                          <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
+                            {eq.location || <span style={{ color: 'var(--adm-text-muted)' }}>—</span>}
+                          </td>
                           <td
                             style={{
                               padding: '6px 10px',
@@ -958,14 +1010,14 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            {eq.what3words}
+                            {eq.what3words || <span style={{ color: 'var(--adm-text-muted)' }}>—</span>}
                           </td>
                           <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', fontWeight: 600 }}>
-                            {eq.type}
+                            {eq.type || <span style={{ color: 'var(--adm-text-muted)', fontWeight: 400 }}>—</span>}
                           </td>
                           <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
                             {eq.capacity !== undefined
-                              ? `${eq.capacity} ${eq.type === 'GENERATOR' ? 'kVA' : 'L'}`
+                              ? `${eq.capacity}${eq.type === 'GENERATOR' ? ' kVA' : eq.type === 'TANK' ? ' L' : ''}`
                               : '—'}
                           </td>
                           <td
@@ -975,7 +1027,7 @@ export const DangerZoneModal: React.FC<DangerZoneModalProps> = ({
                               whiteSpace: 'nowrap',
                             }}
                           >
-                            {eq.rentalSerialNumber}
+                            {eq.rentalSerialNumber || <span style={{ color: 'var(--adm-text-muted)' }}>—</span>}
                           </td>
                         </tr>
                       ))}

@@ -21,7 +21,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 }) => {
   const isGen = asset.type === 'GENERATOR';
   const isTank = asset.type === 'TANK';
-  const isPlant = asset.type === 'PLANT';
+  const isPlant = asset.type === 'PLANT' || !asset.type;
 
   // Form field state
   const [fuelPercentage, setFuelPercentage] = useState<string>('');
@@ -60,13 +60,14 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
   // Action title
   const actionTitle = useMemo(() => {
+    const label = asset.type || 'EQUIPMENT';
     switch (action) {
       case 'check-in':
-        return `CHECK IN ${asset.type}`;
+        return `CHECK IN ${label}`;
       case 'check-out':
-        return `CHECK OUT ${asset.type}`;
+        return `CHECK OUT ${label}`;
       case 'record-fuel':
-        return `TRANSFER FUEL TO ${asset.type}`;
+        return `TRANSFER FUEL TO ${label}`;
       default:
         return 'RECORD TRANSACTION';
     }

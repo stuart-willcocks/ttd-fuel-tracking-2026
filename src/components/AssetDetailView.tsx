@@ -325,18 +325,20 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       {/* 2. METADATA SECTION: Non-monospace what3words, light grey asset data, no equipment type text */}
       <div className="asset-detail-meta-box">
         {/* what3words: Clickable to launch in-app map */}
-        <button
-          type="button"
-          className="asset-detail-w3w asset-detail-w3w-btn"
-          onClick={() => setIsMapModalOpen(true)}
-          title="Open location map"
-        >
-          <MapPin size={14} style={{ flexShrink: 0 }} />
-          <span>{cleanW3w}</span>
-        </button>
+        {cleanW3w ? (
+          <button
+            type="button"
+            className="asset-detail-w3w asset-detail-w3w-btn"
+            onClick={() => setIsMapModalOpen(true)}
+            title="Open location map"
+          >
+            <MapPin size={14} style={{ flexShrink: 0 }} />
+            <span>{cleanW3w}</span>
+          </button>
+        ) : null}
 
         {/* Asset Capacity & Serial Number */}
-        {(asset.capacity !== undefined || asset.rentalSerialNumber) && (
+        {(asset.capacity || asset.rentalSerialNumber) && (
           <div className="asset-detail-spec">
             {asset.capacity ? `${asset.capacity} ${isGenerator ? 'kVA' : 'L'}` : ''}
             {asset.capacity && asset.rentalSerialNumber ? ' • ' : ''}
@@ -345,10 +347,10 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
         )}
 
         {/* Area */}
-        <div className="asset-detail-area">{asset.area.toUpperCase()}</div>
+        {asset.area ? <div className="asset-detail-area">{asset.area.toUpperCase()}</div> : null}
 
         {/* Location */}
-        <div className="asset-detail-location">{asset.location.toUpperCase()}</div>
+        {asset.location ? <div className="asset-detail-location">{asset.location.toUpperCase()}</div> : null}
       </div>
 
       {/* 3. TRANSACTIONS LIST: Vertically scrollable pane, reverse timestamp order */}

@@ -70,7 +70,7 @@ export function normalizeWhat3Words(raw?: string | null): string {
  */
 export function isValidWhat3WordsFormat(raw?: string | null): boolean {
   const clean = normalizeWhat3Words(raw);
-  if (!clean) return false;
+  if (!clean || clean === 'what.three.words') return false;
   const parts = clean.split('.');
   return parts.length === 3 && parts.every((p) => p.length >= 1 && !/\s/.test(p));
 }
@@ -208,6 +208,14 @@ export async function resolveEquipmentCoordinates(
   previousWhat3Words?: string
 ): Promise<Equipment> {
   const currentClean = normalizeWhat3Words(equipment.what3words);
+  if (!currentClean || currentClean === 'what.three.words') {
+    return {
+      ...equipment,
+      what3words: currentClean === 'what.three.words' ? '' : equipment.what3words,
+      latitude: undefined,
+      longitude: undefined,
+    };
+  }
   const prevClean = previousWhat3Words !== undefined ? normalizeWhat3Words(previousWhat3Words) : undefined;
   const w3wChanged = prevClean !== undefined && prevClean !== currentClean;
 

@@ -287,10 +287,10 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       initId = initialAsset.equipmentId;
       initType = initialAsset.type;
       initCap = initialAsset.capacity !== undefined ? String(initialAsset.capacity) : '';
-      initArea = initialAsset.area || 'North Zone';
-      initLoc = initialAsset.location || '';
-      initW3w = stripW3wPrefix(initialAsset.what3words || 'field.power.setup');
-      initRsn = initialAsset.rentalSerialNumber || '';
+      initArea = initialAsset.area ?? '';
+      initLoc = initialAsset.location ?? '';
+      initW3w = stripW3wPrefix(initialAsset.what3words ?? '');
+      initRsn = initialAsset.rentalSerialNumber ?? '';
     } else {
       initId = suggestNextId();
       initType = 'GENERATOR';
@@ -340,12 +340,19 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     );
   }, [initialFormState, equipmentId, type, capacity, area, location, what3words, rentalSerialNumber]);
 
-  // Mandatory fields validation
+  // Mandatory fields validation (Equipment ID required; other fields optional in edit mode)
   const isValid = useMemo(() => {
     const cleanId = equipmentId.trim().toUpperCase();
     if (!cleanId) return false;
     if (!isEditMode && existingAssets.some((a) => a.equipmentId.toUpperCase() === cleanId)) {
       return false;
+    }
+    if (isEditMode) {
+      if (type !== 'PLANT' && capacity.trim() !== '') {
+        const capNum = parseInt(capacity, 10);
+        if (isNaN(capNum) || capNum <= 0) return false;
+      }
+      return true;
     }
     if (!type) return false;
     if (type !== 'PLANT') {
@@ -393,20 +400,21 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     }
 
     const cleanW3w = stripW3wPrefix(what3words.trim());
-    const finalW3w = cleanW3w ? `///${cleanW3w}` : '///field.power.setup';
+    const finalW3w = cleanW3w && cleanW3w.toLowerCase() !== 'what.three.words' ? `///${cleanW3w}` : '';
 
-    const parsedCap = type === 'PLANT' ? undefined : capacity ? parseInt(capacity, 10) : undefined;
+    const parsedCap =
+      type === 'PLANT' || !capacity.trim() ? undefined : parseInt(capacity, 10) || undefined;
 
     const updatedEquipment: Equipment = {
       equipmentId: cleanId,
       type,
       capacity: parsedCap,
-      area: area.trim() || 'Site Area',
-      location: location.trim() || 'Field Station',
+      area: area.trim(),
+      location: location.trim(),
       what3words: finalW3w,
       latitude: initialAsset?.latitude,
       longitude: initialAsset?.longitude,
-      rentalSerialNumber: rentalSerialNumber.trim() || 'RSN-UNKNOWN',
+      rentalSerialNumber: rentalSerialNumber.trim(),
       poweredUpTimestamp: initialAsset?.poweredUpTimestamp,
       poweredDownTimestamp: initialAsset?.poweredDownTimestamp,
       updatedAt: new Date().toISOString(),
@@ -511,10 +519,11 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 onChange={(e) => {
                   const newType = e.target.value as AssetType;
                   setType(newType);
-                  if (newType === 'GENERATOR' && !capacity) setCapacity('100');
-                  if (newType === 'TANK' && !capacity) setCapacity('3000');
+                  if (newType === 'GENERATOR' && !capacity && !isEditMode) setCapacity('100');
+                  if (newType === 'TANK' && !capacity && !isEditMode) setCapacity('3000');
                 }}
               >
+                {isEditMode && <option value="">Unspecified</option>}
                 <option value="GENERATOR">Generator</option>
                 <option value="TANK">Tank</option>
                 <option value="PLANT">Plant</option>

@@ -27,7 +27,9 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   const isMouseDownOnBackdrop = useRef<boolean>(false);
 
   const assetType = useMemo<'GENERATOR' | 'TANK' | 'PLANT'>(() => {
-    if (asset?.type) return asset.type;
+    if (asset?.type === 'GENERATOR' || asset?.type === 'TANK' || asset?.type === 'PLANT') {
+      return asset.type;
+    }
     const t = transaction?.transactionType || '';
     if (t.includes('Tank')) return 'TANK';
     if (t.includes('Plant')) return 'PLANT';

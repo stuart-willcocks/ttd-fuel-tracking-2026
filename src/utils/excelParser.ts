@@ -10,6 +10,7 @@ export interface EquipmentFileValidationResult {
   detectedHeaders: string[];
   missingHeaders: string[];
   errors: string[];
+  warnings: string[];
   equipmentList: Equipment[];
   newCount: number;
   overwriteCount: number;
@@ -65,6 +66,7 @@ export async function validateAndParseEquipmentFile(
       detectedHeaders: [],
       missingHeaders: REQUIRED_COLUMNS.map((c) => c.label),
       errors: ['Could not find an "EquipmentList" sheet in the selected file.'],
+      warnings: [],
       equipmentList: [],
       newCount: 0,
       overwriteCount: 0,
@@ -84,6 +86,7 @@ export async function validateAndParseEquipmentFile(
       detectedHeaders: [],
       missingHeaders: REQUIRED_COLUMNS.map((c) => c.label),
       errors: ['The selected sheet is empty.'],
+      warnings: [],
       equipmentList: [],
       newCount: 0,
       overwriteCount: 0,
@@ -103,6 +106,7 @@ export async function validateAndParseEquipmentFile(
   }
 
   const errors: string[] = [];
+  const warnings: string[] = [];
   const headersValid = missingHeaders.length === 0;
   if (!headersValid) {
     errors.push(
@@ -149,21 +153,25 @@ export async function validateAndParseEquipmentFile(
       if (!rawId) {
         errors.push(`${rowLabel}: Missing EquipmentId.`);
       }
+
+      const blankFields: string[] = [];
       if (!rawArea) {
-        errors.push(`${rowLabel}: Missing Area.`);
+        blankFields.push('Area');
       }
       if (!rawLocation) {
-        errors.push(`${rowLabel}: Missing Location.`);
+        blankFields.push('Location');
       }
 
-      // Validate what3words
-      let formattedW3w = rawW3w;
+      // Validate what3words (permit blank; convert placeholder what.three.words to empty field)
+      let formattedW3w = '';
+      const cleanW3wCandidate = rawW3w.replace(/^\/+/, '').trim().toLowerCase();
       if (!rawW3w) {
-        errors.push(`${rowLabel}: Missing what3words location.`);
+        blankFields.push('what3words');
+      } else if (cleanW3wCandidate === 'what.three.words') {
+        formattedW3w = '';
+        blankFields.push('what3words (was "what.three.words")');
       } else {
-        if (!formattedW3w.startsWith('///')) {
-          formattedW3w = `///${formattedW3w.replace(/^\/+/, '')}`;
-        }
+        formattedW3w = rawW3w.startsWith('///') ? rawW3w : `///${rawW3w.replace(/^\/+/, '')}`;
         if (!isValidWhat3WordsFormat(formattedW3w)) {
           errors.push(
             `${rowLabel}: Invalid what3words "${rawW3w}" (expected 3 words separated by dots, e.g. ///word.word.word).`
@@ -171,10 +179,13 @@ export async function validateAndParseEquipmentFile(
         }
       }
 
-      // Validate Type
+      // Validate Type (permit blank)
       const upperType = rawType.toUpperCase();
       let resolvedType: AssetType | null = null;
-      if (upperType === 'GENERATOR' || upperType === 'GEN' || upperType.includes('GENERATOR')) {
+      if (!rawType) {
+        resolvedType = '';
+        blankFields.push('Type');
+      } else if (upperType === 'GENERATOR' || upperType === 'GEN' || upperType.includes('GENERATOR')) {
         resolvedType = 'GENERATOR';
       } else if (upperType === 'TANK' || upperType.includes('TANK') || upperType.includes('BOWSER')) {
         resolvedType = 'TANK';
@@ -189,48 +200,52 @@ export async function validateAndParseEquipmentFile(
         resolvedType = 'PLANT';
       } else {
         errors.push(
-          `${rowLabel}: Invalid Type "${rawType || '(blank)'}" (expected GENERATOR, TANK, or PLANT).`
+          `${rowLabel}: Invalid Type "${rawType}" (expected GENERATOR, TANK, PLANT, or blank).`
         );
       }
 
-      // Validate Size / Capacity
+      // Validate Size / Capacity (permit blank or 0)
       let capacity: number | undefined = undefined;
       const sizeStr = String(rawSize ?? '').trim();
-      if (resolvedType === 'GENERATOR' || resolvedType === 'TANK') {
-        if (!sizeStr) {
-          errors.push(`${rowLabel}: Missing Size/Capacity for ${resolvedType}.`);
-        } else {
-          const parsedNum =
-            typeof rawSize === 'number'
-              ? rawSize
-              : Number(sizeStr.replace(/,/g, '').replace(/\s*(kva|l|litres|liters)$/i, ''));
-          if (Number.isNaN(parsedNum) || parsedNum <= 0) {
-            errors.push(
-              `${rowLabel}: Invalid Size/Capacity "${sizeStr}" for ${resolvedType} (must be a positive number).`
-            );
-          } else {
-            capacity = Math.round(parsedNum);
-          }
+      if (!sizeStr) {
+        if (resolvedType !== 'PLANT') {
+          blankFields.push('Size');
+        }
+      } else if (resolvedType !== 'PLANT') {
+        const parsedNum =
+          typeof rawSize === 'number'
+            ? rawSize
+            : Number(sizeStr.replace(/,/g, '').replace(/\s*(kva|l|litres|liters)$/i, ''));
+        if (Number.isNaN(parsedNum) || parsedNum < 0) {
+          errors.push(
+            `${rowLabel}: Invalid Size/Capacity "${sizeStr}" (must be a non-negative number or blank).`
+          );
+        } else if (parsedNum > 0) {
+          capacity = Math.round(parsedNum);
         }
       }
 
-      // Validate SerialNumber
+      // Validate SerialNumber (permit blank)
       if (!rawSerial) {
-        errors.push(`${rowLabel}: Missing SerialNumber.`);
+        blankFields.push('SerialNumber');
       }
 
-      if (rawId && resolvedType) {
+      if (blankFields.length > 0) {
+        warnings.push(`${rowLabel}: Blank field(s) — ${blankFields.join(', ')}.`);
+      }
+
+      if (rawId && resolvedType !== null) {
         if (dedupedById.has(rawId)) {
           inFileDuplicateCount++;
         }
         dedupedById.set(rawId, {
           equipmentId: rawId,
-          area: rawArea || 'Site Area',
-          location: rawLocation || 'Field Station',
-          what3words: formattedW3w || '///field.power.setup',
+          area: rawArea,
+          location: rawLocation,
+          what3words: formattedW3w,
           type: resolvedType,
           capacity,
-          rentalSerialNumber: rawSerial || 'RSN-UNKNOWN',
+          rentalSerialNumber: rawSerial,
           updatedAt: new Date().toISOString(),
         });
       }
@@ -261,6 +276,7 @@ export async function validateAndParseEquipmentFile(
     detectedHeaders: rawHeaderRow,
     missingHeaders,
     errors,
+    warnings,
     equipmentList,
     newCount,
     overwriteCount,

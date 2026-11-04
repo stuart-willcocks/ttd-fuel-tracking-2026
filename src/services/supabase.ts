@@ -145,6 +145,26 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 /**
+ * Encodes coordinates and optional blank-type metadata into `device_id` on `equipment_list`
+ */
+function encodeEquipmentDeviceMeta(eq: Equipment): string | null {
+  const cleanW3w = normalizeWhat3Words(eq.what3words);
+  const hasCoords = typeof eq.latitude === 'number' && typeof eq.longitude === 'number';
+  const isBlankType = !eq.type;
+  if (!hasCoords && !isBlankType) return null;
+  const meta: Record<string, unknown> = {};
+  if (hasCoords) {
+    meta.lat = eq.latitude;
+    meta.lng = eq.longitude;
+    meta.w3w = cleanW3w;
+  }
+  if (isBlankType) {
+    meta.blankType = true;
+  }
+  return JSON.stringify(meta);
+}
+
+/**
  * Map a raw Supabase `equipment_list` row to an `Equipment` domain object
  */
 export function mapSupabaseRowToEquipment(row: any): Equipment {
@@ -152,20 +172,26 @@ export function mapSupabaseRowToEquipment(row: any): Equipment {
     typeof row.latitude === 'number' && !Number.isNaN(row.latitude) ? row.latitude : undefined;
   let longitude: number | undefined =
     typeof row.longitude === 'number' && !Number.isNaN(row.longitude) ? row.longitude : undefined;
+  let blankType = false;
 
   const rawW3w = typeof row.what3words === 'string' ? row.what3words : '';
 
-  if ((latitude === undefined || longitude === undefined) && typeof row.device_id === 'string' && row.device_id.startsWith('{')) {
+  if (typeof row.device_id === 'string' && row.device_id.startsWith('{')) {
     try {
       const parsed = JSON.parse(row.device_id);
-      const cleanRowW3w = normalizeWhat3Words(rawW3w);
-      if (
-        typeof parsed.lat === 'number' &&
-        typeof parsed.lng === 'number' &&
-        (!parsed.w3w || normalizeWhat3Words(parsed.w3w) === cleanRowW3w)
-      ) {
-        latitude = parsed.lat;
-        longitude = parsed.lng;
+      if (parsed?.blankType === true) {
+        blankType = true;
+      }
+      if (latitude === undefined || longitude === undefined) {
+        const cleanRowW3w = normalizeWhat3Words(rawW3w);
+        if (
+          typeof parsed.lat === 'number' &&
+          typeof parsed.lng === 'number' &&
+          (!parsed.w3w || normalizeWhat3Words(parsed.w3w) === cleanRowW3w)
+        ) {
+          latitude = parsed.lat;
+          longitude = parsed.lng;
+        }
       }
     } catch {
       // Ignore non-JSON device_id values
@@ -176,6 +202,8 @@ export function mapSupabaseRowToEquipment(row: any): Equipment {
     primeWhat3WordsCache(rawW3w, latitude, longitude);
   }
 
+  const resolvedType: Equipment['type'] = blankType ? '' : ((row.type as Equipment['type']) || '');
+
   return {
     equipmentId: String(row.equipment_id ?? ''),
     area: String(row.area ?? ''),
@@ -183,7 +211,7 @@ export function mapSupabaseRowToEquipment(row: any): Equipment {
     what3words: rawW3w,
     latitude,
     longitude,
-    type: (row.type as Equipment['type']) || 'GENERATOR',
+    type: resolvedType,
     capacity: row.capacity ?? undefined,
     rentalSerialNumber: String(row.rental_serial_number ?? ''),
     poweredUpTimestamp: row.powered_up_timestamp ?? undefined,
@@ -232,19 +260,15 @@ export async function saveEquipmentToSupabase(equipment: Equipment, previousW3wH
   }
 
   const resolvedEq = await resolveEquipmentCoordinates(equipment, previousW3w);
-  const cleanW3w = normalizeWhat3Words(resolvedEq.what3words);
-  const encodedCoords =
-    typeof resolvedEq.latitude === 'number' && typeof resolvedEq.longitude === 'number'
-      ? JSON.stringify({ lat: resolvedEq.latitude, lng: resolvedEq.longitude, w3w: cleanW3w })
-      : null;
+  const encodedMeta = encodeEquipmentDeviceMeta(resolvedEq);
 
   const payload = {
     equipment_id: resolvedEq.equipmentId,
     area: resolvedEq.area,
     location: resolvedEq.location,
     what3words: resolvedEq.what3words,
-    device_id: encodedCoords,
-    type: resolvedEq.type,
+    device_id: encodedMeta,
+    type: resolvedEq.type || 'PLANT',
     capacity: resolvedEq.capacity ?? null,
     rental_serial_number: resolvedEq.rentalSerialNumber,
     powered_up_timestamp: resolvedEq.poweredUpTimestamp ?? null,
@@ -754,19 +778,15 @@ export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]):
   );
 
   const rows = resolvedList.map((eq) => {
-    const cleanW3w = normalizeWhat3Words(eq.what3words);
-    const encodedCoords =
-      typeof eq.latitude === 'number' && typeof eq.longitude === 'number'
-        ? JSON.stringify({ lat: eq.latitude, lng: eq.longitude, w3w: cleanW3w })
-        : null;
+    const encodedMeta = encodeEquipmentDeviceMeta(eq);
 
     const payload: Record<string, unknown> = {
       equipment_id: eq.equipmentId,
       area: eq.area,
       location: eq.location,
       what3words: eq.what3words,
-      device_id: encodedCoords,
-      type: eq.type,
+      device_id: encodedMeta,
+      type: eq.type || 'PLANT',
       capacity: eq.capacity ?? null,
       rental_serial_number: eq.rentalSerialNumber,
       updated_at: new Date().toISOString(),
@@ -935,25 +955,21 @@ export async function uploadTransactionToCloud(
       try {
         const localEq = await db.equipments.get(tx.equipmentId);
         if (localEq) {
-          const cleanW3w = normalizeWhat3Words(localEq.what3words);
-          const encodedCoords =
-            typeof localEq.latitude === 'number' && typeof localEq.longitude === 'number'
-              ? JSON.stringify({ lat: localEq.latitude, lng: localEq.longitude, w3w: cleanW3w })
-              : undefined;
+          const encodedMeta = encodeEquipmentDeviceMeta(localEq);
           const eqPayload: Record<string, unknown> = {
             equipment_id: localEq.equipmentId,
-            area: localEq.area || 'Site Area',
-            location: localEq.location || 'Field Grid',
-            what3words: localEq.what3words || '///field.power.setup',
-            type: localEq.type || 'GENERATOR',
+            area: localEq.area ?? '',
+            location: localEq.location ?? '',
+            what3words: localEq.what3words ?? '',
+            type: localEq.type || 'PLANT',
             capacity: localEq.capacity ?? null,
-            rental_serial_number: localEq.rentalSerialNumber || 'RSN-UNKNOWN',
+            rental_serial_number: localEq.rentalSerialNumber ?? '',
             powered_up_timestamp: localEq.poweredUpTimestamp ?? null,
             powered_down_timestamp: localEq.poweredDownTimestamp ?? null,
             updated_at: new Date().toISOString(),
           };
-          if (encodedCoords !== undefined) {
-            eqPayload.device_id = encodedCoords;
+          if (encodedMeta !== null) {
+            eqPayload.device_id = encodedMeta;
           }
           await client.from('equipment_list').upsert(eqPayload, { onConflict: 'equipment_id' });
           const retryAfterEq = await client

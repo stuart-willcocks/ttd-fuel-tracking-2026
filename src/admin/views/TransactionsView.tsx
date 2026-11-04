@@ -416,9 +416,11 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           {/* Top Row: Identity & Action Toolbar */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span className={`admin-badge admin-badge-${currentAsset.type.toLowerCase()}`} style={{ fontSize: '0.82rem', padding: '4px 10px' }}>
-                {currentAsset.type}
-              </span>
+              {currentAsset.type ? (
+                <span className={`admin-badge admin-badge-${currentAsset.type.toLowerCase()}`} style={{ fontSize: '0.82rem', padding: '4px 10px' }}>
+                  {currentAsset.type}
+                </span>
+              ) : null}
 
               {currentAsset.type === 'GENERATOR' && (
                 <span className={`admin-badge ${isCurrentAssetRunning ? 'admin-badge-running' : 'admin-badge-standby'}`}>
@@ -494,11 +496,13 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 Zone &amp; Location
               </span>
               <p style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--adm-text-primary)', margin: '3px 0 0' }}>
-                {currentAsset.area}
+                {currentAsset.area || '—'}
               </p>
-              <p style={{ fontSize: '0.78rem', color: 'var(--adm-text-secondary)', margin: '1px 0 0' }}>
-                {currentAsset.location}
-              </p>
+              {currentAsset.location ? (
+                <p style={{ fontSize: '0.78rem', color: 'var(--adm-text-secondary)', margin: '1px 0 0' }}>
+                  {currentAsset.location}
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -509,6 +513,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 {currentAsset.type === 'GENERATOR' && currentAsset.capacity ? `${currentAsset.capacity} kVA` : null}
                 {currentAsset.type === 'TANK' && currentAsset.capacity ? `${currentAsset.capacity.toLocaleString()} Litres` : null}
                 {currentAsset.type === 'PLANT' ? 'Unrated' : null}
+                {currentAsset.type !== 'PLANT' && !currentAsset.capacity ? '—' : null}
               </p>
             </div>
 
@@ -517,32 +522,36 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                 What3Words
               </span>
               <p style={{ fontFamily: 'var(--adm-font-mono)', fontWeight: 600, fontSize: '0.82rem', margin: '3px 0 0' }}>
-                <a
-                  href={getGoogleMapsExternalUrl(currentAsset.what3words, currentAsset.latitude, currentAsset.longitude)}
-                  onClick={(e) =>
-                    handleWhat3WordsLinkClick(
-                      e,
-                      currentAsset.what3words,
-                      currentAsset.latitude,
-                      currentAsset.longitude,
-                      (coords) => {
-                        postRemoteEquipment({
-                          ...currentAsset,
-                          latitude: coords.lat,
-                          longitude: coords.lng,
-                        }).catch(() => {});
-                      },
-                      currentAsset.type
-                    )
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                  title="Open location in Google Maps"
-                  style={{ color: 'var(--adm-accent-yellow)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                >
-                  <MapPin size={11} />
-                  <span>{currentAsset.what3words}</span>
-                </a>
+                {currentAsset.what3words ? (
+                  <a
+                    href={getGoogleMapsExternalUrl(currentAsset.what3words, currentAsset.latitude, currentAsset.longitude)}
+                    onClick={(e) =>
+                      handleWhat3WordsLinkClick(
+                        e,
+                        currentAsset.what3words,
+                        currentAsset.latitude,
+                        currentAsset.longitude,
+                        (coords) => {
+                          postRemoteEquipment({
+                            ...currentAsset,
+                            latitude: coords.lat,
+                            longitude: coords.lng,
+                          }).catch(() => {});
+                        },
+                        currentAsset.type
+                      )
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Open location in Google Maps"
+                    style={{ color: 'var(--adm-accent-yellow)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                  >
+                    <MapPin size={11} />
+                    <span>{currentAsset.what3words}</span>
+                  </a>
+                ) : (
+                  <span style={{ color: 'var(--adm-text-muted)' }}>—</span>
+                )}
               </p>
             </div>
 
