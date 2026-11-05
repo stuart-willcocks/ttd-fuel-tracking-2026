@@ -1,25 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  Zap,
   Play,
   Square,
   RefreshCw,
   ShieldAlert,
-  CheckCircle2,
-  AlertTriangle,
   ExternalLink,
   LogOut,
   Trash2,
-  Activity,
-  Fuel,
-  Droplets,
-  Clock,
-  Hash,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import '../admin/admin.css';
 import { AdminLoginView } from '../admin/components/AdminLoginView';
-import { TransactionTypeIcon } from '../components/TransactionTypeIcon';
 import type { Equipment, Transaction, TransactionType } from '../types';
 import { generateUUID } from '../types';
 import { fetchRemoteEquipment, postRemoteTransaction } from '../services/api';
@@ -93,7 +84,7 @@ export const StressTestApp: React.FC = () => {
   const userEmail = adminSession?.user?.email?.trim().toLowerCase() || '';
   const isAuthorizedUser = userEmail === ALLOWED_STRESS_TEST_EMAIL;
 
-  // Automatic version check & cache-busted reload (matches AdminTopNav)
+  // Automatic version check & cache-busted reload
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.search.includes('v=')) {
       try {
@@ -241,7 +232,6 @@ export const StressTestApp: React.FC = () => {
     [assets, selectedEquipmentId]
   );
 
-  // Generators support DEF in FuelTransferGenerator transactions and Power-Up / Power-Down events
   const isGenerator = selectedAsset?.type === 'GENERATOR';
   const isDefApplicable = isGenerator;
 
@@ -254,7 +244,7 @@ export const StressTestApp: React.FC = () => {
       case 'PLANT':
         return 'FuelTransferPlant';
       default:
-        return 'FuelTransferGenerator';
+        return 'FuelTransferPlant';
     }
   };
 
@@ -267,7 +257,7 @@ export const StressTestApp: React.FC = () => {
       case 'PLANT':
         return 'CheckInPlant';
       default:
-        return 'CheckInGenerator';
+        return 'CheckInPlant';
     }
   };
 
@@ -280,24 +270,16 @@ export const StressTestApp: React.FC = () => {
       case 'PLANT':
         return 'CheckOutPlant';
       default:
-        return 'CheckOutGenerator';
+        return 'CheckOutPlant';
     }
   };
 
-  const formatTxTypeBadge = (txType: TransactionType): { label: string; color: string; bg: string } => {
-    if (txType.startsWith('CheckIn')) {
-      return { label: 'Check-In', color: '#4ADE80', bg: 'rgba(34, 197, 94, 0.14)' };
-    }
-    if (txType.startsWith('CheckOut')) {
-      return { label: 'Check-Out', color: '#F87171', bg: 'rgba(239, 68, 68, 0.14)' };
-    }
-    if (txType === 'PoweredUp') {
-      return { label: 'Power-Up', color: '#34D399', bg: 'rgba(16, 185, 129, 0.15)' };
-    }
-    if (txType === 'PoweredDown') {
-      return { label: 'Power-Down', color: '#F87171', bg: 'rgba(239, 68, 68, 0.15)' };
-    }
-    return { label: 'Fuel Transfer', color: '#38BDF8', bg: 'rgba(56, 189, 248, 0.14)' };
+  const formatTxTypeLabel = (txType: TransactionType): string => {
+    if (txType.startsWith('CheckIn')) return 'Check-In';
+    if (txType.startsWith('CheckOut')) return 'Check-Out';
+    if (txType === 'PoweredUp') return 'Power-Up';
+    if (txType === 'PoweredDown') return 'Power-Down';
+    return 'Fuel Transfer';
   };
 
   const computedIntervalMs = useMemo(() => {
@@ -336,13 +318,12 @@ export const StressTestApp: React.FC = () => {
 
     const steps: PlannedStep[] = [];
 
-    // 1. Opening Bookend: Check-In
     if (includeCheckIn) {
       const checkInType = getCheckInTypeForAsset(selectedAsset);
       if (selectedAsset.type === 'GENERATOR') {
         steps.push({
           transactionType: checkInType,
-          summary: 'Fuel: 100% • DEF: 100% • 1000 kWh',
+          summary: 'Fuel 100% • DEF 100% • 1000 kWh',
           fields: {
             checkInFuelPercentage: 100,
             checkInDefPercentage: 100,
@@ -352,7 +333,7 @@ export const StressTestApp: React.FC = () => {
       } else if (selectedAsset.type === 'TANK') {
         steps.push({
           transactionType: checkInType,
-          summary: 'Fuel: 8/8',
+          summary: 'Fuel 8/8',
           fields: {
             checkInFuelEighths: 8,
           },
@@ -360,7 +341,7 @@ export const StressTestApp: React.FC = () => {
       } else {
         steps.push({
           transactionType: checkInType,
-          summary: 'Fuel: 100%',
+          summary: 'Fuel 100%',
           fields: {
             checkInFuelPercentage: 100,
           },
@@ -368,16 +349,14 @@ export const StressTestApp: React.FC = () => {
       }
     }
 
-    // 2. Opening Bookend: Power-Up (Generators only)
     if (includePowerUp && selectedAsset.type === 'GENERATOR') {
       steps.push({
         transactionType: 'PoweredUp',
-        summary: 'Generator Powered Up (ON)',
+        summary: 'ON',
         fields: {},
       });
     }
 
-    // 3. Fuel Transfer Sequence
     for (let i = 0; i < fuelQty; i++) {
       const currentFuel = Math.max(0, initialFuel + i * stepLitres);
       const currentDef = isDefApplicable ? Math.max(0, initialDef + i * stepLitres) : undefined;
@@ -385,8 +364,8 @@ export const StressTestApp: React.FC = () => {
         transactionType: fuelTxType,
         summary:
           currentDef !== undefined
-            ? `Fuel: ${currentFuel} L • DEF: ${currentDef} L`
-            : `Fuel: ${currentFuel} L`,
+            ? `Fuel ${currentFuel}L • DEF ${currentDef}L`
+            : `Fuel ${currentFuel}L`,
         fuelLitres: currentFuel,
         defLitres: currentDef,
         fields: {
@@ -396,22 +375,20 @@ export const StressTestApp: React.FC = () => {
       });
     }
 
-    // 4. Closing Bookend: Power-Down (Generators only)
     if (includePowerDown && selectedAsset.type === 'GENERATOR') {
       steps.push({
         transactionType: 'PoweredDown',
-        summary: 'Generator Powered Down (OFF)',
+        summary: 'OFF',
         fields: {},
       });
     }
 
-    // 5. Closing Bookend: Check-Out
     if (includeCheckOut) {
       const checkOutType = getCheckOutTypeForAsset(selectedAsset);
       if (selectedAsset.type === 'GENERATOR') {
         steps.push({
           transactionType: checkOutType,
-          summary: 'Fuel: 85% • DEF: 85% • 1250 kWh',
+          summary: 'Fuel 85% • DEF 85% • 1250 kWh',
           fields: {
             checkOutFuelPercentage: 85,
             checkOutDefPercentage: 85,
@@ -421,7 +398,7 @@ export const StressTestApp: React.FC = () => {
       } else if (selectedAsset.type === 'TANK') {
         steps.push({
           transactionType: checkOutType,
-          summary: 'Fuel: 6/8',
+          summary: 'Fuel 6/8',
           fields: {
             checkOutFuelEighths: 6,
           },
@@ -429,7 +406,7 @@ export const StressTestApp: React.FC = () => {
       } else {
         steps.push({
           transactionType: checkOutType,
-          summary: 'Fuel: 85%',
+          summary: 'Fuel 85%',
           fields: {
             checkOutFuelPercentage: 85,
           },
@@ -527,13 +504,12 @@ export const StressTestApp: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#0F172A',
+          backgroundColor: '#0B0F19',
           color: '#94A3B8',
           fontSize: '0.9rem',
-          fontWeight: 600,
         }}
       >
-        Verifying user session...
+        Loading...
       </div>
     );
   }
@@ -548,7 +524,6 @@ export const StressTestApp: React.FC = () => {
     );
   }
 
-  // Strict Email Access Control Guard: ONLY design@stuartwillcocks.co.uk may access this app
   if (!isAuthorizedUser) {
     return (
       <div
@@ -564,55 +539,37 @@ export const StressTestApp: React.FC = () => {
       >
         <div
           style={{
-            maxWidth: '460px',
+            maxWidth: '420px',
             width: '100%',
             background: '#111827',
-            border: '1px solid #EF4444',
-            borderRadius: '12px',
-            padding: '28px 24px',
+            border: '1px solid #334155',
+            borderRadius: '10px',
+            padding: '24px',
             textAlign: 'center',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
           }}
         >
-          <div
-            style={{
-              width: '54px',
-              height: '54px',
-              borderRadius: '12px',
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid #EF4444',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px auto',
-              color: '#EF4444',
-            }}
-          >
-            <ShieldAlert size={28} />
-          </div>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 8px 0' }}>
+          <ShieldAlert size={28} color="#94A3B8" style={{ marginBottom: '12px' }} />
+          <h1 style={{ fontSize: '1.15rem', fontWeight: 700, margin: '0 0 8px 0' }}>
             Access Restricted
           </h1>
-          <p style={{ fontSize: '0.88rem', color: '#94A3B8', margin: '0 0 20px 0', lineHeight: 1.5 }}>
-            The Stress Test Simulator is restricted exclusively to{' '}
-            <code style={{ color: '#F8FAFC', fontWeight: 700 }}>{ALLOWED_STRESS_TEST_EMAIL}</code>.
-            You are currently signed in as <code style={{ color: '#FCA5A5' }}>{userEmail || 'unknown'}</code>.
+          <p style={{ fontSize: '0.85rem', color: '#94A3B8', margin: '0 0 18px 0' }}>
+            Signed in as <code>{userEmail || 'unknown'}</code>.
           </p>
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
             <a
               href="/admin"
               style={{
-                padding: '10px 16px',
-                borderRadius: '8px',
+                padding: '8px 14px',
+                borderRadius: '6px',
                 background: '#1E293B',
                 color: '#F8FAFC',
                 textDecoration: 'none',
-                fontWeight: 700,
-                fontSize: '0.85rem',
+                fontWeight: 600,
+                fontSize: '0.84rem',
                 border: '1px solid #334155',
               }}
             >
-              Return to Admin Console
+              Admin Console
             </a>
             <button
               type="button"
@@ -621,13 +578,13 @@ export const StressTestApp: React.FC = () => {
                 setAdminSession(null);
               }}
               style={{
-                padding: '10px 16px',
-                borderRadius: '8px',
-                background: '#EF4444',
-                color: '#FFFFFF',
+                padding: '8px 14px',
+                borderRadius: '6px',
+                background: '#334155',
+                color: '#F8FAFC',
                 border: 'none',
-                fontWeight: 700,
-                fontSize: '0.85rem',
+                fontWeight: 600,
+                fontSize: '0.84rem',
                 cursor: 'pointer',
               }}
             >
@@ -648,100 +605,98 @@ export const StressTestApp: React.FC = () => {
   const totalPlanned = fuelTransferCount + extraBookendCount;
   const progressPct = isRunning || sentCount > 0 ? Math.min(100, Math.round((sentCount / totalPlanned) * 100)) : 0;
 
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    color: '#94A3B8',
+    marginBottom: '5px',
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 10px',
+    background: '#090D16',
+    border: '1px solid #334155',
+    borderRadius: '6px',
+    color: '#F8FAFC',
+    fontSize: '0.9rem',
+    fontFamily: "'JetBrains Mono', monospace",
+    boxSizing: 'border-box',
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: '#0B0F19', color: '#F8FAFC', display: 'flex', flexDirection: 'column' }}>
-      {/* Top Bar */}
+      {/* Header */}
       <header
         style={{
-          background: '#EC721E',
-          padding: '12px 24px',
+          background: '#111827',
+          borderBottom: '1px solid #1E293B',
+          padding: '10px 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: '12px',
-          borderBottom: '2px solid rgba(0,0,0,0.25)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <img src="/logo-01.png" alt="TTD Logo" style={{ height: '56px', width: 'auto', display: 'block' }} />
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#FFFFFF' }}>
-                TTD Fuel Tracking
-              </span>
-              <span
-                style={{
-                  background: '#0B0F19',
-                  color: '#FDE047',
-                  fontSize: '0.72rem',
-                  fontWeight: 800,
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  letterSpacing: '0.05em',
-                }}
-              >
-                STRESS TEST SIMULATOR
-              </span>
-              <span
-                onClick={() => {
-                  if (hasNewVersion) {
-                    performAppUpdate(newVersionTag || undefined);
-                  }
-                }}
-                title={
-                  hasNewVersion
-                    ? `Update to V${newVersionTag || ''} available. Click to reload with latest version.`
-                    : undefined
-                }
-                style={{
-                  background: 'rgba(0,0,0,0.25)',
-                  color: '#FFFFFF',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  fontFamily: 'monospace',
-                  cursor: hasNewVersion ? 'pointer' : 'default',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                }}
-              >
-                <span>V{APP_VERSION}{isStaging ? ' (STAGING)' : ''}</span>
-                {hasNewVersion && (
-                  <span className="admin-version-alert-mark" title="A new app version is available. Click to update now.">
-                    !
-                  </span>
-                )}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600, marginTop: '2px' }}>
-              Authorized User: {adminSession.user.email}
-            </div>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '1rem', fontWeight: 700 }}>Stress Test</span>
+          <span
+            onClick={() => {
+              if (hasNewVersion) {
+                performAppUpdate(newVersionTag || undefined);
+              }
+            }}
+            style={{
+              color: '#94A3B8',
+              fontSize: '0.75rem',
+              fontFamily: 'monospace',
+              cursor: hasNewVersion ? 'pointer' : 'default',
+            }}
+          >
+            v{APP_VERSION}{isStaging ? ' (staging)' : ''}{hasNewVersion ? ' • Update' : ''}
+          </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <a
             href="/admin"
             target="_blank"
             rel="noreferrer"
-            className="admin-top-tool-btn"
-            style={{ textDecoration: 'none' }}
+            style={{
+              color: '#CBD5E1',
+              textDecoration: 'none',
+              fontSize: '0.8rem',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: '1px solid #334155',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+            }}
           >
-            <span>ADMIN CONSOLE</span>
+            <span>Admin</span>
             <ExternalLink size={12} />
           </a>
 
           <a
-            href="/"
+            href="/pda"
             target="_blank"
             rel="noreferrer"
-            className="admin-top-tool-btn"
-            style={{ textDecoration: 'none' }}
+            style={{
+              color: '#CBD5E1',
+              textDecoration: 'none',
+              fontSize: '0.8rem',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: '1px solid #334155',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+            }}
           >
-            <span>PDA APP</span>
+            <span>PDA</span>
             <ExternalLink size={12} />
           </a>
 
@@ -751,10 +706,21 @@ export const StressTestApp: React.FC = () => {
               await signOutAdmin();
               setAdminSession(null);
             }}
-            className="admin-top-tool-btn"
+            style={{
+              background: 'transparent',
+              color: '#CBD5E1',
+              border: '1px solid #334155',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+            }}
           >
-            <LogOut size={14} />
-            <span>SIGN OUT</span>
+            <LogOut size={13} />
+            <span>Sign Out</span>
           </button>
         </div>
       </header>
@@ -762,25 +728,24 @@ export const StressTestApp: React.FC = () => {
       {/* Main Content */}
       <main
         style={{
-          maxWidth: '1240px',
+          maxWidth: '1140px',
           width: '100%',
           margin: '0 auto',
-          padding: '24px',
+          padding: '20px 24px',
           boxSizing: 'border-box',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-          gap: '24px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+          gap: '20px',
           alignItems: 'start',
         }}
       >
-        {/* Left Card: Configuration Form */}
+        {/* Left: Configuration */}
         <section
           style={{
             background: '#111827',
             border: '1px solid #1E293B',
-            borderRadius: '12px',
-            padding: '22px',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.35)',
+            borderRadius: '8px',
+            padding: '18px',
           }}
         >
           <div
@@ -788,196 +753,86 @@ export const StressTestApp: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '18px',
-              paddingBottom: '12px',
-              borderBottom: '1px solid #1E293B',
+              marginBottom: '14px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Zap size={20} color="#EC721E" />
-              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>
-                Transaction Load Generator
-              </h2>
-            </div>
-
+            <h2 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Parameters</h2>
             <button
               type="button"
               onClick={loadEquipment}
               disabled={isLoadingAssets || isRunning}
               style={{
-                background: '#1E293B',
-                color: '#E2E8F0',
+                background: 'transparent',
+                color: '#94A3B8',
                 border: '1px solid #334155',
                 borderRadius: '6px',
-                padding: '6px 10px',
-                fontSize: '0.76rem',
-                fontWeight: 700,
+                padding: '4px 8px',
+                fontSize: '0.75rem',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '5px',
               }}
             >
-              <RefreshCw size={13} className={isLoadingAssets ? 'admin-spin' : ''} />
-              <span>Reload Assets</span>
+              <RefreshCw size={12} className={isLoadingAssets ? 'admin-spin' : ''} />
+              <span>Reload</span>
             </button>
           </div>
 
           {loadError && (
             <div
               style={{
-                background: 'rgba(239, 68, 68, 0.15)',
                 border: '1px solid #EF4444',
                 color: '#FCA5A5',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
+                padding: '8px 10px',
+                borderRadius: '6px',
+                fontSize: '0.8rem',
+                marginBottom: '12px',
               }}
             >
-              <AlertTriangle size={16} />
-              <span>{loadError}</span>
+              {loadError}
             </div>
           )}
 
-          <form onSubmit={handleGenerateTestData} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Equipment ID Selector */}
+          <form onSubmit={handleGenerateTestData} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '0.76rem',
-                  fontWeight: 700,
-                  color: '#94A3B8',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                  marginBottom: '6px',
-                }}
-              >
-                Equipment ID
-              </label>
+              <label style={labelStyle}>Equipment</label>
               <select
                 value={selectedEquipmentId}
                 onChange={(e) => setSelectedEquipmentId(e.target.value)}
                 disabled={isRunning || assets.length === 0}
                 required
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  background: '#030712',
-                  border: '1px solid #334155',
-                  borderRadius: '8px',
-                  color: '#F8FAFC',
-                  fontSize: '0.92rem',
-                  fontWeight: 700,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  boxSizing: 'border-box',
-                }}
+                style={inputStyle}
               >
                 {assets.length === 0 ? (
                   <option value="">No equipment found</option>
                 ) : (
-                  assets.map((asset) => (
-                    <option key={asset.equipmentId} value={asset.equipmentId}>
-                      {asset.equipmentId} — {asset.type} ({asset.area} / {asset.location})
-                    </option>
-                  ))
+                  assets.map((asset) => {
+                    const meta = [asset.type, asset.area].filter(Boolean).join(' • ');
+                    return (
+                      <option key={asset.equipmentId} value={asset.equipmentId}>
+                        {meta ? `${asset.equipmentId} (${meta})` : asset.equipmentId}
+                      </option>
+                    );
+                  })
                 )}
               </select>
-              {selectedAsset && (
-                <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#94A3B8' }}>
-                  Asset Type: <strong style={{ color: '#F8FAFC' }}>{selectedAsset.type}</strong> • Fuel Transfer Type:{' '}
-                  <code style={{ color: '#38BDF8' }}>{getTransactionTypeForAsset(selectedAsset)}</code>
-                </div>
-              )}
             </div>
 
-            {/* Bookend Transactions Options */}
-            <div
-              style={{
-                background: '#090D16',
-                border: '1px solid #1E293B',
-                borderRadius: '8px',
-                padding: '12px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '10px',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    color: '#94A3B8',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  Bookend Transactions (Before / After Fuel Transfers)
-                </span>
-                <button
-                  type="button"
-                  disabled={isRunning}
-                  onClick={() => {
-                    const allSelected =
-                      includeCheckIn &&
-                      includeCheckOut &&
-                      (!isGenerator || (includePowerUp && includePowerDown));
-                    if (allSelected) {
-                      setIncludeCheckIn(false);
-                      setIncludePowerUp(false);
-                      setIncludePowerDown(false);
-                      setIncludeCheckOut(false);
-                    } else {
-                      setIncludeCheckIn(true);
-                      if (isGenerator) {
-                        setIncludePowerUp(true);
-                        setIncludePowerDown(true);
-                      }
-                      setIncludeCheckOut(true);
-                    }
-                  }}
-                  style={{
-                    background: '#1E293B',
-                    color: '#E2E8F0',
-                    border: '1px solid #334155',
-                    borderRadius: '4px',
-                    padding: '3px 8px',
-                    fontSize: '0.7rem',
-                    fontWeight: 700,
-                    cursor: isRunning ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {includeCheckIn &&
-                  includeCheckOut &&
-                  (!isGenerator || (includePowerUp && includePowerDown))
-                    ? 'Clear All'
-                    : 'Select All'}
-                </button>
-              </div>
-
+            <div>
+              <label style={labelStyle}>Bookends</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <label
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    padding: '8px 10px',
+                    padding: '7px 10px',
                     borderRadius: '6px',
-                    background: includeCheckIn ? 'rgba(34, 197, 94, 0.12)' : '#030712',
-                    border: `1px solid ${includeCheckIn ? 'rgba(34, 197, 94, 0.45)' : '#334155'}`,
-                    cursor: isRunning ? 'not-allowed' : 'pointer',
+                    background: '#090D16',
+                    border: '1px solid #334155',
                     fontSize: '0.82rem',
-                    fontWeight: 600,
-                    color: '#F8FAFC',
+                    cursor: isRunning ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <input
@@ -985,14 +840,8 @@ export const StressTestApp: React.FC = () => {
                     checked={includeCheckIn}
                     onChange={(e) => setIncludeCheckIn(e.target.checked)}
                     disabled={isRunning}
-                    style={{ accentColor: '#22C55E', cursor: isRunning ? 'not-allowed' : 'pointer' }}
                   />
-                  <div>
-                    <div>Check-In</div>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 500 }}>
-                      Opening bookend
-                    </div>
-                  </div>
+                  <span>Check-In</span>
                 </label>
 
                 <label
@@ -1000,18 +849,13 @@ export const StressTestApp: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    padding: '8px 10px',
+                    padding: '7px 10px',
                     borderRadius: '6px',
-                    background:
-                      isGenerator && includePowerUp ? 'rgba(16, 185, 129, 0.12)' : '#030712',
-                    border: `1px solid ${
-                      isGenerator && includePowerUp ? 'rgba(16, 185, 129, 0.45)' : '#334155'
-                    }`,
-                    opacity: isGenerator ? 1 : 0.45,
-                    cursor: isRunning || !isGenerator ? 'not-allowed' : 'pointer',
+                    background: '#090D16',
+                    border: '1px solid #334155',
                     fontSize: '0.82rem',
-                    fontWeight: 600,
-                    color: '#F8FAFC',
+                    opacity: isGenerator ? 1 : 0.4,
+                    cursor: isRunning || !isGenerator ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <input
@@ -1019,17 +863,8 @@ export const StressTestApp: React.FC = () => {
                     checked={isGenerator && includePowerUp}
                     onChange={(e) => setIncludePowerUp(e.target.checked)}
                     disabled={isRunning || !isGenerator}
-                    style={{
-                      accentColor: '#10B981',
-                      cursor: isRunning || !isGenerator ? 'not-allowed' : 'pointer',
-                    }}
                   />
-                  <div>
-                    <div>Power-Up</div>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 500 }}>
-                      {isGenerator ? 'Before fuel transfers' : 'Generators only'}
-                    </div>
-                  </div>
+                  <span>Power-Up</span>
                 </label>
 
                 <label
@@ -1037,18 +872,13 @@ export const StressTestApp: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    padding: '8px 10px',
+                    padding: '7px 10px',
                     borderRadius: '6px',
-                    background:
-                      isGenerator && includePowerDown ? 'rgba(239, 68, 68, 0.12)' : '#030712',
-                    border: `1px solid ${
-                      isGenerator && includePowerDown ? 'rgba(239, 68, 68, 0.45)' : '#334155'
-                    }`,
-                    opacity: isGenerator ? 1 : 0.45,
-                    cursor: isRunning || !isGenerator ? 'not-allowed' : 'pointer',
+                    background: '#090D16',
+                    border: '1px solid #334155',
                     fontSize: '0.82rem',
-                    fontWeight: 600,
-                    color: '#F8FAFC',
+                    opacity: isGenerator ? 1 : 0.4,
+                    cursor: isRunning || !isGenerator ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <input
@@ -1056,17 +886,8 @@ export const StressTestApp: React.FC = () => {
                     checked={isGenerator && includePowerDown}
                     onChange={(e) => setIncludePowerDown(e.target.checked)}
                     disabled={isRunning || !isGenerator}
-                    style={{
-                      accentColor: '#EF4444',
-                      cursor: isRunning || !isGenerator ? 'not-allowed' : 'pointer',
-                    }}
                   />
-                  <div>
-                    <div>Power-Down</div>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 500 }}>
-                      {isGenerator ? 'After fuel transfers' : 'Generators only'}
-                    </div>
-                  </div>
+                  <span>Power-Down</span>
                 </label>
 
                 <label
@@ -1074,14 +895,12 @@ export const StressTestApp: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    padding: '8px 10px',
+                    padding: '7px 10px',
                     borderRadius: '6px',
-                    background: includeCheckOut ? 'rgba(239, 68, 68, 0.12)' : '#030712',
-                    border: `1px solid ${includeCheckOut ? 'rgba(239, 68, 68, 0.45)' : '#334155'}`,
-                    cursor: isRunning ? 'not-allowed' : 'pointer',
+                    background: '#090D16',
+                    border: '1px solid #334155',
                     fontSize: '0.82rem',
-                    fontWeight: 600,
-                    color: '#F8FAFC',
+                    cursor: isRunning ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <input
@@ -1089,38 +908,15 @@ export const StressTestApp: React.FC = () => {
                     checked={includeCheckOut}
                     onChange={(e) => setIncludeCheckOut(e.target.checked)}
                     disabled={isRunning}
-                    style={{ accentColor: '#DC2626', cursor: isRunning ? 'not-allowed' : 'pointer' }}
                   />
-                  <TransactionTypeIcon type="check-out" size={16} />
-                  <div>
-                    <div>Check-Out</div>
-                    <div style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 500 }}>
-                      Closing bookend
-                    </div>
-                  </div>
+                  <span>Check-Out</span>
                 </label>
               </div>
             </div>
 
-            {/* Quantity & Increment Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    color: '#94A3B8',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    marginBottom: '6px',
-                  }}
-                >
-                  <Hash size={13} />
-                  <span>Quantity of Transactions</span>
-                </label>
+                <label style={labelStyle}>Quantity</label>
                 <input
                   type="number"
                   min={1}
@@ -1130,35 +926,12 @@ export const StressTestApp: React.FC = () => {
                   onChange={(e) => setQuantity(e.target.value)}
                   disabled={isRunning}
                   required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    background: '#030712',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: '#F8FAFC',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    boxSizing: 'border-box',
-                  }}
+                  style={inputStyle}
                 />
               </div>
 
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    color: '#94A3B8',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    marginBottom: '6px',
-                  }}
-                >
-                  Increment Amount (Litres)
-                </label>
+                <label style={labelStyle}>Increment (L)</label>
                 <input
                   type="number"
                   step={1}
@@ -1166,41 +939,14 @@ export const StressTestApp: React.FC = () => {
                   onChange={(e) => setIncrementLitres(e.target.value)}
                   disabled={isRunning}
                   required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    background: '#030712',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: '#F8FAFC',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    boxSizing: 'border-box',
-                  }}
+                  style={inputStyle}
                 />
               </div>
             </div>
 
-            {/* Starting Values for Fuel and DEF */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    color: '#94A3B8',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    marginBottom: '6px',
-                  }}
-                >
-                  <Fuel size={13} color="#F59E0B" />
-                  <span>Starting Fuel (Litres)</span>
-                </label>
+                <label style={labelStyle}>Start Fuel (L)</label>
                 <input
                   type="number"
                   min={0}
@@ -1209,38 +955,12 @@ export const StressTestApp: React.FC = () => {
                   onChange={(e) => setStartFuelLitres(e.target.value)}
                   disabled={isRunning}
                   required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    background: '#030712',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: '#F8FAFC',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    boxSizing: 'border-box',
-                  }}
+                  style={inputStyle}
                 />
               </div>
 
               <div>
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    color: isDefApplicable ? '#94A3B8' : '#475569',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    marginBottom: '6px',
-                  }}
-                >
-                  <Droplets size={13} color={isDefApplicable ? '#38BDF8' : '#475569'} />
-                  <span>Starting DEF (Litres)</span>
-                </label>
+                <label style={{ ...labelStyle, opacity: isDefApplicable ? 1 : 0.4 }}>Start DEF (L)</label>
                 <input
                   type="number"
                   min={0}
@@ -1250,46 +970,17 @@ export const StressTestApp: React.FC = () => {
                   disabled={isRunning || !isDefApplicable}
                   required={isDefApplicable}
                   style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    background: isDefApplicable ? '#030712' : '#090D16',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: isDefApplicable ? '#F8FAFC' : '#475569',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    boxSizing: 'border-box',
+                    ...inputStyle,
+                    opacity: isDefApplicable ? 1 : 0.4,
                     cursor: isDefApplicable ? 'text' : 'not-allowed',
                   }}
                 />
-                {!isDefApplicable && (
-                  <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '4px' }}>
-                    Not applicable for {selectedAsset?.type || 'this asset type'}
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Send Rate Controls */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    color: '#94A3B8',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    marginBottom: '6px',
-                  }}
-                >
-                  <Clock size={13} />
-                  <span>Send Rate</span>
-                </label>
+                <label style={labelStyle}>Rate</label>
                 <input
                   type="number"
                   min={0.1}
@@ -1298,213 +989,65 @@ export const StressTestApp: React.FC = () => {
                   onChange={(e) => setRateValue(e.target.value)}
                   disabled={isRunning}
                   required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    background: '#030712',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: '#F8FAFC',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    boxSizing: 'border-box',
-                  }}
+                  style={inputStyle}
                 />
               </div>
 
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    color: '#94A3B8',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    marginBottom: '6px',
-                  }}
-                >
-                  Rate Unit
-                </label>
+                <label style={labelStyle}>Unit</label>
                 <select
                   value={rateUnit}
                   onChange={(e) => setRateUnit(e.target.value as 'per_second' | 'interval_ms')}
                   disabled={isRunning}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    background: '#030712',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: '#F8FAFC',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    boxSizing: 'border-box',
-                  }}
+                  style={{ ...inputStyle, fontFamily: 'inherit' }}
                 >
-                  <option value="per_second">Transactions / second</option>
-                  <option value="interval_ms">Milliseconds between transactions</option>
+                  <option value="per_second">Tx / sec</option>
+                  <option value="interval_ms">Interval (ms)</option>
                 </select>
               </div>
             </div>
 
-            {/* Simulated Device ID */}
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '0.76rem',
-                  fontWeight: 700,
-                  color: '#94A3B8',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                  marginBottom: '6px',
-                }}
-              >
-                Simulated Device ID Tag
-              </label>
+              <label style={labelStyle}>Device ID</label>
               <input
                 type="text"
                 value={simulatedDeviceId}
                 onChange={(e) => setSimulatedDeviceId(e.target.value.toUpperCase())}
                 disabled={isRunning}
                 placeholder="STRESS-TEST-SIM"
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  background: '#030712',
-                  border: '1px solid #334155',
-                  borderRadius: '8px',
-                  color: '#F8FAFC',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  boxSizing: 'border-box',
-                }}
+                style={inputStyle}
               />
             </div>
 
-            {/* Sequence Preview Box */}
-            <div
-              style={{
-                background: '#090D16',
-                border: '1px solid #1E293B',
-                borderRadius: '8px',
-                padding: '12px',
-                fontSize: '0.8rem',
-                color: '#94A3B8',
-                lineHeight: 1.5,
-              }}
-            >
-              <div style={{ fontWeight: 700, color: '#E2E8F0', marginBottom: '4px' }}>
-                Sequence Preview ({totalPlanned} total transactions @ {computedIntervalMs}ms interval):
-              </div>
-              {includeCheckIn && (
-                <div>
-                  • Opening:{' '}
-                  <strong style={{ color: '#4ADE80' }}>
-                    Check-In (
-                    {selectedAsset?.type === 'GENERATOR'
-                      ? '100% Fuel, 100% DEF, 1000 kWh'
-                      : selectedAsset?.type === 'TANK'
-                        ? '8/8 Fuel'
-                        : '100% Fuel'}
-                    )
-                  </strong>
-                </div>
-              )}
-              {includePowerUp && isGenerator && (
-                <div>
-                  • Opening: <strong style={{ color: '#34D399' }}>Power-Up (Generator ON)</strong>
-                </div>
-              )}
-              <div>
-                • Fuel Transfer #1: Fuel ={' '}
-                <strong>{Math.max(0, Math.round(Number(startFuelLitres) || 0))} L</strong>
-                {isDefApplicable && (
-                  <>
-                    , DEF = <strong>{Math.max(0, Math.round(Number(startDefLitres) || 0))} L</strong>
-                  </>
-                )}
-              </div>
-              {fuelTransferCount > 1 && (
-                <div>
-                  • Fuel Transfer #{fuelTransferCount}: Fuel ={' '}
-                  <strong>
-                    {Math.max(
-                      0,
-                      Math.round(Number(startFuelLitres) || 0) +
-                        (fuelTransferCount - 1) * Math.round(Number(incrementLitres) || 0)
-                    )}{' '}
-                    L
-                  </strong>
-                  {isDefApplicable && (
-                    <>
-                      , DEF ={' '}
-                      <strong>
-                        {Math.max(
-                          0,
-                          Math.round(Number(startDefLitres) || 0) +
-                            (fuelTransferCount - 1) * Math.round(Number(incrementLitres) || 0)
-                        )}{' '}
-                        L
-                      </strong>
-                    </>
-                  )}
-                </div>
-              )}
-              {includePowerDown && isGenerator && (
-                <div>
-                  • Closing: <strong style={{ color: '#F87171' }}>Power-Down (Generator OFF)</strong>
-                </div>
-              )}
-              {includeCheckOut && (
-                <div>
-                  • Closing:{' '}
-                  <strong style={{ color: '#FACC15' }}>
-                    Check-Out (
-                    {selectedAsset?.type === 'GENERATOR'
-                      ? '85% Fuel, 85% DEF, 1250 kWh'
-                      : selectedAsset?.type === 'TANK'
-                        ? '6/8 Fuel'
-                        : '85% Fuel'}
-                    )
-                  </strong>
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
               <button
                 type="submit"
                 disabled={isRunning || !selectedAsset}
                 style={{
                   flex: 1,
-                  padding: '13px 18px',
-                  background: isRunning ? '#475569' : '#EC721E',
-                  color: '#000000',
+                  padding: '10px 16px',
+                  background: isRunning ? '#334155' : '#E2E8F0',
+                  color: isRunning ? '#94A3B8' : '#0F172A',
                   border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: 800,
-                  fontSize: '0.95rem',
+                  borderRadius: '6px',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
                   cursor: isRunning || !selectedAsset ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
+                  gap: '6px',
                 }}
               >
                 {isRunning ? (
                   <>
-                    <RefreshCw size={16} className="admin-spin" />
-                    <span>Generating Test Data ({sentCount}/{totalPlanned})...</span>
+                    <RefreshCw size={15} className="admin-spin" />
+                    <span>Running ({sentCount}/{totalPlanned})</span>
                   </>
                 ) : (
                   <>
-                    <Play size={16} fill="#000000" />
-                    <span>Generate test data</span>
+                    <Play size={15} fill="#0F172A" />
+                    <span>Start ({totalPlanned})</span>
                   </>
                 )}
               </button>
@@ -1514,20 +1057,20 @@ export const StressTestApp: React.FC = () => {
                   type="button"
                   onClick={handleStop}
                   style={{
-                    padding: '13px 18px',
-                    background: '#EF4444',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: 800,
-                    fontSize: '0.9rem',
+                    padding: '10px 14px',
+                    background: '#1E293B',
+                    color: '#F8FAFC',
+                    border: '1px solid #475569',
+                    borderRadius: '6px',
+                    fontWeight: 600,
+                    fontSize: '0.88rem',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
                   }}
                 >
-                  <Square size={15} fill="#FFFFFF" />
+                  <Square size={14} fill="#F8FAFC" />
                   <span>Stop</span>
                 </button>
               )}
@@ -1535,35 +1078,20 @@ export const StressTestApp: React.FC = () => {
           </form>
         </section>
 
-        {/* Right Card: Live Execution Progress & Telemetry Log */}
+        {/* Right: Log */}
         <section
           style={{
             background: '#111827',
             border: '1px solid #1E293B',
-            borderRadius: '12px',
-            padding: '22px',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.35)',
+            borderRadius: '8px',
+            padding: '18px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px',
+            gap: '14px',
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingBottom: '12px',
-              borderBottom: '1px solid #1E293B',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Activity size={20} color="#22C55E" />
-              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>
-                Live Execution Feed
-              </h2>
-            </div>
-
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>Log</h2>
             {logs.length > 0 && !isRunning && (
               <button
                 type="button"
@@ -1578,9 +1106,8 @@ export const StressTestApp: React.FC = () => {
                   color: '#94A3B8',
                   border: '1px solid #334155',
                   borderRadius: '6px',
-                  padding: '5px 10px',
+                  padding: '4px 8px',
                   fontSize: '0.75rem',
-                  fontWeight: 600,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1588,63 +1115,36 @@ export const StressTestApp: React.FC = () => {
                 }}
               >
                 <Trash2 size={12} />
-                <span>Clear Log</span>
+                <span>Clear</span>
               </button>
             )}
           </div>
 
-          {/* KPI Counters */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-            <div
-              style={{
-                background: '#090D16',
-                border: '1px solid #1E293B',
-                borderRadius: '8px',
-                padding: '12px',
-              }}
-            >
-              <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase' }}>
-                Dispatched
-              </div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'monospace', marginTop: '4px' }}>
-                {sentCount} <span style={{ fontSize: '0.85rem', color: '#64748B' }}>/ {totalPlanned}</span>
+          {/* Counters */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+            <div style={{ background: '#090D16', border: '1px solid #1E293B', borderRadius: '6px', padding: '10px' }}>
+              <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Sent</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'monospace', marginTop: '2px' }}>
+                {sentCount}/{totalPlanned}
               </div>
             </div>
 
-            <div
-              style={{
-                background: 'rgba(34, 197, 94, 0.08)',
-                border: '1px solid rgba(34, 197, 94, 0.3)',
-                borderRadius: '8px',
-                padding: '12px',
-              }}
-            >
-              <div style={{ fontSize: '0.72rem', color: '#86EFAC', fontWeight: 700, textTransform: 'uppercase' }}>
-                Succeeded
-              </div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#22C55E', fontFamily: 'monospace', marginTop: '4px' }}>
+            <div style={{ background: '#090D16', border: '1px solid #1E293B', borderRadius: '6px', padding: '10px' }}>
+              <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>OK</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'monospace', marginTop: '2px' }}>
                 {successCount}
               </div>
             </div>
 
-            <div
-              style={{
-                background: errorCount > 0 ? 'rgba(239, 68, 68, 0.12)' : '#090D16',
-                border: `1px solid ${errorCount > 0 ? 'rgba(239, 68, 68, 0.4)' : '#1E293B'}`,
-                borderRadius: '8px',
-                padding: '12px',
-              }}
-            >
-              <div style={{ fontSize: '0.72rem', color: errorCount > 0 ? '#FCA5A5' : '#94A3B8', fontWeight: 700, textTransform: 'uppercase' }}>
-                Errors
-              </div>
+            <div style={{ background: '#090D16', border: '1px solid #1E293B', borderRadius: '6px', padding: '10px' }}>
+              <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Errors</div>
               <div
                 style={{
-                  fontSize: '1.4rem',
-                  fontWeight: 800,
-                  color: errorCount > 0 ? '#EF4444' : '#94A3B8',
+                  fontSize: '1.2rem',
+                  fontWeight: 700,
+                  color: errorCount > 0 ? '#EF4444' : '#F8FAFC',
                   fontFamily: 'monospace',
-                  marginTop: '4px',
+                  marginTop: '2px',
                 }}
               >
                 {errorCount}
@@ -1653,112 +1153,82 @@ export const StressTestApp: React.FC = () => {
           </div>
 
           {/* Progress Bar */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: '#94A3B8', marginBottom: '6px' }}>
-              <span>Batch Progress</span>
-              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{progressPct}%</span>
-            </div>
+          <div
+            style={{
+              width: '100%',
+              height: '6px',
+              background: '#090D16',
+              borderRadius: '999px',
+              overflow: 'hidden',
+              border: '1px solid #1E293B',
+            }}
+          >
             <div
               style={{
-                width: '100%',
-                height: '10px',
-                background: '#090D16',
-                borderRadius: '999px',
-                overflow: 'hidden',
-                border: '1px solid #1E293B',
+                width: `${progressPct}%`,
+                height: '100%',
+                background: '#94A3B8',
+                transition: 'width 0.15s ease',
               }}
-            >
-              <div
-                style={{
-                  width: `${progressPct}%`,
-                  height: '100%',
-                  background: '#22C55E',
-                  transition: 'width 0.15s ease',
-                }}
-              />
-            </div>
+            />
           </div>
 
-          {/* Log Table */}
+          {/* Table */}
           <div
             style={{
               background: '#090D16',
               border: '1px solid #1E293B',
-              borderRadius: '8px',
+              borderRadius: '6px',
               maxHeight: '420px',
               overflowY: 'auto',
             }}
           >
             {logs.length === 0 ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748B', fontSize: '0.85rem' }}>
-                Configure parameters on the left and press <strong>Generate test data</strong> to begin streaming fuel transfer transactions.
+              <div style={{ padding: '32px 16px', textAlign: 'center', color: '#64748B', fontSize: '0.82rem' }}>
+                No transactions sent.
               </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #1E293B', background: '#0F172A', textAlign: 'left', color: '#94A3B8' }}>
-                    <th style={{ padding: '8px 10px' }}>#</th>
-                    <th style={{ padding: '8px 10px' }}>Asset</th>
-                    <th style={{ padding: '8px 10px' }}>Type</th>
-                    <th style={{ padding: '8px 10px' }}>Details</th>
-                    <th style={{ padding: '8px 10px' }}>Latency</th>
-                    <th style={{ padding: '8px 10px' }}>Status</th>
+                  <tr style={{ borderBottom: '1px solid #1E293B', textAlign: 'left', color: '#94A3B8' }}>
+                    <th style={{ padding: '7px 10px' }}>#</th>
+                    <th style={{ padding: '7px 10px' }}>Asset</th>
+                    <th style={{ padding: '7px 10px' }}>Type</th>
+                    <th style={{ padding: '7px 10px' }}>Details</th>
+                    <th style={{ padding: '7px 10px' }}>Time</th>
+                    <th style={{ padding: '7px 10px' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {logs.map((entry) => {
-                    const badge = formatTxTypeBadge(entry.transactionType);
-                    return (
-                      <tr key={entry.txId} style={{ borderBottom: '1px solid #1E293B' }}>
-                        <td style={{ padding: '7px 10px', fontFamily: 'monospace', color: '#94A3B8' }}>
-                          #{entry.index}
-                        </td>
-                        <td style={{ padding: '7px 10px', fontFamily: 'monospace', fontWeight: 700 }}>
-                          {entry.equipmentId}
-                        </td>
-                        <td style={{ padding: '7px 10px', whiteSpace: 'nowrap' }}>
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              padding: '2px 7px',
-                              borderRadius: '4px',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              color: badge.color,
-                              background: badge.bg,
-                            }}
-                          >
-                            <TransactionTypeIcon type={entry.transactionType} size={13} />
-                            <span>{badge.label}</span>
-                          </span>
-                        </td>
-                        <td style={{ padding: '7px 10px', fontFamily: 'monospace', color: '#E2E8F0', fontWeight: 600 }}>
-                          {entry.summary}
-                        </td>
-                        <td style={{ padding: '7px 10px', fontFamily: 'monospace', color: '#94A3B8' }}>
-                          {entry.durationMs}ms
-                        </td>
-                        <td style={{ padding: '7px 10px' }}>
-                          {entry.status === 'success' ? (
-                            <span style={{ color: '#22C55E', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
-                              <CheckCircle2 size={13} />
-                              <span>Sent</span>
-                            </span>
-                          ) : (
-                            <span
-                              title={entry.errorMessage}
-                              style={{ color: '#EF4444', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}
-                            >
-                              <AlertTriangle size={13} />
-                              <span>Failed</span>
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {logs.map((entry) => (
+                    <tr key={entry.txId} style={{ borderBottom: '1px solid #1E293B' }}>
+                      <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: '#94A3B8' }}>
+                        {entry.index}
+                      </td>
+                      <td style={{ padding: '6px 10px', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {entry.equipmentId}
+                      </td>
+                      <td style={{ padding: '6px 10px', color: '#CBD5E1', whiteSpace: 'nowrap' }}>
+                        {formatTxTypeLabel(entry.transactionType)}
+                      </td>
+                      <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: '#E2E8F0' }}>
+                        {entry.summary}
+                      </td>
+                      <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: '#94A3B8' }}>
+                        {entry.durationMs}ms
+                      </td>
+                      <td
+                        style={{
+                          padding: '6px 10px',
+                          fontWeight: 600,
+                          color: entry.status === 'error' ? '#EF4444' : '#94A3B8',
+                        }}
+                        title={entry.errorMessage}
+                      >
+                        {entry.status === 'success' ? 'OK' : 'Error'}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}
@@ -1770,4 +1240,3 @@ export const StressTestApp: React.FC = () => {
 };
 
 export default StressTestApp;
-
