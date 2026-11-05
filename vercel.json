@@ -77,6 +77,15 @@
       ]
     },
     {
+      "source": "/pda.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate, max-age=0"
+        }
+      ]
+    },
+    {
       "source": "/pda/(.*)",
       "headers": [
         {
@@ -198,11 +207,11 @@
   "rewrites": [
     {
       "source": "/pda",
-      "destination": "/index.html"
+      "destination": "/pda.html"
     },
     {
       "source": "/pda/(.*)",
-      "destination": "/index.html"
+      "destination": "/pda.html"
     },
     {
       "source": "/admin",

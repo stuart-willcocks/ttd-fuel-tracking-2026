@@ -187,11 +187,28 @@ export const AdminTopNav: React.FC<AdminTopNavProps> = ({
 
         {/* Link to Zebra Handheld Field Web App */}
         <a
-          href="/pda"
+          href="/"
           target="_blank"
           rel="noreferrer"
           className="admin-top-tool-btn"
-          title="Open PDA scanner interface in new tab"
+          title="Open PDA scanner interface in detached window"
+          onClick={(e) => {
+            try {
+              const pdaUrl = new URL('/', window.location.origin);
+              pdaUrl.searchParams.set('pda_window', '1');
+              const pop = window.open(
+                pdaUrl.toString(),
+                'TTD_PDA_WINDOW',
+                'width=430,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=no'
+              );
+              if (pop && !pop.closed) {
+                e.preventDefault();
+                pop.focus?.();
+              }
+            } catch {
+              // Fall back to default <a href="/" target="_blank">
+            }
+          }}
         >
           <Smartphone size={14} />
           <span>LAUNCH PDA APP</span>

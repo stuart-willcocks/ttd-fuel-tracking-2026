@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
@@ -89,7 +90,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         navigateFallback: null,
         globPatterns: ['**/*.{ico,png,svg,woff,woff2}'],
-        globIgnores: ['**/admin.html', '**/stress-test.html', '**/index.html', '**/assets/**'],
+        globIgnores: ['**/admin.html', '**/stress-test.html', '**/pda.html', '**/index.html', '**/assets/**'],
         runtimeCaching: [
           {
             urlPattern: ({ request, url }: { request: Request; url: URL }) =>
@@ -169,6 +170,13 @@ export default defineConfig({
           }
           next();
         });
+      },
+      closeBundle() {
+        const indexHtml = path.resolve(__dirname, 'dist/index.html');
+        const pdaHtml = path.resolve(__dirname, 'dist/pda.html');
+        if (fs.existsSync(indexHtml)) {
+          fs.copyFileSync(indexHtml, pdaHtml);
+        }
       },
     },
     {
