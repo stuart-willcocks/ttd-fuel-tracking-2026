@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Check, Power, PowerOff, Clock, AlertCircle, MapPin, X } from 'lucide-react';
-import { IconCheckIn, IconCheckOut, IconFuel, IconBack } from './icons/AppIcons';
+import { Check, Clock, AlertCircle, MapPin, X } from 'lucide-react';
+import { IconCheckIn, IconCheckOut, IconFuel, IconBack, IconPoweredOn, IconPoweredOff } from './icons/AppIcons';
 import type { Equipment, Transaction, ActionType } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
@@ -436,7 +436,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
             className="btn-pda-rect btn-pda-green"
             onClick={() => onSelectAction('power-up')}
           >
-            <Power size={18} />
+            <IconPoweredOn size={20} />
             <span>Mark powered up</span>
           </button>
         )}
@@ -447,7 +447,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
             className="btn-pda-rect btn-pda-slate"
             onClick={() => onSelectAction('power-down')}
           >
-            <PowerOff size={18} />
+            <IconPoweredOff size={20} />
             <span>Mark powered down</span>
           </button>
         )}

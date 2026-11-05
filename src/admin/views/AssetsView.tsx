@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { Equipment, Transaction, AuthorizedDevice } from '../../types';
 import { EquipmentTypeIcon } from '../../components/EquipmentTypeIcon';
+import { IconPoweredOn, IconPoweredOff } from '../../components/icons/AppIcons';
 import { formatPdaTimestamp } from '../../utils/dateFormat';
 import {
   getGoogleMapsExternalUrl,
@@ -1463,8 +1464,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     <td>
                       {asset.type === 'GENERATOR' ? (
                         <span className={`admin-badge ${isRunning ? 'admin-badge-running' : 'admin-badge-standby'}`}>
-                          <span className={`pulse-dot ${isRunning ? 'green' : 'slate'}`} />
-                          {isRunning ? 'ON' : 'OFF'}
+                          {isRunning ? <IconPoweredOn size={18} /> : <IconPoweredOff size={18} />}
+                          <span>{isRunning ? 'ON' : 'OFF'}</span>
                         </span>
                       ) : (
                         <span style={{ fontSize: '0.78rem', color: 'var(--adm-text-muted)' }}>—</span>

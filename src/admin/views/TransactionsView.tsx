@@ -7,7 +7,6 @@ import {
   X,
   Edit,
   QrCode,
-  Zap,
   MapPin,
   ArrowUpDown,
   ArrowUp,
@@ -19,6 +18,7 @@ import { getGeneratorPowerState } from '../../utils/powerState';
 import { getGoogleMapsExternalUrl, handleWhat3WordsLinkClick } from '../../services/what3words';
 import { postRemoteEquipment } from '../../services/api';
 import { TransactionTypeIcon } from '../../components/TransactionTypeIcon';
+import { IconPoweredOn, IconPoweredOff } from '../../components/icons/AppIcons';
 
 interface TransactionsViewProps {
   transactions: Transaction[];
@@ -420,8 +420,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
               {currentAsset.type === 'GENERATOR' && (
                 <span className={`admin-badge ${isCurrentAssetRunning ? 'admin-badge-running' : 'admin-badge-standby'}`}>
-                  <span className={`pulse-dot ${isCurrentAssetRunning ? 'green' : 'slate'}`} />
-                  {isCurrentAssetRunning ? 'ON' : 'OFF'}
+                  {isCurrentAssetRunning ? <IconPoweredOn size={18} /> : <IconPoweredOff size={18} />}
+                  <span>{isCurrentAssetRunning ? 'ON' : 'OFF'}</span>
                 </span>
               )}
 
@@ -468,7 +468,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                   title={isCurrentAssetRunning ? 'Turn OFF' : 'Turn ON'}
                   style={{ color: isCurrentAssetRunning ? '#F87171' : '#4ADE80' }}
                 >
-                  <Zap size={14} />
+                  {isCurrentAssetRunning ? <IconPoweredOff size={18} /> : <IconPoweredOn size={18} />}
                   <span>{isCurrentAssetRunning ? 'Turn OFF' : 'Turn ON'}</span>
                 </button>
               )}

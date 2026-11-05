@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Power, PowerOff } from 'lucide-react';
-import { IconCancel } from './icons/AppIcons';
+import { IconCancel, IconPoweredOn, IconPoweredOff } from './icons/AppIcons';
 import type { Equipment } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
 
@@ -45,11 +44,11 @@ export const PowerEventModal: React.FC<PowerEventModalProps> = ({
         <div className="power-modal-header">
           {isPowerUp ? (
             <span className="power-modal-icon-wrap power-up">
-              <Power size={26} color="#16A34A" />
+              <IconPoweredOn size={26} />
             </span>
           ) : (
             <span className="power-modal-icon-wrap power-down">
-              <PowerOff size={26} color="#DC2626" />
+              <IconPoweredOff size={26} />
             </span>
           )}
           <div>
@@ -77,7 +76,7 @@ export const PowerEventModal: React.FC<PowerEventModalProps> = ({
             className={`btn-modal-confirm ${isPowerUp ? 'btn-pda-green' : 'btn-pda-slate'}`}
             onClick={handleConfirm}
           >
-            {isPowerUp ? <Power size={22} /> : <PowerOff size={22} />}
+            {isPowerUp ? <IconPoweredOn size={22} /> : <IconPoweredOff size={22} />}
             <span>{isPowerUp ? 'Confirm Power Up' : 'Confirm Power Down'}</span>
           </button>
 

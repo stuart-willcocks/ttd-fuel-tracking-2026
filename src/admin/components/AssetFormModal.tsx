@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { X, Plus, Sparkles, MapPin, Check, Zap, Trash2, ChevronDown } from 'lucide-react';
+import { X, Plus, Sparkles, MapPin, Check, Trash2, ChevronDown } from 'lucide-react';
+import { IconPoweredOn, IconPoweredOff } from '../../components/icons/AppIcons';
 import type { Equipment, AssetType } from '../../types';
 import {
   resolveEquipmentCoordinates,
@@ -688,7 +689,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                       fontWeight: 600,
                     }}
                   >
-                    <Zap size={14} />
+                    {isPowerOn ? <IconPoweredOff size={18} /> : <IconPoweredOn size={18} />}
                     <span>{isPowerOn ? 'Turn OFF' : 'Turn ON'}</span>
                   </button>
                 )}

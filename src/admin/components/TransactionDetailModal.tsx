@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { X, Edit, Trash2, Check, AlertTriangle } from 'lucide-react';
+import { IconPoweredOn, IconPoweredOff } from '../../components/icons/AppIcons';
 import type { Transaction, TransactionType, Equipment } from '../../types';
 import { formatAdminTimestamp } from '../../utils/dateFormat';
 import { getDeviceId } from '../../services/device';
@@ -534,7 +535,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                     color: txType === 'PoweredUp' ? '#FFFFFF' : undefined,
                   }}
                 >
-                  PoweredUp (ON)
+                  <IconPoweredOn size={18} />
+                  <span>PoweredUp (ON)</span>
                 </button>
                 <button
                   type="button"
@@ -548,7 +550,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                     color: txType === 'PoweredDown' ? '#FFFFFF' : undefined,
                   }}
                 >
-                  PoweredDown (OFF)
+                  <IconPoweredOff size={18} />
+                  <span>PoweredDown (OFF)</span>
                 </button>
               </div>
             </div>

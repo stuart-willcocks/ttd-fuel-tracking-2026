@@ -3063,12 +3063,18 @@ export function getFleetSatelliteMapSrcDoc(
             '<g transform="translate(-34)"><path d="M 46,5 V 3 h 9 v 18 h -9 v -1 -1" /><path d="m 37,12 h 10 1" /><path d="m 41,9 -4,3 4,3" /></g></svg>';
         }
         if (t === 'PoweredUp' || t === 'power-up') {
-          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#16A34A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">' +
-            '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg>';
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none">' +
+            '<rect x="4" y="8" width="8" height="8" fill="#7F7F7F" /><rect x="12" y="8" width="8" height="8" fill="#00FF00" />' +
+            '<circle cx="8" cy="12" r="2" fill="none" stroke="#393939" stroke-width="1.2" />' +
+            '<line x1="16" y1="9.5" x2="16" y2="14.5" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round" />' +
+            '<rect x="3.5" y="7.5" width="17" height="9" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round" /></svg>';
         }
         if (t === 'PoweredDown' || t === 'power-down') {
-          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#DC2626" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">' +
-            '<path d="M18.36 6.64A9 9 0 0 1 20.77 15"/><path d="M6.16 6.16a9 9 0 1 0 12.68 12.68"/><path d="M12 2v4"/><path d="m2 2 20 20"/></svg>';
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none">' +
+            '<rect x="4" y="8" width="8" height="8" fill="#FF0000" /><rect x="12" y="8" width="8" height="8" fill="#7F7F7F" />' +
+            '<circle cx="8" cy="12" r="2" fill="none" stroke="#FFFFFF" stroke-width="1.2" />' +
+            '<line x1="16" y1="9.5" x2="16" y2="14.5" stroke="#4F4F4F" stroke-width="1.4" stroke-linecap="round" />' +
+            '<rect x="3.5" y="7.5" width="17" height="9" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round" /></svg>';
         }
         // FuelTransfer
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none">' +

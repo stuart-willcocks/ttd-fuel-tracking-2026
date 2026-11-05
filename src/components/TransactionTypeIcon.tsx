@@ -1,6 +1,6 @@
 import React from 'react';
-import { Power, PowerOff, Clock } from 'lucide-react';
-import { IconCheckIn, IconCheckOut, IconFuel } from './icons/AppIcons';
+import { Clock } from 'lucide-react';
+import { IconCheckIn, IconCheckOut, IconFuel, IconPoweredOn, IconPoweredOff } from './icons/AppIcons';
 import type { TransactionType } from '../types';
 
 interface TransactionTypeIconProps {
@@ -37,7 +37,7 @@ export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({
   if (t === 'PoweredUp' || t === 'power-up') {
     return (
       <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Powered Up'} style={{ color: '#16A34A' }}>
-        <Power size={size} color="#16A34A" className="tx-type-icon icon-powerup" />
+        <IconPoweredOn size={size} className="tx-type-icon icon-powerup" />
       </span>
     );
   }
@@ -45,7 +45,7 @@ export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({
   if (t === 'PoweredDown' || t === 'power-down') {
     return (
       <span className={`tx-type-icon-wrapper ${className}`} title={title || 'Powered Down'} style={{ color: '#DC2626' }}>
-        <PowerOff size={size} color="#DC2626" className="tx-type-icon icon-powerdown" />
+        <IconPoweredOff size={size} className="tx-type-icon icon-powerdown" />
       </span>
     );
   }

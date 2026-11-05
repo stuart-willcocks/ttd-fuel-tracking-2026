@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Trash2, Check, Power, PowerOff, Lock, Unlock, Pencil } from 'lucide-react';
-import { IconCancel } from './icons/AppIcons';
+import { Trash2, Check, Lock, Unlock, Pencil } from 'lucide-react';
+import { IconCancel, IconPoweredOn, IconPoweredOff } from './icons/AppIcons';
 import type { Equipment, Transaction } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
 import { getDeviceId } from '../services/device';
@@ -595,7 +595,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                   className={`edit-tx-power-btn ${powerType === 'PoweredUp' ? 'selected-power-up' : ''}`}
                   onClick={() => setPowerType('PoweredUp')}
                 >
-                  <Power size={18} />
+                  <IconPoweredOn size={20} />
                   <span>Powered Up</span>
                 </button>
 
@@ -604,7 +604,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                   className={`edit-tx-power-btn ${powerType === 'PoweredDown' ? 'selected-power-down' : ''}`}
                   onClick={() => setPowerType('PoweredDown')}
                 >
-                  <PowerOff size={18} />
+                  <IconPoweredOff size={20} />
                   <span>Powered Down</span>
                 </button>
               </div>
