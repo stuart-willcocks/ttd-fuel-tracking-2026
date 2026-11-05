@@ -309,7 +309,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   // CSV Export
   const handleExportCsv = () => {
     const headers = [
-      'TransactionUUID',
       'EquipmentId',
       'AssetType',
       'TransactionType',
@@ -326,15 +325,13 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       'CheckInKWH',
       'CheckOutKWH',
       'DeviceId',
-      'SyncStatus',
     ];
 
     const rows = sortedTransactions.map((t) => {
       const eq = assetMap.get(t.equipmentId);
       return [
-        `"${t.id}"`,
         `"${t.equipmentId}"`,
-        `"${eq?.type || 'UNKNOWN'}"`,
+        `"${eq?.type || ''}"`,
         `"${t.transactionType}"`,
         `"${t.transactionTimestamp}"`,
         `"${t.uploadTimestamp || ''}"`,
@@ -349,7 +346,6 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         t.checkInKWH ?? '""',
         t.checkOutKWH ?? '""',
         `"${t.deviceId || ''}"`,
-        `"${t.syncStatus}"`,
       ];
     });
 
