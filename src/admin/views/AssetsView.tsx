@@ -903,9 +903,35 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   };
 
   return (
-    <div className="admin-page-container">
+    <div
+      className="admin-page-container"
+      style={
+        viewMode === 'MAP'
+          ? {
+              flex: 1,
+              minHeight: 0,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              padding: '12px 20px 14px 20px',
+              boxSizing: 'border-box',
+            }
+          : undefined
+      }
+    >
       {/* Top Action Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          flexWrap: 'wrap',
+          gap: '10px',
+          marginBottom: viewMode === 'MAP' ? '10px' : '20px',
+          flexShrink: 0,
+        }}
+      >
         <button type="button" onClick={handleExportCsv} className="admin-btn admin-btn-secondary">
           <Download size={15} />
           <span>Export CSV</span>
@@ -946,11 +972,12 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '14px',
-          marginBottom: '20px',
+          marginBottom: viewMode === 'MAP' ? '10px' : '20px',
           background: 'var(--adm-surface-1)',
-          padding: '16px 20px',
+          padding: viewMode === 'MAP' ? '10px 16px' : '16px 20px',
           borderRadius: 'var(--adm-radius-lg)',
           border: '1px solid var(--adm-border-subtle)',
+          flexShrink: 0,
         }}
       >
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
@@ -969,7 +996,16 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       </div>
 
       {/* Filter Tabs */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: viewMode === 'MAP' ? '10px' : '20px',
+          flexShrink: 0,
+        }}
+      >
         {/* Group 1: Equipment Type (All equipment, Generators, Tanks, Plant) */}
         {[
           { key: 'ALL' as TypeFilter, label: 'All equipment', count: counts.all },
@@ -1535,8 +1571,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             padding: 0,
             margin: 0,
             overflow: 'hidden',
-            height: 'calc(100vh - 285px)',
-            minHeight: '560px',
+            flex: 1,
+            minHeight: 0,
+            height: '100%',
             border: '1px solid var(--adm-border-subtle)',
             position: 'relative',
             display: 'flex',

@@ -1123,7 +1123,9 @@ function getMoveEquipmentMapSrcDoc(
       var toggleLabelsText = document.getElementById('toggleLabelsText');
       var showLabels = false;
       try {
-        showLabels = window.localStorage && window.localStorage.getItem('ttd_move_map_labels_enabled') === '1';
+        if (window.localStorage) {
+          window.localStorage.removeItem('ttd_move_map_labels_enabled');
+        }
       } catch (e) {}
 
       function applyLabelsState() {
@@ -1147,11 +1149,6 @@ function getMoveEquipmentMapSrcDoc(
       toggleLabelsBtn.addEventListener('click', function(ev) {
         ev.stopPropagation();
         showLabels = !showLabels;
-        try {
-          if (window.localStorage) {
-            window.localStorage.setItem('ttd_move_map_labels_enabled', showLabels ? '1' : '0');
-          }
-        } catch (e) {}
         applyLabelsState();
       });
 
@@ -2980,7 +2977,9 @@ export function getFleetSatelliteMapSrcDoc(
 
       var showLabels = false;
       try {
-        showLabels = window.localStorage && window.localStorage.getItem('ttd_admin_fleet_map_labels_v1') === 'true';
+        if (window.localStorage) {
+          window.localStorage.removeItem('ttd_admin_fleet_map_labels_v1');
+        }
       } catch (e) {}
 
       var toggleLabelsBtn = document.getElementById('toggleLabelsBtn');
@@ -3006,11 +3005,6 @@ export function getFleetSatelliteMapSrcDoc(
       if (toggleLabelsBtn) {
         toggleLabelsBtn.addEventListener('click', function() {
           showLabels = !showLabels;
-          try {
-            if (window.localStorage) {
-              window.localStorage.setItem('ttd_admin_fleet_map_labels_v1', showLabels ? 'true' : 'false');
-            }
-          } catch (e) {}
           applyLabelsState();
         });
       }

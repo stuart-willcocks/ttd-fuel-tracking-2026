@@ -718,8 +718,23 @@ export const AdminApp: React.FC = () => {
         </div>
 
         {/* Main Content Viewport spanning full width */}
-        <div className="admin-main-wrap">
-          <main style={{ flex: 1, minWidth: 0, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+        <div
+          className="admin-main-wrap"
+          style={currentView === 'MAP' ? { overflow: 'hidden', scrollbarGutter: 'auto' } : undefined}
+        >
+          <main
+            style={{
+              flex: 1,
+              minWidth: 0,
+              minHeight: 0,
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              ...(currentView === 'MAP'
+                ? { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }
+                : {}),
+            }}
+          >
             {(currentView === 'ASSETS' || currentView === 'MAP') && (
               <AssetsView
                 assets={assets}
