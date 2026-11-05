@@ -3064,17 +3064,13 @@ export function getFleetSatelliteMapSrcDoc(
         }
         if (t === 'PoweredUp' || t === 'power-up') {
           return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none">' +
-            '<rect x="4" y="8" width="8" height="8" fill="#7F7F7F" /><rect x="12" y="8" width="8" height="8" fill="#00FF00" />' +
-            '<circle cx="8" cy="12" r="2" fill="none" stroke="#393939" stroke-width="1.2" />' +
-            '<line x1="16" y1="9.5" x2="16" y2="14.5" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round" />' +
-            '<rect x="3.5" y="7.5" width="17" height="9" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round" /></svg>';
+            '<rect x="1.5" y="1.5" width="21" height="21" rx="0.5" fill="#00DC00" stroke="#000000" stroke-width="1" stroke-linejoin="round" />' +
+            '<rect x="11" y="6" width="2" height="12" fill="#000000" /></svg>';
         }
         if (t === 'PoweredDown' || t === 'power-down') {
           return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none">' +
-            '<rect x="4" y="8" width="8" height="8" fill="#FF0000" /><rect x="12" y="8" width="8" height="8" fill="#7F7F7F" />' +
-            '<circle cx="8" cy="12" r="2" fill="none" stroke="#FFFFFF" stroke-width="1.2" />' +
-            '<line x1="16" y1="9.5" x2="16" y2="14.5" stroke="#4F4F4F" stroke-width="1.4" stroke-linecap="round" />' +
-            '<rect x="3.5" y="7.5" width="17" height="9" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round" /></svg>';
+            '<rect x="1.5" y="1.5" width="21" height="21" rx="0.5" fill="#FF0000" stroke="#000000" stroke-width="1" stroke-linejoin="round" />' +
+            '<circle cx="12" cy="12" r="5" fill="none" stroke="#FFFFFF" stroke-width="2" /></svg>';
         }
         // FuelTransfer
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none">' +

@@ -519,7 +519,7 @@ export const IconTank: React.FC<IconProps> = ({
 );
 export const IconTrailerTank = IconTank;
 
-// 10) Powered On (Rocker switch with grey 'O' left and green 'I' right, from public/icons/batch_powered_on.png)
+// 10) Powered On (Green square with black 'I' bar, from public/icons/batch_powered_on.png)
 export const IconPoweredOn: React.FC<IconProps> = ({
   size = 24,
   className = '',
@@ -534,15 +534,12 @@ export const IconPoweredOn: React.FC<IconProps> = ({
     className={className}
     {...props}
   >
-    <rect x="4" y="8" width="8" height="8" fill="#7F7F7F" />
-    <rect x="12" y="8" width="8" height="8" fill="#00FF00" />
-    <circle cx="8" cy="12" r="2" fill="none" stroke="#393939" strokeWidth="1.2" />
-    <line x1="16" y1="9.5" x2="16" y2="14.5" stroke="#FFFFFF" strokeWidth="1.4" strokeLinecap="round" />
-    <rect x="3.5" y="7.5" width="17" height="9" fill="none" stroke="#000000" strokeWidth="1" strokeLinejoin="round" />
+    <rect x="1.5" y="1.5" width="21" height="21" rx="0.5" fill="#00DC00" stroke="#000000" strokeWidth="1" strokeLinejoin="round" />
+    <rect x="11" y="6" width="2" height="12" fill="#000000" />
   </svg>
 );
 
-// 11) Powered Off (Rocker switch with red 'O' left and grey 'I' right, from public/icons/batch_powered_off.png)
+// 11) Powered Off (Red square with white 'O' ring, from public/icons/batch_powered_off.png)
 export const IconPoweredOff: React.FC<IconProps> = ({
   size = 24,
   className = '',
@@ -557,10 +554,7 @@ export const IconPoweredOff: React.FC<IconProps> = ({
     className={className}
     {...props}
   >
-    <rect x="4" y="8" width="8" height="8" fill="#FF0000" />
-    <rect x="12" y="8" width="8" height="8" fill="#7F7F7F" />
-    <circle cx="8" cy="12" r="2" fill="none" stroke="#FFFFFF" strokeWidth="1.2" />
-    <line x1="16" y1="9.5" x2="16" y2="14.5" stroke="#4F4F4F" strokeWidth="1.4" strokeLinecap="round" />
-    <rect x="3.5" y="7.5" width="17" height="9" fill="none" stroke="#000000" strokeWidth="1" strokeLinejoin="round" />
+    <rect x="1.5" y="1.5" width="21" height="21" rx="0.5" fill="#FF0000" stroke="#000000" strokeWidth="1" strokeLinejoin="round" />
+    <circle cx="12" cy="12" r="5" fill="none" stroke="#FFFFFF" strokeWidth="2" />
   </svg>
 );
