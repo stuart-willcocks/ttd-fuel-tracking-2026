@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ShieldAlert,
   CheckCircle2,
   RefreshCw,
   AlertTriangle,
@@ -199,26 +198,6 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
             TTD Fuel Tracking
           </span>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              background: 'rgba(239, 68, 68, 0.25)',
-              color: '#EF4444',
-              border: '1px solid #EF4444',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontSize: '0.72rem',
-              fontWeight: 800,
-            }}
-          >
-            <ShieldAlert size={13} color="#EF4444" />
-            <span>NOT AUTHORIZED</span>
-          </div>
-        </div>
       </div>
 
       {/* Main Content Area */}
@@ -234,30 +213,6 @@ export const DeviceEnrollmentView: React.FC<DeviceEnrollmentViewProps> = ({
         }}
       >
         <div>
-          {/* Header Icon & Title */}
-          <div style={{ textAlign: 'center', marginBottom: '18px' }}>
-            <div
-              style={{
-                width: '46px',
-                height: '46px',
-                margin: '0 auto 10px auto',
-                borderRadius: '10px',
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid #EF4444',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#EF4444',
-              }}
-            >
-              <ShieldAlert size={24} />
-            </div>
-
-            <h1 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>
-              Device not authorized
-            </h1>
-          </div>
-
           {/* Feedback Banners */}
           {errorMsg && (
             <div
