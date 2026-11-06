@@ -13,6 +13,7 @@ import { postRemoteTransaction } from './api';
 import {
   normalizeWhat3Words,
   primeWhat3WordsCache,
+  getCachedWhat3WordsCoordinates,
   resolveEquipmentCoordinates,
   convertWhat3WordsToCoordinates,
 } from './what3words';
@@ -198,6 +199,14 @@ export function mapSupabaseRowToEquipment(row: any): Equipment {
     }
   }
 
+  if ((latitude === undefined || longitude === undefined) && rawW3w) {
+    const cached = getCachedWhat3WordsCoordinates(rawW3w);
+    if (cached) {
+      latitude = cached.lat;
+      longitude = cached.lng;
+    }
+  }
+
   if (latitude !== undefined && longitude !== undefined && rawW3w) {
     primeWhat3WordsCache(rawW3w, latitude, longitude);
   }
@@ -267,6 +276,8 @@ export async function saveEquipmentToSupabase(equipment: Equipment, previousW3wH
     area: resolvedEq.area,
     location: resolvedEq.location,
     what3words: resolvedEq.what3words,
+    latitude: resolvedEq.latitude ?? null,
+    longitude: resolvedEq.longitude ?? null,
     device_id: encodedMeta,
     type: resolvedEq.type || 'PLANT',
     capacity: resolvedEq.capacity ?? null,
@@ -785,6 +796,8 @@ export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]):
       area: eq.area,
       location: eq.location,
       what3words: eq.what3words,
+      latitude: eq.latitude ?? null,
+      longitude: eq.longitude ?? null,
       device_id: encodedMeta,
       type: eq.type || 'PLANT',
       capacity: eq.capacity ?? null,
