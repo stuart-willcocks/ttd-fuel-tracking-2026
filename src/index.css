@@ -2336,10 +2336,14 @@ iframe[src*="vercel.live"],
   border: 1px solid var(--border-subtle);
   border-radius: 0px !important;
   padding: 8px 12px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .values-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -2348,6 +2352,7 @@ iframe[src*="vercel.live"],
   padding: 6px 8px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-main);
+  vertical-align: top;
 }
 
 .values-table tr:last-child td {
@@ -2357,12 +2362,37 @@ iframe[src*="vercel.live"],
 .values-table .lbl {
   font-weight: 600;
   color: var(--text-muted);
-  width: 40%;
+  width: 38%;
 }
 
 .values-table .val {
   font-weight: 700;
   color: var(--text-main);
+  width: 62%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.confirm-w3w-cell {
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.confirm-w3w-value {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.confirm-w3w-prev {
+  font-size: 11px;
+  color: #6B7280;
+  font-weight: 500;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .modal-buttons-row {

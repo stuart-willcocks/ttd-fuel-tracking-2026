@@ -485,11 +485,14 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
                   </tr>
                   <tr>
                     <td className="lbl">what3words</td>
-                    <td className="val" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {effectiveCleanW3w ? `///${effectiveCleanW3w}` : '—'}
+                    <td
+                      className="val confirm-w3w-cell"
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      <div className="confirm-w3w-value">{effectiveCleanW3w || '—'}</div>
                       {isLocationChanged && (
-                        <div style={{ fontSize: '11px', color: '#6B7280', fontWeight: 500 }}>
-                          Previously: {initialCleanW3w ? `///${initialCleanW3w}` : '—'}
+                        <div className="confirm-w3w-prev">
+                          Previously: {initialCleanW3w || '—'}
                         </div>
                       )}
                     </td>

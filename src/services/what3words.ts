@@ -836,27 +836,32 @@ export function getPdaRelocateMapSrcDoc(
     }
     .map-bottom-controls {
       position: absolute;
-      bottom: 20px;
-      right: 8px;
+      bottom: 18px;
+      left: 6px;
+      right: 6px;
       z-index: 1000;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 6px;
+      justify-content: flex-end;
+      gap: 5px;
     }
     .recenter-btn {
       background: #FFFFFF;
       color: #0F172A;
       border: 1px solid #CBD5E1;
       border-radius: 4px;
-      padding: 5px 8px;
-      font-size: 11px;
+      padding: 5px 7px;
+      font-size: 10.5px;
       font-weight: 700;
       cursor: pointer;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 4px;
       user-select: none;
+      white-space: nowrap;
     }
     .recenter-btn:hover {
       background: #F8FAFC;
@@ -962,15 +967,15 @@ export function getPdaRelocateMapSrcDoc(
   <div id="map"></div>
   <div class="map-top-hint" id="mapHint">Tap map to relocate equipment</div>
   <div class="map-bottom-controls" id="mapBottomControls">
-    <button type="button" class="recenter-btn" id="deviceLocBtn" title="Show or hide current device location">
+    <button type="button" class="recenter-btn" id="deviceLocBtn" title="Zoom to current device location">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>
         <path d="M12 18h.01"/>
       </svg>
-      <span id="deviceLocLabel">My Location</span>
+      <span id="deviceLocLabel">Zoom to my location</span>
     </button>
-    <button type="button" class="recenter-btn" id="recenterBtn" title="Re-centre on equipment">
-      <span>⌖ Centre</span>
+    <button type="button" class="recenter-btn" id="recenterBtn" title="Zoom to equipment location">
+      <span>⌖ Zoom to equipment location</span>
     </button>
   </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
@@ -1154,15 +1159,11 @@ export function getPdaRelocateMapSrcDoc(
         } else {
           deviceMarker.setLatLng(pos);
         }
-        deviceLocLabel.textContent = 'My Location';
+        deviceLocLabel.textContent = 'Zoom to my location';
         if (!hasFittedDeviceOnce) {
           hasFittedDeviceOnce = true;
           try {
-            map.fitBounds(L.latLngBounds([target, pos]), {
-              padding: [36, 36],
-              maxZoom: 19,
-              animate: true
-            });
+            map.setView(pos, 19, { animate: true });
           } catch (e) {}
         }
       }
@@ -1178,7 +1179,7 @@ export function getPdaRelocateMapSrcDoc(
         }
         hasFittedDeviceOnce = false;
         deviceLocBtn.classList.remove('active');
-        deviceLocLabel.textContent = 'My Location';
+        deviceLocLabel.textContent = 'Zoom to my location';
         try {
           window.parent.postMessage({ type: 'TTD_PDA_LOCATION_TOGGLE', enabled: false }, '*');
         } catch (e) {}
@@ -1216,7 +1217,7 @@ export function getPdaRelocateMapSrcDoc(
                     updateDeviceMarker(pos2.coords.latitude, pos2.coords.longitude);
                   },
                   function() {
-                    if (!deviceMarker) deviceLocLabel.textContent = 'My Location';
+                    if (!deviceMarker) deviceLocLabel.textContent = 'Zoom to my location';
                   },
                   { enableHighAccuracy: false, timeout: 5000, maximumAge: 180000 }
                 );
