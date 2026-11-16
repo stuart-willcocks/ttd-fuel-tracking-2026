@@ -556,27 +556,31 @@ export function getGoogleSatelliteMapSrcDoc(
     }
     .map-bottom-controls {
       position: absolute;
-      bottom: 24px;
-      right: 12px;
+      bottom: 20px;
+      left: 8px;
+      right: 8px;
       z-index: 1000;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 8px;
+      justify-content: flex-end;
+      gap: 6px;
     }
     .recenter-btn {
       background: #FFFFFF;
       color: #0F172A;
       border: 1px solid #CBD5E1;
       border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 12px;
+      padding: 5px 8px;
+      font-size: 11px;
       font-weight: 700;
       cursor: pointer;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       user-select: none;
+      white-space: nowrap;
     }
     .recenter-btn:hover {
       background: #F8FAFC;
@@ -589,10 +593,13 @@ export function getGoogleSatelliteMapSrcDoc(
     .recenter-btn.active:hover {
       background: #1D4ED8;
     }
-    .recenter-btn.active {
-      background: #2563EB;
-      color: #FFFFFF;
-      border-color: #1D4ED8;
+    #w3wGridCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 400;
     }
     @keyframes pdaPulseRing {
       0% { transform: scale(0.85); opacity: 0.75; }
@@ -643,7 +650,15 @@ export function getGoogleSatelliteMapSrcDoc(
 </head>
 <body>
   <div id="map"></div>
+  <canvas id="w3wGridCanvas"></canvas>
   <div class="map-bottom-controls">
+    <button type="button" class="recenter-btn active" id="toggleGridBtn" title="Show or hide what3words 3m grid">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="18" height="18" x="3" y="3" rx="2"/>
+        <path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>
+      </svg>
+      <span id="toggleGridLabel">Grid: On</span>
+    </button>
     <button type="button" class="recenter-btn" id="deviceLocBtn" title="Show or hide current device location">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>
@@ -725,6 +740,96 @@ export function getGoogleSatelliteMapSrcDoc(
       });
 
       L.marker(target, { icon: eqMarkerIcon }).addTo(map);
+
+      var gridCanvas = document.getElementById('w3wGridCanvas');
+      var toggleGridBtn = document.getElementById('toggleGridBtn');
+      var toggleGridLabel = document.getElementById('toggleGridLabel');
+      var showGrid = true;
+      var dLat3m = 3 / 111319.49079;
+      var cosLat = Math.cos((target[0] * Math.PI) / 180);
+      var dLng3m = 3 / (111319.49079 * Math.max(0.01, cosLat));
+
+      function drawW3wGrid() {
+        if (!gridCanvas) return;
+        var size = map.getSize();
+        if (!size || size.x <= 0 || size.y <= 0) return;
+        var dpr = window.devicePixelRatio || 1;
+        var reqW = Math.round(size.x * dpr);
+        var reqH = Math.round(size.y * dpr);
+        if (gridCanvas.width !== reqW || gridCanvas.height !== reqH) {
+          gridCanvas.width = reqW;
+          gridCanvas.height = reqH;
+        }
+        var ctx = gridCanvas.getContext('2d');
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, size.x, size.y);
+
+        if (!showGrid || map.getZoom() < 17.5) return;
+
+        var bounds = map.getBounds();
+        var south = bounds.getSouth();
+        var north = bounds.getNorth();
+        var west = bounds.getWest();
+        var east = bounds.getEast();
+
+        var startLatIdx = Math.floor(south / dLat3m);
+        var endLatIdx = Math.ceil(north / dLat3m);
+        var startLngIdx = Math.floor(west / dLng3m);
+        var endLngIdx = Math.ceil(east / dLng3m);
+
+        if (endLatIdx - startLatIdx > 250 || endLngIdx - startLngIdx > 250) return;
+
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1;
+
+        for (var i = startLatIdx; i <= endLatIdx; i++) {
+          var lat = i * dLat3m;
+          var y = Math.round(map.latLngToContainerPoint([lat, west]).y) + 0.5;
+          ctx.moveTo(0, y);
+          ctx.lineTo(size.x, y);
+        }
+
+        for (var j = startLngIdx; j <= endLngIdx; j++) {
+          var lng = j * dLng3m;
+          var x = Math.round(map.latLngToContainerPoint([south, lng]).x) + 0.5;
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, size.y);
+        }
+
+        ctx.stroke();
+
+        var cellLat0 = Math.floor(target[0] / dLat3m) * dLat3m;
+        var cellLat1 = cellLat0 + dLat3m;
+        var cellLng0 = Math.floor(target[1] / dLng3m) * dLng3m;
+        var cellLng1 = cellLng0 + dLng3m;
+        var nwPt = map.latLngToContainerPoint([cellLat1, cellLng0]);
+        var sePt = map.latLngToContainerPoint([cellLat0, cellLng1]);
+        ctx.fillStyle = 'rgba(236, 114, 30, 0.22)';
+        ctx.fillRect(nwPt.x, nwPt.y, sePt.x - nwPt.x, sePt.y - nwPt.y);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(nwPt.x, nwPt.y, sePt.x - nwPt.x, sePt.y - nwPt.y);
+      }
+
+      if (toggleGridBtn) {
+        toggleGridBtn.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          showGrid = !showGrid;
+          if (showGrid) {
+            toggleGridBtn.classList.add('active');
+            if (toggleGridLabel) toggleGridLabel.textContent = 'Grid: On';
+          } else {
+            toggleGridBtn.classList.remove('active');
+            if (toggleGridLabel) toggleGridLabel.textContent = 'Grid: Off';
+          }
+          drawW3wGrid();
+        });
+      }
+
+      map.on('move zoom viewreset resize', drawW3wGrid);
+      setTimeout(drawW3wGrid, 50);
 
       var deviceLocBtn = document.getElementById('deviceLocBtn');
       var deviceLocLabel = document.getElementById('deviceLocLabel');
@@ -1092,6 +1197,13 @@ export function getPdaRelocateMapSrcDoc(
   <canvas id="w3wGridCanvas"></canvas>
   <div class="map-top-hint" id="mapHint">Tap map to relocate equipment</div>
   <div class="map-bottom-controls" id="mapBottomControls">
+    <button type="button" class="recenter-btn active" id="toggleGridBtn" title="Show or hide what3words 3m grid">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="18" height="18" x="3" y="3" rx="2"/>
+        <path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>
+      </svg>
+      <span id="toggleGridLabel">Grid: On</span>
+    </button>
     <button type="button" class="recenter-btn" id="deviceLocBtn" title="Zoom to current device location">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>
@@ -1179,6 +1291,9 @@ export function getPdaRelocateMapSrcDoc(
       var moveLine = null;
       var mapHint = document.getElementById('mapHint');
       var gridCanvas = document.getElementById('w3wGridCanvas');
+      var toggleGridBtn = document.getElementById('toggleGridBtn');
+      var toggleGridLabel = document.getElementById('toggleGridLabel');
+      var showGrid = true;
       var dLat3m = 3 / 111319.49079;
       var cosLat = Math.cos((target[0] * Math.PI) / 180);
       var dLng3m = 3 / (111319.49079 * Math.max(0.01, cosLat));
@@ -1200,7 +1315,7 @@ export function getPdaRelocateMapSrcDoc(
         ctx.clearRect(0, 0, size.x, size.y);
 
         // Render 3m x 3m what3words grid at zoom >= 17.5 where cells are clearly distinguishable
-        if (map.getZoom() < 17.5) return;
+        if (!showGrid || map.getZoom() < 17.5) return;
 
         var bounds = map.getBounds();
         var south = bounds.getSouth();
@@ -1252,6 +1367,21 @@ export function getPdaRelocateMapSrcDoc(
           ctx.lineWidth = 1.5;
           ctx.strokeRect(nwPt.x, nwPt.y, cellW, cellH);
         }
+      }
+
+      if (toggleGridBtn) {
+        toggleGridBtn.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          showGrid = !showGrid;
+          if (showGrid) {
+            toggleGridBtn.classList.add('active');
+            if (toggleGridLabel) toggleGridLabel.textContent = 'Grid: On';
+          } else {
+            toggleGridBtn.classList.remove('active');
+            if (toggleGridLabel) toggleGridLabel.textContent = 'Grid: Off';
+          }
+          drawW3wGrid();
+        });
       }
 
       map.on('move zoom viewreset resize', drawW3wGrid);
@@ -1917,11 +2047,27 @@ function getMoveEquipmentMapSrcDoc(
     .eq-move-cancel-btn:hover {
       background: rgba(71, 85, 105, 0.98);
     }
+    #w3wGridCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 400;
+    }
   </style>
 </head>
 <body>
   <div id="map" class="move-aiming-mode"></div>
+  <canvas id="w3wGridCanvas"></canvas>
   <div class="map-bottom-controls" id="mapBottomControls">
+    <button type="button" class="recenter-btn active" id="toggleGridBtn" title="Show or hide what3words 3m grid">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="18" height="18" x="3" y="3" rx="2"/>
+        <path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>
+      </svg>
+      <span id="toggleGridText">Grid: On</span>
+    </button>
     <button type="button" class="recenter-btn" id="toggleLabelsBtn" title="Enable or disable Google Map labels">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
@@ -2054,6 +2200,99 @@ function getMoveEquipmentMapSrcDoc(
       var lastCandidateLng = target[1];
       var lastCandidateLabel = eqId;
 
+      var gridCanvas = document.getElementById('w3wGridCanvas');
+      var toggleGridBtn = document.getElementById('toggleGridBtn');
+      var toggleGridText = document.getElementById('toggleGridText');
+      var showGrid = true;
+      var dLat3m = 3 / 111319.49079;
+      var cosLat = Math.cos((target[0] * Math.PI) / 180);
+      var dLng3m = 3 / (111319.49079 * Math.max(0.01, cosLat));
+
+      function drawW3wGrid() {
+        if (!gridCanvas) return;
+        var size = map.getSize();
+        if (!size || size.x <= 0 || size.y <= 0) return;
+        var dpr = window.devicePixelRatio || 1;
+        var reqW = Math.round(size.x * dpr);
+        var reqH = Math.round(size.y * dpr);
+        if (gridCanvas.width !== reqW || gridCanvas.height !== reqH) {
+          gridCanvas.width = reqW;
+          gridCanvas.height = reqH;
+        }
+        var ctx = gridCanvas.getContext('2d');
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, size.x, size.y);
+
+        if (!showGrid || map.getZoom() < 17.5) return;
+
+        var bounds = map.getBounds();
+        var south = bounds.getSouth();
+        var north = bounds.getNorth();
+        var west = bounds.getWest();
+        var east = bounds.getEast();
+
+        var startLatIdx = Math.floor(south / dLat3m);
+        var endLatIdx = Math.ceil(north / dLat3m);
+        var startLngIdx = Math.floor(west / dLng3m);
+        var endLngIdx = Math.ceil(east / dLng3m);
+
+        if (endLatIdx - startLatIdx > 320 || endLngIdx - startLngIdx > 320) return;
+
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1;
+
+        for (var i = startLatIdx; i <= endLatIdx; i++) {
+          var lat = i * dLat3m;
+          var y = Math.round(map.latLngToContainerPoint([lat, west]).y) + 0.5;
+          ctx.moveTo(0, y);
+          ctx.lineTo(size.x, y);
+        }
+
+        for (var j = startLngIdx; j <= endLngIdx; j++) {
+          var lng = j * dLng3m;
+          var x = Math.round(map.latLngToContainerPoint([south, lng]).x) + 0.5;
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, size.y);
+        }
+
+        ctx.stroke();
+
+        var activeLl = candidateMarker ? candidateMarker.getLatLng() : L.latLng(target[0], target[1]);
+        if (activeLl) {
+          var cellLat0 = Math.floor(activeLl.lat / dLat3m) * dLat3m;
+          var cellLat1 = cellLat0 + dLat3m;
+          var cellLng0 = Math.floor(activeLl.lng / dLng3m) * dLng3m;
+          var cellLng1 = cellLng0 + dLng3m;
+          var nwPt = map.latLngToContainerPoint([cellLat1, cellLng0]);
+          var sePt = map.latLngToContainerPoint([cellLat0, cellLng1]);
+          ctx.fillStyle = candidateMarker ? 'rgba(37, 99, 235, 0.22)' : 'rgba(236, 114, 30, 0.22)';
+          ctx.fillRect(nwPt.x, nwPt.y, sePt.x - nwPt.x, sePt.y - nwPt.y);
+          ctx.strokeStyle = candidateMarker ? 'rgba(147, 197, 253, 0.9)' : 'rgba(255, 255, 255, 0.75)';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(nwPt.x, nwPt.y, sePt.x - nwPt.x, sePt.y - nwPt.y);
+        }
+      }
+
+      if (toggleGridBtn) {
+        toggleGridBtn.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          showGrid = !showGrid;
+          if (showGrid) {
+            toggleGridBtn.classList.add('active');
+            if (toggleGridText) toggleGridText.textContent = 'Grid: On';
+          } else {
+            toggleGridBtn.classList.remove('active');
+            if (toggleGridText) toggleGridText.textContent = 'Grid: Off';
+          }
+          drawW3wGrid();
+        });
+      }
+
+      map.on('move zoom viewreset resize', drawW3wGrid);
+      setTimeout(drawW3wGrid, 50);
+
       function attachConfirmBoxHandlers() {
         if (!candidateMarker) return;
         var rootEl = candidateMarker.getElement();
@@ -2166,6 +2405,7 @@ function getMoveEquipmentMapSrcDoc(
         } else {
           moveLine.setLatLngs([target, pos]);
         }
+        drawW3wGrid();
       }
 
       function clearCandidateLocation() {
@@ -2184,6 +2424,7 @@ function getMoveEquipmentMapSrcDoc(
           map.removeLayer(moveLine);
           moveLine = null;
         }
+        drawW3wGrid();
       }
 
       map.on('mousemove', function(ev) {
@@ -3755,11 +3996,23 @@ export function getFleetSatelliteMapSrcDoc(
     .eq-move-cancel-btn:hover {
       background: rgba(71, 85, 105, 0.98);
     }
+    #w3wGridCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 400;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <canvas id="w3wGridCanvas"></canvas>
   <div class="map-bottom-controls">
+    <button type="button" class="fit-btn active" id="toggleGridBtn" title="Toggle what3words 3m grid overlay">
+      <span>⊞ Grid: <span id="gridStatusText">On</span></span>
+    </button>
     <button type="button" class="fit-btn" id="toggleLabelsBtn" title="Toggle default Google Maps location labels">
       <span>🏷 Map Labels: <span id="labelsStatusText">Off</span></span>
     </button>
@@ -3857,6 +4110,113 @@ export function getFleetSatelliteMapSrcDoc(
           applyLabelsState();
         });
       }
+
+      var gridCanvas = document.getElementById('w3wGridCanvas');
+      var toggleGridBtn = document.getElementById('toggleGridBtn');
+      var gridStatusText = document.getElementById('gridStatusText');
+      var showGrid = true;
+
+      function drawFleetW3wGrid() {
+        if (!gridCanvas) return;
+        var size = map.getSize();
+        if (!size || size.x <= 0 || size.y <= 0) return;
+        var dpr = window.devicePixelRatio || 1;
+        var reqW = Math.round(size.x * dpr);
+        var reqH = Math.round(size.y * dpr);
+        if (gridCanvas.width !== reqW || gridCanvas.height !== reqH) {
+          gridCanvas.width = reqW;
+          gridCanvas.height = reqH;
+        }
+        var ctx = gridCanvas.getContext('2d');
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, size.x, size.y);
+
+        if (!showGrid) return;
+
+        var center = map.getCenter();
+        var dLat3m = 3 / 111319.49079;
+        var cosLat = Math.cos((center.lat * Math.PI) / 180);
+        var dLng3m = 3 / (111319.49079 * Math.max(0.01, cosLat));
+
+        // Draw full viewport 3m x 3m grid lines when zoomed in (zoom >= 17.5)
+        if (map.getZoom() >= 17.5) {
+          var bounds = map.getBounds();
+          var south = bounds.getSouth();
+          var north = bounds.getNorth();
+          var west = bounds.getWest();
+          var east = bounds.getEast();
+
+          var startLatIdx = Math.floor(south / dLat3m);
+          var endLatIdx = Math.ceil(north / dLat3m);
+          var startLngIdx = Math.floor(west / dLng3m);
+          var endLngIdx = Math.ceil(east / dLng3m);
+
+          if (endLatIdx - startLatIdx <= 400 && endLngIdx - startLngIdx <= 400) {
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.32)';
+            ctx.lineWidth = 1;
+
+            for (var i = startLatIdx; i <= endLatIdx; i++) {
+              var lat = i * dLat3m;
+              var y = Math.round(map.latLngToContainerPoint([lat, west]).y) + 0.5;
+              ctx.moveTo(0, y);
+              ctx.lineTo(size.x, y);
+            }
+
+            for (var j = startLngIdx; j <= endLngIdx; j++) {
+              var lng = j * dLng3m;
+              var x = Math.round(map.latLngToContainerPoint([south, lng]).x) + 0.5;
+              ctx.moveTo(x, 0);
+              ctx.lineTo(x, size.y);
+            }
+
+            ctx.stroke();
+          }
+        }
+
+        // Highlight the 3m x 3m what3words square for each equipment marker when zoom >= 16
+        if (map.getZoom() >= 16 && typeof itemsById === 'object' && itemsById) {
+          var eqIds = Object.keys(itemsById);
+          for (var k = 0; k < eqIds.length; k++) {
+            var it = itemsById[eqIds[k]];
+            if (!it || it.type === 'PDA' || typeof it.lat !== 'number' || typeof it.lng !== 'number') continue;
+            var cellLat0 = Math.floor(it.lat / dLat3m) * dLat3m;
+            var cellLat1 = cellLat0 + dLat3m;
+            var cellLng0 = Math.floor(it.lng / dLng3m) * dLng3m;
+            var cellLng1 = cellLng0 + dLng3m;
+            var nwPt = map.latLngToContainerPoint([cellLat1, cellLng0]);
+            var sePt = map.latLngToContainerPoint([cellLat0, cellLng1]);
+            var w = Math.max(3, sePt.x - nwPt.x);
+            var h = Math.max(3, sePt.y - nwPt.y);
+            ctx.fillStyle = 'rgba(236, 114, 30, 0.2)';
+            ctx.fillRect(nwPt.x, nwPt.y, w, h);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.72)';
+            ctx.lineWidth = 1.25;
+            ctx.strokeRect(nwPt.x, nwPt.y, w, h);
+          }
+        }
+      }
+
+      if (toggleGridBtn) {
+        toggleGridBtn.addEventListener('click', function() {
+          showGrid = !showGrid;
+          if (showGrid) {
+            toggleGridBtn.classList.add('active');
+            if (gridStatusText) gridStatusText.textContent = 'On';
+            if (map.getZoom() < 18) {
+              map.setZoom(19, { animate: true });
+            }
+          } else {
+            toggleGridBtn.classList.remove('active');
+            if (gridStatusText) gridStatusText.textContent = 'Off';
+          }
+          drawFleetW3wGrid();
+        });
+      }
+
+      map.on('move zoom viewreset resize', drawFleetW3wGrid);
+      setTimeout(drawFleetW3wGrid, 60);
 
       function getEquipmentSvg(type, color) {
         if (type === 'GENERATOR') {
@@ -4744,6 +5104,7 @@ export function getFleetSatelliteMapSrcDoc(
         }
 
         updateLeaderTrianglesForZoom(map.getZoom());
+        drawFleetW3wGrid();
       }
 
       renderOrUpdateMarkers(items);
