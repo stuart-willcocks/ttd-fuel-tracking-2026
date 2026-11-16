@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Check, Clock, AlertCircle, MapPin, X } from 'lucide-react';
+import { Check, Clock, AlertCircle, MapPin, X, Pencil } from 'lucide-react';
 import { IconCheckIn, IconCheckOut, IconFuel, IconBack, IconPoweredOn, IconPoweredOff } from './icons/AppIcons';
 import type { Equipment, Transaction, ActionType } from '../types';
 import { formatPdaTimestamp } from '../utils/dateFormat';
@@ -22,6 +22,7 @@ export interface AssetDetailViewProps {
   transactions: Transaction[];
   onSelectAction: (action: ActionType) => void;
   onBack: () => void;
+  onEditDetails?: () => void;
   onUpdateTransaction?: (updatedTx: Transaction) => void | Promise<void>;
   onDeleteTransaction?: (transactionId: string) => void | Promise<void>;
 }
@@ -31,6 +32,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
   transactions,
   onSelectAction,
   onBack,
+  onEditDetails,
   onUpdateTransaction,
   onDeleteTransaction,
 }) => {
@@ -312,13 +314,24 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
   return (
     <div className="old-screen-container asset-detail-container">
-      {/* 1. ASSET ID: Matches placement and styling of scan view text box */}
+      {/* 1. ASSET ID: Back button to the left of equipment ID text box */}
       <div className="scan-top-area">
-        <div className="old-scan-input asset-detail-id-box">
-          <span className="asset-detail-id-icon">
-            <EquipmentTypeIcon type={asset.type} size={24} />
-          </span>
-          <span className="asset-detail-id-text">{asset.equipmentId}</span>
+        <div className="asset-detail-top-row">
+          <button
+            type="button"
+            className="btn-pda-back-square"
+            onClick={onBack}
+            aria-label="Back"
+            title="Back"
+          >
+            <IconBack size={24} color="#FFFFFF" />
+          </button>
+          <div className="old-scan-input asset-detail-id-box">
+            <span className="asset-detail-id-icon">
+              <EquipmentTypeIcon type={asset.type} size={24} />
+            </span>
+            <span className="asset-detail-id-text">{asset.equipmentId}</span>
+          </div>
         </div>
       </div>
 
@@ -463,11 +476,11 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
         <button
           type="button"
-          className="btn-pda-rect btn-pda-red"
-          onClick={onBack}
+          className="btn-pda-rect btn-pda-blue"
+          onClick={onEditDetails}
         >
-          <IconBack size={20} />
-          <span>Back</span>
+          <Pencil size={18} />
+          <span>Edit details</span>
         </button>
       </div>
 

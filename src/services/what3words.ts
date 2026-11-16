@@ -770,6 +770,509 @@ export function getGoogleSatelliteMapSrcDoc(
 }
 
 /**
+ * Generates a self-contained HTML document (`srcDoc`) for the PDA Edit Details interactive map,
+ * allowing the technician to relocate an asset by tapping or dragging on the satellite map.
+ */
+export function getPdaRelocateMapSrcDoc(
+  w3w?: string | null,
+  lat?: number | null,
+  lng?: number | null,
+  equipmentType?: Equipment['type'] | null
+): string {
+  const clean = normalizeWhat3Words(w3w);
+  const cached =
+    typeof lat === 'number' && typeof lng === 'number' && !Number.isNaN(lat) && !Number.isNaN(lng)
+      ? { lat, lng }
+      : getCachedWhat3WordsCoordinates(clean);
+
+  const targetLat = cached ? cached.lat : 52.0733;
+  const targetLng = cached ? cached.lng : -1.0147;
+  const eqTypeJson = JSON.stringify(equipmentType || 'GENERATOR').replace(/</g, '\\u003c');
+  const eqW3wJson = JSON.stringify(clean ? `///${clean}` : 'Current').replace(/</g, '\\u003c');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
+  <style>
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #0F172A;
+      overflow: hidden;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      cursor: crosshair;
+    }
+    .leaflet-control-attribution {
+      font-size: 9px !important;
+      background: rgba(15, 23, 42, 0.65) !important;
+      color: #CBD5E1 !important;
+      padding: 1px 5px !important;
+      border-top-left-radius: 4px;
+    }
+    .leaflet-control-attribution a {
+      color: #93C5FD !important;
+    }
+    .map-top-hint {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.85);
+      color: #F8FAFC;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      pointer-events: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    }
+    .map-bottom-controls {
+      position: absolute;
+      bottom: 20px;
+      right: 8px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .recenter-btn {
+      background: #FFFFFF;
+      color: #0F172A;
+      border: 1px solid #CBD5E1;
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      user-select: none;
+    }
+    .recenter-btn:hover {
+      background: #F8FAFC;
+    }
+    .recenter-btn.active {
+      background: #2563EB;
+      color: #FFFFFF;
+      border-color: #1D4ED8;
+    }
+    @keyframes pdaPulseRing {
+      0% { transform: scale(0.85); opacity: 0.75; }
+      70% { transform: scale(1.65); opacity: 0; }
+      100% { transform: scale(1.65); opacity: 0; }
+    }
+    .pda-device-loc-wrap {
+      position: relative;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pda-device-loc-pulse {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(37, 99, 235, 0.45);
+      animation: pdaPulseRing 2s infinite ease-out;
+      pointer-events: none;
+    }
+    .pda-device-loc-disc {
+      position: relative;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #64748B;
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+    }
+    .eq-relocate-marker {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translate(-50%, -16px);
+      user-select: none;
+    }
+    .eq-relocate-disc-current {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #EC721E;
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .eq-relocate-disc-new {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #2563EB;
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.38), 0 4px 10px rgba(0, 0, 0, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .eq-relocate-label {
+      margin-top: 2px;
+      padding: 2px 5px;
+      border-radius: 3px;
+      background: rgba(15, 23, 42, 0.88);
+      color: #FFFFFF;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9.5px;
+      font-weight: 700;
+      white-space: nowrap;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+    .eq-relocate-label-new {
+      margin-top: 2px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: #1D4ED8;
+      color: #FFFFFF;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 800;
+      white-space: nowrap;
+      border: 1px solid #93C5FD;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="map-top-hint" id="mapHint">Tap map to relocate equipment</div>
+  <div class="map-bottom-controls" id="mapBottomControls">
+    <button type="button" class="recenter-btn" id="deviceLocBtn" title="Show or hide current device location">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>
+        <path d="M12 18h.01"/>
+      </svg>
+      <span id="deviceLocLabel">My Location</span>
+    </button>
+    <button type="button" class="recenter-btn" id="recenterBtn" title="Re-centre on equipment">
+      <span>⌖ Centre</span>
+    </button>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+  <script>
+    (function() {
+      var target = [${targetLat}, ${targetLng}];
+      var eqType = ${eqTypeJson};
+      var eqW3w = ${eqW3wJson};
+
+      var map = L.map('map', {
+        center: target,
+        zoom: 19,
+        maxZoom: 21,
+        minZoom: 3,
+        zoomControl: true,
+        doubleClickZoom: false
+      });
+
+      var bottomControls = document.getElementById('mapBottomControls');
+      if (bottomControls && L.DomEvent) {
+        L.DomEvent.disableClickPropagation(bottomControls);
+      }
+
+      L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        maxZoom: 21,
+        maxNativeZoom: 20,
+        subdomains: ['0', '1', '2', '3'],
+        attribution: 'Map data &copy; Google Satellite'
+      }).addTo(map);
+
+      function getEquipmentSvg(type, color) {
+        if (type === 'GENERATOR') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none">' +
+            '<g transform="translate(-102)">' +
+            '<path d="m 106,6 c -1,0 -2,1 -2,2 v 9 c 0,1 1,2 2,2 h 16 c 1,0 2,-1 2,-2 V 8 c 0,-1 -1,-2 -2,-2 z M 118.69922,7.9003906 120.30078,9.099609 118.5,11.5 h 3 l -4.19922,5.599609 -1.60156,-1.199218 L 117.5,13.5 h -3 z M 106,8.5 h 7 v 2 h -7 z m 0,3 h 7 v 2 h -7 z m 0,3 h 7 v 2 h -7 z" fill="' + color + '" fill-rule="evenodd"/>' +
+            '<path d="m 107,4.5 h 3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 106,21 h 16" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="M 118,6 V 3 h 2" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
+            '</g></svg>';
+        }
+        if (type === 'TANK') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none">' +
+            '<g transform="translate(-136)">' +
+            '<rect x="139" y="5.5" width="15.5" height="8" rx="2.5" fill="' + color + '" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<circle cx="147" cy="18.5" r="2.5" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="m 143,3 h 3.5" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 151,16 h 7" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '<path d="m 143,16 h -3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
+            '</g></svg>';
+        }
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none">' +
+          '<g transform="translate(-170)">' +
+          '<circle cx="175.82" cy="20.11" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+          '<circle cx="184.72" cy="20.16" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+          '<path d="M 172.72,19.70 172.5,11.5 176,11 176.5,5.5 182,5 l 1,0.5 1.5,8.5 h 3.5" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="m 172.72,19.20 1.5,-2 h 3.5 l 1,2 h 3 l 2,-2" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="m 192,21.5 h -4 V 2" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '</g></svg>';
+      }
+
+      var currentHtml = '<div class="eq-relocate-marker">' +
+        '<div class="eq-relocate-disc-current">' + getEquipmentSvg(eqType, '#FFFFFF') + '</div>' +
+        '<div class="eq-relocate-label">' + eqW3w + '</div>' +
+        '</div>';
+
+      var currentIcon = L.divIcon({
+        html: currentHtml,
+        className: '',
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+      });
+
+      L.marker(target, { icon: currentIcon, interactive: false }).addTo(map);
+
+      var candidateMarker = null;
+      var moveLine = null;
+      var mapHint = document.getElementById('mapHint');
+
+      function buildNewIcon(labelText) {
+        var html = '<div class="eq-relocate-marker">' +
+          '<div class="eq-relocate-disc-new">' + getEquipmentSvg(eqType, '#FFFFFF') + '</div>' +
+          '<div class="eq-relocate-label-new">' + labelText + '</div>' +
+          '</div>';
+        return L.divIcon({
+          html: html,
+          className: '',
+          iconSize: [0, 0],
+          iconAnchor: [0, 0]
+        });
+      }
+
+      function pickLocation(lat, lng, labelText) {
+        var pos = [lat, lng];
+        if (!candidateMarker) {
+          candidateMarker = L.marker(pos, {
+            icon: buildNewIcon(labelText),
+            draggable: true,
+            zIndexOffset: 1000
+          }).addTo(map);
+          candidateMarker.on('dragend', function(ev) {
+            var ll = ev.target.getLatLng();
+            if (ll) {
+              pickLocation(ll.lat, ll.lng, 'Resolving ///...');
+              try {
+                window.parent.postMessage({
+                  type: 'TTD_PDA_RELOCATE_PICK',
+                  lat: ll.lat,
+                  lng: ll.lng
+                }, '*');
+              } catch (e) {}
+            }
+          });
+        } else {
+          candidateMarker.setLatLng(pos);
+          candidateMarker.setIcon(buildNewIcon(labelText));
+        }
+
+        if (!moveLine) {
+          moveLine = L.polyline([target, pos], {
+            color: '#2563EB',
+            weight: 3,
+            dashArray: '6, 4',
+            opacity: 0.95,
+            interactive: false
+          }).addTo(map);
+        } else {
+          moveLine.setLatLngs([target, pos]);
+        }
+
+        if (mapHint) {
+          mapHint.textContent = 'Tap map or drag blue pin to adjust';
+        }
+      }
+
+      function handleMapSelect(ev) {
+        if (!ev || !ev.latlng) return;
+        var lat = ev.latlng.lat;
+        var lng = ev.latlng.lng;
+        pickLocation(lat, lng, 'Resolving ///...');
+        try {
+          window.parent.postMessage({
+            type: 'TTD_PDA_RELOCATE_PICK',
+            lat: lat,
+            lng: lng
+          }, '*');
+        } catch (e) {}
+      }
+
+      map.on('click', handleMapSelect);
+      map.on('dblclick', handleMapSelect);
+
+      var deviceLocBtn = document.getElementById('deviceLocBtn');
+      var deviceLocLabel = document.getElementById('deviceLocLabel');
+      var isDeviceLocEnabled = false;
+      var deviceMarker = null;
+      var geoWatchId = null;
+      var hasFittedDeviceOnce = false;
+
+      var deviceIconHtml = '<div class="pda-device-loc-wrap">' +
+        '<div class="pda-device-loc-pulse"></div>' +
+        '<div class="pda-device-loc-disc">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>' +
+        '<path d="M12 18h.01"/>' +
+        '</svg>' +
+        '</div></div>';
+
+      var deviceDivIcon = L.divIcon({
+        html: deviceIconHtml,
+        className: '',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      function updateDeviceMarker(lat, lng) {
+        if (!isDeviceLocEnabled) return;
+        if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return;
+        var pos = [lat, lng];
+        if (!deviceMarker) {
+          deviceMarker = L.marker(pos, { icon: deviceDivIcon, zIndexOffset: 500 }).addTo(map);
+        } else {
+          deviceMarker.setLatLng(pos);
+        }
+        deviceLocLabel.textContent = 'My Location';
+        if (!hasFittedDeviceOnce) {
+          hasFittedDeviceOnce = true;
+          try {
+            map.fitBounds(L.latLngBounds([target, pos]), {
+              padding: [36, 36],
+              maxZoom: 19,
+              animate: true
+            });
+          } catch (e) {}
+        }
+      }
+
+      function stopDeviceTracking() {
+        if (geoWatchId !== null && navigator.geolocation) {
+          try { navigator.geolocation.clearWatch(geoWatchId); } catch (e) {}
+          geoWatchId = null;
+        }
+        if (deviceMarker) {
+          map.removeLayer(deviceMarker);
+          deviceMarker = null;
+        }
+        hasFittedDeviceOnce = false;
+        deviceLocBtn.classList.remove('active');
+        deviceLocLabel.textContent = 'My Location';
+        try {
+          window.parent.postMessage({ type: 'TTD_PDA_LOCATION_TOGGLE', enabled: false }, '*');
+        } catch (e) {}
+      }
+
+      function startDeviceTracking() {
+        deviceLocBtn.classList.add('active');
+        hasFittedDeviceOnce = false;
+        try {
+          var raw = (window.sessionStorage && window.sessionStorage.getItem('ttd_cached_location')) ||
+                    (window.localStorage && window.localStorage.getItem('ttd_cached_location'));
+          if (raw) {
+            var cached = JSON.parse(raw);
+            if (cached && typeof cached.latitude === 'number' && typeof cached.longitude === 'number') {
+              updateDeviceMarker(cached.latitude, cached.longitude);
+            }
+          }
+        } catch (e) {}
+        try {
+          window.parent.postMessage({ type: 'TTD_PDA_LOCATION_TOGGLE', enabled: true }, '*');
+        } catch (e) {}
+        if (navigator.geolocation) {
+          if (!deviceMarker) deviceLocLabel.textContent = 'Locating...';
+          try {
+            geoWatchId = navigator.geolocation.watchPosition(
+              function(pos) {
+                if (!isDeviceLocEnabled) return;
+                updateDeviceMarker(pos.coords.latitude, pos.coords.longitude);
+              },
+              function() {
+                if (!isDeviceLocEnabled) return;
+                navigator.geolocation.getCurrentPosition(
+                  function(pos2) {
+                    if (!isDeviceLocEnabled) return;
+                    updateDeviceMarker(pos2.coords.latitude, pos2.coords.longitude);
+                  },
+                  function() {
+                    if (!deviceMarker) deviceLocLabel.textContent = 'My Location';
+                  },
+                  { enableHighAccuracy: false, timeout: 5000, maximumAge: 180000 }
+                );
+              },
+              { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+            );
+          } catch (e) {}
+        }
+      }
+
+      deviceLocBtn.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        isDeviceLocEnabled = !isDeviceLocEnabled;
+        if (isDeviceLocEnabled) startDeviceTracking();
+        else stopDeviceTracking();
+      });
+
+      document.getElementById('recenterBtn').addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        if (candidateMarker) {
+          map.setView(candidateMarker.getLatLng(), 19, { animate: true });
+        } else {
+          map.setView(target, 19, { animate: true });
+        }
+      });
+
+      window.addEventListener('message', function(ev) {
+        if (ev.source !== window.parent) return;
+        var data = ev && ev.data;
+        if (!data || typeof data !== 'object') return;
+        if (data.type === 'TTD_PDA_LOCATION_UPDATE') {
+          updateDeviceMarker(data.lat, data.lng);
+        } else if (data.type === 'TTD_PDA_RELOCATE_RESOLVED') {
+          pickLocation(data.lat, data.lng, 'New: ' + data.formattedWords);
+        } else if (data.type === 'TTD_PDA_RELOCATE_RESET') {
+          if (candidateMarker) {
+            map.removeLayer(candidateMarker);
+            candidateMarker = null;
+          }
+          if (moveLine) {
+            map.removeLayer(moveLine);
+            moveLine = null;
+          }
+          if (mapHint) {
+            mapHint.textContent = 'Tap map to relocate equipment';
+          }
+          map.setView(target, 19, { animate: true });
+        }
+      });
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+/**
  * Opens a clutter-free Google Maps pure Satellite modal overlay in the Admin Console.
  * Uses pure Google Satellite tiles (`lyrs=s`) so all POI icons (photo locations, hotels,
  * hospitals, restaurants) and Google sidebars are completely suppressed.

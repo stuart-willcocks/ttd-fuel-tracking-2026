@@ -451,6 +451,7 @@ export const App: React.FC = () => {
     });
     setActiveAssetId(equipmentId);
     setActiveAction(null);
+    setIsEditingAsset(false);
     await loadAssetDetails(equipmentId);
     setCurrentView('ASSET_DETAIL_VIEW');
     if (syncEngine.isEffectivelyOnline()) {
@@ -463,6 +464,7 @@ export const App: React.FC = () => {
     setCurrentAsset(null);
     setCurrentAssetTransactions([]);
     setActiveAction(null);
+    setIsEditingAsset(false);
     setCurrentView('SCAN_SCREEN');
   };
 
@@ -747,11 +749,19 @@ export const App: React.FC = () => {
         ) : (
           /* ASSET_DETAIL_VIEW */
           currentAsset && (
-            !activeAction ? (
+            isEditingAsset ? (
+              <EditAssetModal
+                asset={currentAsset}
+                isOpen={isEditingAsset}
+                onClose={() => setIsEditingAsset(false)}
+                onSave={handleSaveEditedAsset}
+              />
+            ) : !activeAction ? (
               <AssetDetailView
                 asset={currentAsset}
                 transactions={currentAssetTransactions}
                 onSelectAction={handleSelectAction}
+                onEditDetails={() => setIsEditingAsset(true)}
                 onBack={handleBackToScanner}
                 onUpdateTransaction={handleUpdateTransaction}
                 onDeleteTransaction={handleDeleteTransaction}
@@ -787,16 +797,6 @@ export const App: React.FC = () => {
           isOpen={isConfirmModalOpen}
           onCancel={() => setIsConfirmModalOpen(false)}
           onConfirm={handleConfirmTransaction}
-        />
-      )}
-
-      {/* Edit Equipment Modal */}
-      {currentAsset && (
-        <EditAssetModal
-          asset={currentAsset}
-          isOpen={isEditingAsset}
-          onClose={() => setIsEditingAsset(false)}
-          onSave={handleSaveEditedAsset}
         />
       )}
 
