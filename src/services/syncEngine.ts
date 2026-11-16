@@ -11,6 +11,10 @@ import { fetchRemoteEquipment, fetchRemoteTransactions, deleteRemoteTransaction,
 import type { Equipment, Transaction } from '../types';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
 import {
+  convertCoordinatesToWhat3Words,
+  needsWhat3WordsReverseResolution,
+} from './what3words';
+import {
   isDeviceEnrolled,
   getDeviceId,
   getDeviceToken,
@@ -356,6 +360,8 @@ class SyncEngine {
 
   /**
    * Saves an equipment update locally immediately and queues it for remote sync if offline.
+   * If saved with GPS coordinates while what3words was unavailable, automatically resolves
+   * what3words as soon as the service is available.
    */
   public async saveEquipment(equipment: Equipment): Promise<void> {
     await db.equipments.put(equipment);
@@ -363,14 +369,78 @@ class SyncEngine {
     this.savePendingEquipmentIds();
 
     if (this.isEffectivelyOnline()) {
+      let toUpload = equipment;
+      const gpsCoords = needsWhat3WordsReverseResolution(equipment);
+      if (gpsCoords) {
+        const resolved = await convertCoordinatesToWhat3Words(gpsCoords.lat, gpsCoords.lng);
+        if (resolved) {
+          toUpload = {
+            ...equipment,
+            what3words: resolved.formattedWords,
+            latitude: resolved.lat,
+            longitude: resolved.lng,
+            updatedAt: new Date().toISOString(),
+          };
+          await db.equipments.put(toUpload);
+          this.notifyDataChange();
+        }
+      }
+
       try {
-        await postRemoteEquipment(equipment);
+        await postRemoteEquipment(toUpload);
         this.pendingEquipmentIds.delete(equipment.equipmentId);
         this.savePendingEquipmentIds();
       } catch {
         // Remains in pendingEquipmentIds to flush on next online sync
       }
     }
+  }
+
+  /**
+   * Checks all local equipment records for any whose location is stored as GPS coordinates
+   * instead of a what3words 3-word address, resolves them via the what3words API when available,
+   * updates IndexedDB and the remote database, and refreshes all UI surfaces.
+   */
+  public async resolvePendingGpsLocations(): Promise<boolean> {
+    if (!this.isEffectivelyOnline()) return false;
+    let anyResolved = false;
+
+    try {
+      const allEq = await db.equipments.toArray();
+      for (const eq of allEq) {
+        if (!this.isEffectivelyOnline()) break;
+        const gpsCoords = needsWhat3WordsReverseResolution(eq);
+        if (!gpsCoords) continue;
+
+        const resolved = await convertCoordinatesToWhat3Words(gpsCoords.lat, gpsCoords.lng);
+        if (resolved) {
+          const updatedEq: Equipment = {
+            ...eq,
+            what3words: resolved.formattedWords,
+            latitude: resolved.lat,
+            longitude: resolved.lng,
+            updatedAt: new Date().toISOString(),
+          };
+          await db.equipments.put(updatedEq);
+          anyResolved = true;
+          try {
+            await postRemoteEquipment(updatedEq);
+            this.pendingEquipmentIds.delete(updatedEq.equipmentId);
+            this.savePendingEquipmentIds();
+          } catch {
+            this.pendingEquipmentIds.add(updatedEq.equipmentId);
+            this.savePendingEquipmentIds();
+          }
+        }
+      }
+    } catch {
+      // Ignore transient errors
+    }
+
+    if (anyResolved) {
+      this.notifyDataChange();
+    }
+    return anyResolved;
   }
 
   /**
@@ -733,6 +803,9 @@ class SyncEngine {
         this.lastSyncTime = new Date().toLocaleTimeString();
         await this.notify();
         this.notifyDataChange();
+        if (needsWhat3WordsReverseResolution(incomingEq) && this.isEffectivelyOnline()) {
+          this.resolvePendingGpsLocations().catch(() => {});
+        }
         return;
       }
 
@@ -893,8 +966,26 @@ class SyncEngine {
       if (this.pendingEquipmentIds.size > 0 && this.isEffectivelyOnline()) {
         for (const eqId of Array.from(this.pendingEquipmentIds)) {
           try {
-            const localEq = await db.equipments.get(eqId);
+            let localEq = await db.equipments.get(eqId);
             if (localEq) {
+              const gpsCoords = needsWhat3WordsReverseResolution(localEq);
+              if (gpsCoords) {
+                const resolved = await convertCoordinatesToWhat3Words(
+                  gpsCoords.lat,
+                  gpsCoords.lng
+                );
+                if (resolved) {
+                  localEq = {
+                    ...localEq,
+                    what3words: resolved.formattedWords,
+                    latitude: resolved.lat,
+                    longitude: resolved.lng,
+                    updatedAt: new Date().toISOString(),
+                  };
+                  await db.equipments.put(localEq);
+                  hadUpdates = true;
+                }
+              }
               await postRemoteEquipment(localEq);
             }
             this.pendingEquipmentIds.delete(eqId);
@@ -1084,6 +1175,12 @@ class SyncEngine {
             hadUpdates = true;
           }
         }
+      }
+
+      // Automatically resolve any equipment records that still have GPS coordinates instead of what3words
+      const resolvedAnyGps = await this.resolvePendingGpsLocations();
+      if (resolvedAnyGps) {
+        hadUpdates = true;
       }
 
       this.lastSyncTime = new Date().toLocaleTimeString();

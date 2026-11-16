@@ -578,7 +578,11 @@ export const App: React.FC = () => {
       setIsEnrolled(false);
       return;
     }
-    const resolved = await resolveEquipmentCoordinates(updated, currentAsset?.what3words);
+    const resolved = await resolveEquipmentCoordinates(
+      updated,
+      currentAsset?.what3words,
+      syncEngine.isEffectivelyOnline()
+    );
     setCurrentAsset(resolved);
     setIsEditingAsset(false);
     await syncEngine.saveEquipment(resolved);

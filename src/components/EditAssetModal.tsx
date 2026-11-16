@@ -285,6 +285,46 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
     );
   };
 
+  // Automatically resolve GPS coordinate relocation to what3words as soon as the service becomes available
+  useEffect(() => {
+    if (!isOpen || !relocatedW3w) return;
+    if (isValidWhat3WordsFormat(relocatedW3w.words)) return;
+
+    let cancelled = false;
+    const tryResolveCandidate = async () => {
+      if (cancelled || !syncEngine.isEffectivelyOnline()) return;
+      const resolved = await convertCoordinatesToWhat3Words(
+        relocatedW3w.lat,
+        relocatedW3w.lng
+      );
+      if (cancelled || !resolved) return;
+      setRelocatedW3w(resolved);
+      mapIframeRef.current?.contentWindow?.postMessage(
+        {
+          type: 'TTD_PDA_RELOCATE_RESOLVED',
+          lat: resolved.lat,
+          lng: resolved.lng,
+          formattedWords: resolved.formattedWords,
+        },
+        '*'
+      );
+    };
+
+    tryResolveCandidate();
+    const unsub = syncEngine.subscribe((state) => {
+      if (state.isOnline) {
+        tryResolveCandidate();
+      }
+    });
+    const timer = setInterval(tryResolveCandidate, 8000);
+
+    return () => {
+      cancelled = true;
+      unsub();
+      clearInterval(timer);
+    };
+  }, [isOpen, relocatedW3w]);
+
   const parsedCapacity = useMemo(() => {
     const trimmed = capacity.trim();
     if (!trimmed) return undefined;

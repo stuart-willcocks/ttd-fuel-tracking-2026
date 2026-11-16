@@ -47,6 +47,10 @@ import {
 } from '../services/supabase';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
 import { formatErrorMessage } from '../utils/errorMessage';
+import {
+  convertCoordinatesToWhat3Words,
+  needsWhat3WordsReverseResolution,
+} from '../services/what3words';
 
 export const AdminApp: React.FC = () => {
   const initialAuthInfo = getInitialAuthUrlInfo();
@@ -212,6 +216,51 @@ export const AdminApp: React.FC = () => {
       clearInterval(interval);
     };
   }, [isAuthenticated, loadFleetData, isCreateModalOpen, editingAsset]);
+
+  // Automatically resolve any equipment records uploaded with GPS coordinates to what3words as soon as the service is available
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const pendingGpsAssets = assets.filter((a) => needsWhat3WordsReverseResolution(a) !== null);
+    if (pendingGpsAssets.length === 0) return;
+
+    let cancelled = false;
+    const resolvePending = async () => {
+      if (cancelled || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
+      for (const item of pendingGpsAssets) {
+        if (cancelled) return;
+        const coords = needsWhat3WordsReverseResolution(item);
+        if (!coords) continue;
+        const resolved = await convertCoordinatesToWhat3Words(coords.lat, coords.lng);
+        if (cancelled || !resolved) continue;
+
+        const updatedAsset: Equipment = {
+          ...item,
+          what3words: resolved.formattedWords,
+          latitude: resolved.lat,
+          longitude: resolved.lng,
+          updatedAt: new Date().toISOString(),
+        };
+
+        setAssets((prev) =>
+          reconcileEquipmentPowerStates(
+            prev.map((a) => (a.equipmentId === updatedAsset.equipmentId ? updatedAsset : a)),
+            transactionsRef.current
+          )
+        );
+        postRemoteEquipment(updatedAsset).catch(() => {});
+      }
+    };
+
+    resolvePending();
+    const retryTimer = setInterval(resolvePending, 10000);
+    window.addEventListener('online', resolvePending);
+
+    return () => {
+      cancelled = true;
+      clearInterval(retryTimer);
+      window.removeEventListener('online', resolvePending);
+    };
+  }, [isAuthenticated, assets]);
 
   // Real-time listener for database transactions, equipment, and telemetry logged by field PDAs
   useEffect(() => {

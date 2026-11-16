@@ -325,6 +325,9 @@ export async function convertCoordinatesToWhat3Words(
   if (typeof lat !== 'number' || typeof lng !== 'number' || Number.isNaN(lat) || Number.isNaN(lng)) {
     return null;
   }
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return null;
+  }
   hydrateCache();
 
   const apiKey = getWhat3WordsApiKey();
@@ -369,15 +372,48 @@ export async function convertCoordinatesToWhat3Words(
 }
 
 /**
+ * Returns the GPS coordinates of an Equipment record if its what3words field is currently
+ * stored as a GPS coordinate pair (or empty/non-3-word while coordinates exist) and therefore
+ * needs reverse-geocoding to a what3words 3-word address when the service is available.
+ */
+export function needsWhat3WordsReverseResolution(equipment: Equipment): W3WCoordinates | null {
+  const parsed = parseGpsCoordinatesString(equipment.what3words);
+  if (parsed) return parsed;
+  const clean = normalizeWhat3Words(equipment.what3words);
+  if (
+    !isValidWhat3WordsFormat(clean) &&
+    typeof equipment.latitude === 'number' &&
+    !Number.isNaN(equipment.latitude) &&
+    typeof equipment.longitude === 'number' &&
+    !Number.isNaN(equipment.longitude)
+  ) {
+    return { lat: equipment.latitude, lng: equipment.longitude };
+  }
+  return null;
+}
+
+/**
  * Ensures an Equipment object has resolved latitude/longitude for its what3words address or GPS coordinate string.
  * Converts once on save or update when coordinates are missing or when what3words has changed.
  */
 export async function resolveEquipmentCoordinates(
   equipment: Equipment,
-  previousWhat3Words?: string
+  previousWhat3Words?: string,
+  allowReverseGeocode: boolean = true
 ): Promise<Equipment> {
   const parsedGps = parseGpsCoordinatesString(equipment.what3words);
   if (parsedGps) {
+    if (allowReverseGeocode) {
+      const reverseRes = await convertCoordinatesToWhat3Words(parsedGps.lat, parsedGps.lng);
+      if (reverseRes) {
+        return {
+          ...equipment,
+          what3words: reverseRes.formattedWords,
+          latitude: reverseRes.lat,
+          longitude: reverseRes.lng,
+        };
+      }
+    }
     return {
       ...equipment,
       what3words: formatGpsCoordinates(parsedGps.lat, parsedGps.lng),
@@ -395,6 +431,20 @@ export async function resolveEquipmentCoordinates(
   const currentClean = normalizeWhat3Words(equipment.what3words);
   if (!currentClean || currentClean === 'what.three.words') {
     if (hasExistingCoords) {
+      if (allowReverseGeocode) {
+        const reverseRes = await convertCoordinatesToWhat3Words(
+          equipment.latitude!,
+          equipment.longitude!
+        );
+        if (reverseRes) {
+          return {
+            ...equipment,
+            what3words: reverseRes.formattedWords,
+            latitude: reverseRes.lat,
+            longitude: reverseRes.lng,
+          };
+        }
+      }
       return {
         ...equipment,
         what3words: formatGpsCoordinates(equipment.latitude!, equipment.longitude!),
@@ -4465,8 +4515,10 @@ export function getFleetSatelliteMapSrcDoc(
               hdrMetaParts.push(item.rentalSerialNumber);
             }
 
-            var w3wDisplay = item.what3words
-              ? (item.what3words.indexOf('///') === 0 ? item.what3words : '///' + item.what3words)
+            var cleanItemW3w = item.what3words ? String(item.what3words).replace(/^\/+/, '').trim() : '';
+            var isItemGps = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(cleanItemW3w);
+            var w3wDisplay = cleanItemW3w
+              ? (isItemGps ? cleanItemW3w : '///' + cleanItemW3w)
               : '';
             var areaLocStr = (item.area && item.location)
               ? (item.area + ' / ' + item.location)
@@ -4582,8 +4634,12 @@ export function getFleetSatelliteMapSrcDoc(
               marker.closeTooltip();
 
               var popupContainer = document.createElement('div');
-              var w3wDisplayPopup = (currentItem && currentItem.what3words)
-                ? (currentItem.what3words.indexOf('///') === 0 ? currentItem.what3words : '///' + currentItem.what3words)
+              var cleanPopupW3w = (currentItem && currentItem.what3words)
+                ? String(currentItem.what3words).replace(/^\/+/, '').trim()
+                : '';
+              var isPopupGps = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(cleanPopupW3w);
+              var w3wDisplayPopup = cleanPopupW3w
+                ? (isPopupGps ? cleanPopupW3w : '///' + cleanPopupW3w)
                 : '';
               var areaLocStrPopup = (currentItem && currentItem.area && currentItem.location)
                 ? (currentItem.area + ' / ' + currentItem.location)
