@@ -4515,10 +4515,13 @@ export function getFleetSatelliteMapSrcDoc(
               hdrMetaParts.push(item.rentalSerialNumber);
             }
 
-            var cleanItemW3w = item.what3words ? String(item.what3words).replace(/^\/+/, '').trim() : '';
-            var isItemGps = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(cleanItemW3w);
-            var w3wDisplay = cleanItemW3w
-              ? (isItemGps ? cleanItemW3w : '///' + cleanItemW3w)
+            var rawItemW3w = item.what3words ? String(item.what3words).trim() : '';
+            while (rawItemW3w.charAt(0) === '/') {
+              rawItemW3w = rawItemW3w.slice(1).trim();
+            }
+            var isItemGps = rawItemW3w.indexOf(',') !== -1;
+            var w3wDisplay = rawItemW3w
+              ? (isItemGps ? rawItemW3w : '///' + rawItemW3w)
               : '';
             var areaLocStr = (item.area && item.location)
               ? (item.area + ' / ' + item.location)
@@ -4634,12 +4637,15 @@ export function getFleetSatelliteMapSrcDoc(
               marker.closeTooltip();
 
               var popupContainer = document.createElement('div');
-              var cleanPopupW3w = (currentItem && currentItem.what3words)
-                ? String(currentItem.what3words).replace(/^\/+/, '').trim()
+              var rawPopupW3w = (currentItem && currentItem.what3words)
+                ? String(currentItem.what3words).trim()
                 : '';
-              var isPopupGps = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(cleanPopupW3w);
-              var w3wDisplayPopup = cleanPopupW3w
-                ? (isPopupGps ? cleanPopupW3w : '///' + cleanPopupW3w)
+              while (rawPopupW3w.charAt(0) === '/') {
+                rawPopupW3w = rawPopupW3w.slice(1).trim();
+              }
+              var isPopupGps = rawPopupW3w.indexOf(',') !== -1;
+              var w3wDisplayPopup = rawPopupW3w
+                ? (isPopupGps ? rawPopupW3w : '///' + rawPopupW3w)
                 : '';
               var areaLocStrPopup = (currentItem && currentItem.area && currentItem.location)
                 ? (currentItem.area + ' / ' + currentItem.location)

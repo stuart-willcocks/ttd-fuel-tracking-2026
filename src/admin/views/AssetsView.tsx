@@ -774,11 +774,15 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
     const items: FleetMapMarkerItem[] = [];
     for (const asset of sortedAssets) {
-      if (!asset.what3words) continue;
-      const coords =
-        typeof asset.latitude === 'number' && typeof asset.longitude === 'number'
-          ? { lat: asset.latitude, lng: asset.longitude }
-          : getCachedWhat3WordsCoordinates(asset.what3words);
+      const hasLatLng =
+        typeof asset.latitude === 'number' &&
+        !Number.isNaN(asset.latitude) &&
+        typeof asset.longitude === 'number' &&
+        !Number.isNaN(asset.longitude);
+      if (!asset.what3words && !hasLatLng) continue;
+      const coords = hasLatLng
+        ? { lat: asset.latitude!, lng: asset.longitude! }
+        : getCachedWhat3WordsCoordinates(asset.what3words);
       if (!coords) continue;
 
       const isOn =
