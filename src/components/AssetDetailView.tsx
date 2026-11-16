@@ -9,8 +9,10 @@ import { EditTransactionModal } from './EditTransactionModal';
 import { ActionConfirmModal } from './ActionConfirmModal';
 import {
   convertWhat3WordsToCoordinates,
+  formatGpsCoordinates,
   getCachedWhat3WordsCoordinates,
   getGoogleSatelliteMapSrcDoc,
+  isValidWhat3WordsFormat,
   type W3WCoordinates,
 } from '../services/what3words';
 import { db } from '../db/indexedDB';
@@ -42,7 +44,13 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
   const [pendingTxToModify, setPendingTxToModify] = useState<Transaction | null>(null);
   const [selectedTransactionForEdit, setSelectedTransactionForEdit] = useState<Transaction | null>(null);
   const [isMapModalOpen, setIsMapModalOpen] = useState<boolean>(false);
-  const cleanW3w = (asset.what3words || '').replace(/^\/+/, '').trim();
+  const rawCleanW3w = (asset.what3words || '').replace(/^\/+/, '').trim();
+  const cleanW3w =
+    rawCleanW3w ||
+    (typeof asset.latitude === 'number' && typeof asset.longitude === 'number'
+      ? formatGpsCoordinates(asset.latitude, asset.longitude)
+      : '');
+  const isW3wThreeWords = isValidWhat3WordsFormat(cleanW3w);
   const [resolvedCoords, setResolvedCoords] = useState<W3WCoordinates | null>(() => {
     if (typeof asset.latitude === 'number' && typeof asset.longitude === 'number') {
       return { lat: asset.latitude, lng: asset.longitude };
@@ -524,7 +532,9 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
             <div className="modal-header-simple w3w-map-modal-header">
               <div className="w3w-map-modal-title-group">
                 <MapPin size={16} style={{ color: '#2563EB', flexShrink: 0 }} />
-                <span className="w3w-map-modal-title">///{cleanW3w}</span>
+                <span className="w3w-map-modal-title">
+                  {isW3wThreeWords ? `///${cleanW3w}` : cleanW3w}
+                </span>
               </div>
               <button
                 type="button"

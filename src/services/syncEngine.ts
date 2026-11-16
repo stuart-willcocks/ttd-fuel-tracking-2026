@@ -7,8 +7,8 @@ import {
   mapSupabaseRowToTransaction,
   invalidateDeviceTokenCache,
 } from './supabase';
-import { fetchRemoteEquipment, fetchRemoteTransactions, deleteRemoteTransaction } from './api';
-import type { Transaction } from '../types';
+import { fetchRemoteEquipment, fetchRemoteTransactions, deleteRemoteTransaction, postRemoteEquipment } from './api';
+import type { Equipment, Transaction } from '../types';
 import { getGeneratorPowerState, reconcileEquipmentPowerStates } from '../utils/powerState';
 import {
   isDeviceEnrolled,
@@ -39,6 +39,7 @@ class SyncEngine {
   private dataListeners: Set<RemoteDataListener> = new Set();
   private revocationListeners: Set<DeviceRevocationListener> = new Set();
   private deletedTxIds: Set<string> = new Set();
+  private pendingEquipmentIds: Set<string> = new Set();
   private isSimulatedOffline: boolean = false;
   private isSyncing: boolean = false;
   private isFlushing: boolean = false;
@@ -66,6 +67,10 @@ class SyncEngine {
         const stored = localStorage.getItem('ttd_deleted_tx_ids');
         if (stored) {
           this.deletedTxIds = new Set(JSON.parse(stored));
+        }
+        const storedEq = localStorage.getItem('ttd_pending_equipment_ids');
+        if (storedEq) {
+          this.pendingEquipmentIds = new Set(JSON.parse(storedEq));
         }
       } catch {
         // Ignore localStorage errors
@@ -335,6 +340,36 @@ class SyncEngine {
       localStorage.setItem('ttd_deleted_tx_ids', JSON.stringify(Array.from(this.deletedTxIds)));
     } catch {
       // Ignore localStorage errors
+    }
+  }
+
+  private savePendingEquipmentIds() {
+    try {
+      localStorage.setItem(
+        'ttd_pending_equipment_ids',
+        JSON.stringify(Array.from(this.pendingEquipmentIds))
+      );
+    } catch {
+      // Ignore localStorage errors
+    }
+  }
+
+  /**
+   * Saves an equipment update locally immediately and queues it for remote sync if offline.
+   */
+  public async saveEquipment(equipment: Equipment): Promise<void> {
+    await db.equipments.put(equipment);
+    this.pendingEquipmentIds.add(equipment.equipmentId);
+    this.savePendingEquipmentIds();
+
+    if (this.isEffectivelyOnline()) {
+      try {
+        await postRemoteEquipment(equipment);
+        this.pendingEquipmentIds.delete(equipment.equipmentId);
+        this.savePendingEquipmentIds();
+      } catch {
+        // Remains in pendingEquipmentIds to flush on next online sync
+      }
     }
   }
 
@@ -854,6 +889,22 @@ class SyncEngine {
         }
       }
 
+      // Flush any locally edited equipment records before pulling remote equipment
+      if (this.pendingEquipmentIds.size > 0 && this.isEffectivelyOnline()) {
+        for (const eqId of Array.from(this.pendingEquipmentIds)) {
+          try {
+            const localEq = await db.equipments.get(eqId);
+            if (localEq) {
+              await postRemoteEquipment(localEq);
+            }
+            this.pendingEquipmentIds.delete(eqId);
+            this.savePendingEquipmentIds();
+          } catch {
+            // Keep in pendingEquipmentIds and retry on next sync
+          }
+        }
+      }
+
       // Step 2: Download only the requested tables from central server (protects Supabase egress quota)
       const [remoteEquipment, remoteTransactions] = await Promise.all([
         fetchEq
@@ -1011,6 +1062,7 @@ class SyncEngine {
           const allLocalTxs = await db.transactions.toArray();
           const reconciled = reconcileEquipmentPowerStates(remoteEquipment, allLocalTxs);
           const changedEquipment = reconciled.filter((remEq) => {
+            if (this.pendingEquipmentIds.has(remEq.equipmentId)) return false;
             const loc = localEqById.get(remEq.equipmentId);
             if (!loc) return true;
             return (

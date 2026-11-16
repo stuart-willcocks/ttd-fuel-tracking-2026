@@ -20,7 +20,6 @@ import { Smartphone, ExternalLink } from 'lucide-react';
 import { DesktopLaunchpad } from './components/DesktopLaunchpad';
 import { isMobileDevice, isDesktopOrSurface } from './utils/deviceDetector';
 import { resolveEquipmentCoordinates } from './services/what3words';
-import { postRemoteEquipment } from './services/api';
 
 export type AppView = 'SPLASH_SCREEN' | 'SCAN_SCREEN' | 'ASSET_DETAIL_VIEW';
 
@@ -580,11 +579,10 @@ export const App: React.FC = () => {
       return;
     }
     const resolved = await resolveEquipmentCoordinates(updated, currentAsset?.what3words);
-    await db.equipments.put(resolved);
     setCurrentAsset(resolved);
     setIsEditingAsset(false);
+    await syncEngine.saveEquipment(resolved);
     await refreshAssetsList();
-    await postRemoteEquipment(resolved).catch(() => {});
   };
 
   const handleUpdateTransaction = async (updatedTx: Transaction) => {

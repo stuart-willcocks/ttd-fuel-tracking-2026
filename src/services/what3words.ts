@@ -201,11 +201,35 @@ export function normalizeWhat3Words(raw?: string | null): string {
 }
 
 /**
+ * Formats a latitude/longitude coordinate pair for display & fallback storage
+ */
+export function formatGpsCoordinates(lat: number, lng: number): string {
+  return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
+/**
+ * Parses a "lat, lng" coordinate string if valid
+ */
+export function parseGpsCoordinatesString(raw?: string | null): W3WCoordinates | null {
+  if (!raw) return null;
+  const clean = String(raw).replace(/^\/+/, '').trim();
+  const match = clean.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if (!match) return null;
+  const lat = parseFloat(match[1]);
+  const lng = parseFloat(match[2]);
+  if (Number.isNaN(lat) || Number.isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return null;
+  }
+  return { lat, lng };
+}
+
+/**
  * Checks if a normalized string looks like a valid 3-word address (word.word.word)
  */
 export function isValidWhat3WordsFormat(raw?: string | null): boolean {
   const clean = normalizeWhat3Words(raw);
   if (!clean || clean === 'what.three.words') return false;
+  if (parseGpsCoordinatesString(clean)) return false;
   const parts = clean.split('.');
   return parts.length === 3 && parts.every((p) => p.length >= 1 && !/\s/.test(p));
 }
@@ -226,10 +250,12 @@ export function primeWhat3WordsCache(rawW3w?: string | null, lat?: number | null
 }
 
 /**
- * Synchronously retrieves cached coordinates for a what3words address if known
+ * Synchronously retrieves cached coordinates for a what3words address or GPS coordinate string if known
  */
 export function getCachedWhat3WordsCoordinates(rawW3w?: string | null): W3WCoordinates | null {
   hydrateCache();
+  const parsedGps = parseGpsCoordinatesString(rawW3w);
+  if (parsedGps) return parsedGps;
   const clean = normalizeWhat3Words(rawW3w);
   if (!clean) return null;
   return memoryCache.get(clean) || null;
@@ -241,6 +267,10 @@ export function getCachedWhat3WordsCoordinates(rawW3w?: string | null): W3WCoord
  */
 export async function convertWhat3WordsToCoordinates(rawW3w?: string | null): Promise<W3WCoordinates | null> {
   hydrateCache();
+  const parsedGps = parseGpsCoordinatesString(rawW3w);
+  if (parsedGps) {
+    return parsedGps;
+  }
   const clean = normalizeWhat3Words(rawW3w);
   if (!isValidWhat3WordsFormat(clean)) {
     return null;
@@ -249,6 +279,10 @@ export async function convertWhat3WordsToCoordinates(rawW3w?: string | null): Pr
   const cached = memoryCache.get(clean);
   if (cached) {
     return cached;
+  }
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return null;
   }
 
   const apiKey = getWhat3WordsApiKey();
@@ -335,15 +369,37 @@ export async function convertCoordinatesToWhat3Words(
 }
 
 /**
- * Ensures an Equipment object has resolved latitude/longitude for its what3words address.
+ * Ensures an Equipment object has resolved latitude/longitude for its what3words address or GPS coordinate string.
  * Converts once on save or update when coordinates are missing or when what3words has changed.
  */
 export async function resolveEquipmentCoordinates(
   equipment: Equipment,
   previousWhat3Words?: string
 ): Promise<Equipment> {
+  const parsedGps = parseGpsCoordinatesString(equipment.what3words);
+  if (parsedGps) {
+    return {
+      ...equipment,
+      what3words: formatGpsCoordinates(parsedGps.lat, parsedGps.lng),
+      latitude: parsedGps.lat,
+      longitude: parsedGps.lng,
+    };
+  }
+
+  const hasExistingCoords =
+    typeof equipment.latitude === 'number' &&
+    typeof equipment.longitude === 'number' &&
+    !Number.isNaN(equipment.latitude) &&
+    !Number.isNaN(equipment.longitude);
+
   const currentClean = normalizeWhat3Words(equipment.what3words);
   if (!currentClean || currentClean === 'what.three.words') {
+    if (hasExistingCoords) {
+      return {
+        ...equipment,
+        what3words: formatGpsCoordinates(equipment.latitude!, equipment.longitude!),
+      };
+    }
     return {
       ...equipment,
       what3words: currentClean === 'what.three.words' ? '' : equipment.what3words,
@@ -353,12 +409,6 @@ export async function resolveEquipmentCoordinates(
   }
   const prevClean = previousWhat3Words !== undefined ? normalizeWhat3Words(previousWhat3Words) : undefined;
   const w3wChanged = prevClean !== undefined && prevClean !== currentClean;
-
-  const hasExistingCoords =
-    typeof equipment.latitude === 'number' &&
-    typeof equipment.longitude === 'number' &&
-    !Number.isNaN(equipment.latitude) &&
-    !Number.isNaN(equipment.longitude);
 
   if (hasExistingCoords && !w3wChanged) {
     primeWhat3WordsCache(currentClean, equipment.latitude, equipment.longitude);
@@ -374,7 +424,12 @@ export async function resolveEquipmentCoordinates(
     };
   }
 
-  // If what3words changed to an invalid/placeholder string, clear stale coordinates
+  // If offline or what3words API is inaccessible, preserve existing coordinates if present
+  if (hasExistingCoords) {
+    return equipment;
+  }
+
+  // If what3words changed to an invalid/placeholder string and no coordinates exist, clear stale coordinates
   if (w3wChanged) {
     return {
       ...equipment,
@@ -788,7 +843,12 @@ export function getPdaRelocateMapSrcDoc(
   const targetLat = cached ? cached.lat : 52.0733;
   const targetLng = cached ? cached.lng : -1.0147;
   const eqTypeJson = JSON.stringify(equipmentType || 'GENERATOR').replace(/</g, '\\u003c');
-  const eqW3wJson = JSON.stringify(clean ? `///${clean}` : 'Current').replace(/</g, '\\u003c');
+  const displayLabel = clean
+    ? isValidWhat3WordsFormat(clean)
+      ? `///${clean}`
+      : clean
+    : formatGpsCoordinates(targetLat, targetLng);
+  const eqW3wJson = JSON.stringify(displayLabel).replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -847,9 +907,9 @@ export function getPdaRelocateMapSrcDoc(
       gap: 5px;
     }
     .recenter-btn {
-      background: #FFFFFF;
-      color: #0F172A;
-      border: 1px solid #CBD5E1;
+      background: #FFFFFF !important;
+      color: #0F172A !important;
+      border: 1px solid #CBD5E1 !important;
       border-radius: 4px;
       padding: 5px 7px;
       font-size: 10.5px;
@@ -862,14 +922,20 @@ export function getPdaRelocateMapSrcDoc(
       gap: 4px;
       user-select: none;
       white-space: nowrap;
+      transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
     .recenter-btn:hover {
-      background: #F8FAFC;
+      background: #F8FAFC !important;
+      color: #0F172A !important;
     }
     .recenter-btn.active {
-      background: #2563EB;
-      color: #FFFFFF;
-      border-color: #1D4ED8;
+      background: #2563EB !important;
+      color: #FFFFFF !important;
+      border-color: #1D4ED8 !important;
+    }
+    .recenter-btn.active:hover {
+      background: #1D4ED8 !important;
+      color: #FFFFFF !important;
     }
     @keyframes pdaPulseRing {
       0% { transform: scale(0.85); opacity: 0.75; }
@@ -974,7 +1040,7 @@ export function getPdaRelocateMapSrcDoc(
       </svg>
       <span id="deviceLocLabel">Zoom to my location</span>
     </button>
-    <button type="button" class="recenter-btn" id="recenterBtn" title="Zoom to equipment location">
+    <button type="button" class="recenter-btn active" id="recenterBtn" title="Zoom to equipment location">
       <span>⌖ Zoom to equipment location</span>
     </button>
   </div>
@@ -1078,7 +1144,7 @@ export function getPdaRelocateMapSrcDoc(
           candidateMarker.on('dragend', function(ev) {
             var ll = ev.target.getLatLng();
             if (ll) {
-              pickLocation(ll.lat, ll.lng, 'Resolving ///...');
+              pickLocation(ll.lat, ll.lng, 'Resolving...');
               try {
                 window.parent.postMessage({
                   type: 'TTD_PDA_RELOCATE_PICK',
@@ -1114,7 +1180,7 @@ export function getPdaRelocateMapSrcDoc(
         if (!ev || !ev.latlng) return;
         var lat = ev.latlng.lat;
         var lng = ev.latlng.lng;
-        pickLocation(lat, lng, 'Resolving ///...');
+        pickLocation(lat, lng, 'Resolving...');
         try {
           window.parent.postMessage({
             type: 'TTD_PDA_RELOCATE_PICK',
@@ -1129,10 +1195,22 @@ export function getPdaRelocateMapSrcDoc(
 
       var deviceLocBtn = document.getElementById('deviceLocBtn');
       var deviceLocLabel = document.getElementById('deviceLocLabel');
+      var recenterBtn = document.getElementById('recenterBtn');
       var isDeviceLocEnabled = false;
+      var shouldZoomToDevice = false;
       var deviceMarker = null;
+      var lastDevicePos = null;
       var geoWatchId = null;
-      var hasFittedDeviceOnce = false;
+
+      function setActiveZoomButton(which) {
+        if (which === 'myLocation') {
+          deviceLocBtn.classList.add('active');
+          recenterBtn.classList.remove('active');
+        } else {
+          recenterBtn.classList.add('active');
+          deviceLocBtn.classList.remove('active');
+        }
+      }
 
       var deviceIconHtml = '<div class="pda-device-loc-wrap">' +
         '<div class="pda-device-loc-pulse"></div>' +
@@ -1154,40 +1232,32 @@ export function getPdaRelocateMapSrcDoc(
         if (!isDeviceLocEnabled) return;
         if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return;
         var pos = [lat, lng];
+        lastDevicePos = pos;
         if (!deviceMarker) {
           deviceMarker = L.marker(pos, { icon: deviceDivIcon, zIndexOffset: 500 }).addTo(map);
         } else {
           deviceMarker.setLatLng(pos);
         }
         deviceLocLabel.textContent = 'Zoom to my location';
-        if (!hasFittedDeviceOnce) {
-          hasFittedDeviceOnce = true;
+        if (shouldZoomToDevice) {
+          shouldZoomToDevice = false;
           try {
             map.setView(pos, 19, { animate: true });
           } catch (e) {}
         }
       }
 
-      function stopDeviceTracking() {
-        if (geoWatchId !== null && navigator.geolocation) {
-          try { navigator.geolocation.clearWatch(geoWatchId); } catch (e) {}
-          geoWatchId = null;
-        }
-        if (deviceMarker) {
-          map.removeLayer(deviceMarker);
-          deviceMarker = null;
-        }
-        hasFittedDeviceOnce = false;
-        deviceLocBtn.classList.remove('active');
-        deviceLocLabel.textContent = 'Zoom to my location';
-        try {
-          window.parent.postMessage({ type: 'TTD_PDA_LOCATION_TOGGLE', enabled: false }, '*');
-        } catch (e) {}
-      }
-
       function startDeviceTracking() {
-        deviceLocBtn.classList.add('active');
-        hasFittedDeviceOnce = false;
+        isDeviceLocEnabled = true;
+        shouldZoomToDevice = true;
+        setActiveZoomButton('myLocation');
+
+        if (lastDevicePos) {
+          try {
+            map.setView(lastDevicePos, 19, { animate: true });
+          } catch (e) {}
+        }
+
         try {
           var raw = (window.sessionStorage && window.sessionStorage.getItem('ttd_cached_location')) ||
                     (window.localStorage && window.localStorage.getItem('ttd_cached_location'));
@@ -1201,7 +1271,7 @@ export function getPdaRelocateMapSrcDoc(
         try {
           window.parent.postMessage({ type: 'TTD_PDA_LOCATION_TOGGLE', enabled: true }, '*');
         } catch (e) {}
-        if (navigator.geolocation) {
+        if (navigator.geolocation && geoWatchId === null) {
           if (!deviceMarker) deviceLocLabel.textContent = 'Locating...';
           try {
             geoWatchId = navigator.geolocation.watchPosition(
@@ -1230,13 +1300,13 @@ export function getPdaRelocateMapSrcDoc(
 
       deviceLocBtn.addEventListener('click', function(ev) {
         ev.stopPropagation();
-        isDeviceLocEnabled = !isDeviceLocEnabled;
-        if (isDeviceLocEnabled) startDeviceTracking();
-        else stopDeviceTracking();
+        startDeviceTracking();
       });
 
-      document.getElementById('recenterBtn').addEventListener('click', function(ev) {
+      recenterBtn.addEventListener('click', function(ev) {
         ev.stopPropagation();
+        shouldZoomToDevice = false;
+        setActiveZoomButton('equipment');
         if (candidateMarker) {
           map.setView(candidateMarker.getLatLng(), 19, { animate: true });
         } else {
@@ -1264,6 +1334,7 @@ export function getPdaRelocateMapSrcDoc(
           if (mapHint) {
             mapHint.textContent = 'Tap map to relocate equipment';
           }
+          setActiveZoomButton('equipment');
           map.setView(target, 19, { animate: true });
         }
       });

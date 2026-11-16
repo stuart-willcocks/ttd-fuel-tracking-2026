@@ -6,14 +6,17 @@ import { EquipmentTypeIcon } from './EquipmentTypeIcon';
 import {
   convertWhat3WordsToCoordinates,
   convertCoordinatesToWhat3Words,
+  formatGpsCoordinates,
   getCachedWhat3WordsCoordinates,
   getPdaRelocateMapSrcDoc,
+  isValidWhat3WordsFormat,
   normalizeWhat3Words,
   primeWhat3WordsCache,
   type W3WCoordinates,
   type W3WReverseResult,
 } from '../services/what3words';
 import { getCurrentLocation } from '../services/telemetry';
+import { syncEngine } from '../services/syncEngine';
 
 interface EditAssetModalProps {
   asset: Equipment;
@@ -32,10 +35,14 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
   const isTank = asset.type === 'TANK';
   const capacityUnit = isGenerator ? 'kVA' : isTank ? 'L' : '';
 
-  const initialCleanW3w = useMemo(
-    () => normalizeWhat3Words(asset.what3words),
-    [asset.what3words]
-  );
+  const initialCleanW3w = useMemo(() => {
+    const clean = normalizeWhat3Words(asset.what3words);
+    if (clean) return clean;
+    if (typeof asset.latitude === 'number' && typeof asset.longitude === 'number') {
+      return formatGpsCoordinates(asset.latitude, asset.longitude);
+    }
+    return '';
+  }, [asset.what3words, asset.latitude, asset.longitude]);
 
   const [capacity, setCapacity] = useState<string>(() =>
     asset.capacity !== undefined && asset.capacity !== null ? String(asset.capacity) : ''
@@ -159,27 +166,62 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
         const pickedLat = data.lat;
         const pickedLng = data.lng;
         const seq = ++lookupSeqRef.current;
-        setIsResolvingW3w(true);
-        setRelocateError(null);
 
-        convertCoordinatesToWhat3Words(pickedLat, pickedLng).then((resolved) => {
-          if (seq !== lookupSeqRef.current) return;
+        const applyGpsFallback = (lat: number, lng: number) => {
+          const gpsStr = formatGpsCoordinates(lat, lng);
+          const fallbackResult: W3WReverseResult = {
+            words: gpsStr,
+            formattedWords: gpsStr,
+            lat,
+            lng,
+          };
           setIsResolvingW3w(false);
-          if (!resolved) {
-            setRelocateError('Unable to resolve what3words for that point. Tap again.');
-            return;
-          }
-          setRelocatedW3w(resolved);
+          setRelocateError(null);
+          setRelocatedW3w(fallbackResult);
           mapIframeRef.current?.contentWindow?.postMessage(
             {
               type: 'TTD_PDA_RELOCATE_RESOLVED',
-              lat: resolved.lat,
-              lng: resolved.lng,
-              formattedWords: resolved.formattedWords,
+              lat,
+              lng,
+              formattedWords: gpsStr,
             },
             '*'
           );
-        });
+        };
+
+        // If PDA is offline (or in simulated offline mode), record and display GPS coordinates immediately
+        if (!syncEngine.isEffectivelyOnline()) {
+          applyGpsFallback(pickedLat, pickedLng);
+          return;
+        }
+
+        setIsResolvingW3w(true);
+        setRelocateError(null);
+
+        convertCoordinatesToWhat3Words(pickedLat, pickedLng)
+          .then((resolved) => {
+            if (seq !== lookupSeqRef.current) return;
+            if (!resolved) {
+              // what3words API inaccessible for any reason: fallback to GPS coordinates
+              applyGpsFallback(pickedLat, pickedLng);
+              return;
+            }
+            setIsResolvingW3w(false);
+            setRelocatedW3w(resolved);
+            mapIframeRef.current?.contentWindow?.postMessage(
+              {
+                type: 'TTD_PDA_RELOCATE_RESOLVED',
+                lat: resolved.lat,
+                lng: resolved.lng,
+                formattedWords: resolved.formattedWords,
+              },
+              '*'
+            );
+          })
+          .catch(() => {
+            if (seq !== lookupSeqRef.current) return;
+            applyGpsFallback(pickedLat, pickedLng);
+          });
         return;
       }
 
@@ -267,6 +309,7 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
   const effectiveCleanW3w = relocatedW3w
     ? normalizeWhat3Words(relocatedW3w.words)
     : initialCleanW3w;
+  const isEffectiveW3wWords = isValidWhat3WordsFormat(effectiveCleanW3w);
 
   const handleOpenConfirm = (e: React.FormEvent) => {
     e.preventDefault();
@@ -278,11 +321,20 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
     if (!canSave) return;
     setIsSaving(true);
     try {
-      const formattedW3w = effectiveCleanW3w ? `///${effectiveCleanW3w}` : '';
+      const formattedW3w = effectiveCleanW3w
+        ? isEffectiveW3wWords
+          ? `///${effectiveCleanW3w}`
+          : effectiveCleanW3w
+        : '';
       const nextLat = relocatedW3w ? relocatedW3w.lat : asset.latitude;
       const nextLng = relocatedW3w ? relocatedW3w.lng : asset.longitude;
 
-      if (effectiveCleanW3w && typeof nextLat === 'number' && typeof nextLng === 'number') {
+      if (
+        isEffectiveW3wWords &&
+        effectiveCleanW3w &&
+        typeof nextLat === 'number' &&
+        typeof nextLng === 'number'
+      ) {
         primeWhat3WordsCache(effectiveCleanW3w, nextLat, nextLng);
       }
 
@@ -372,7 +424,11 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
                 <span className="edit-asset-w3w-resolving">Resolving what3words...</span>
               ) : (
                 <span className="edit-asset-w3w-text">
-                  ///{effectiveCleanW3w || 'unassigned'}
+                  {effectiveCleanW3w
+                    ? isEffectiveW3wWords
+                      ? `///${effectiveCleanW3w}`
+                      : effectiveCleanW3w
+                    : 'unassigned'}
                 </span>
               )}
               {isLocationChanged && !isResolvingW3w && (
@@ -484,7 +540,9 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
                     </td>
                   </tr>
                   <tr>
-                    <td className="lbl">what3words</td>
+                    <td className="lbl">
+                      {isEffectiveW3wWords ? 'what3words' : 'GPS Coordinates'}
+                    </td>
                     <td
                       className="val confirm-w3w-cell"
                       style={{ fontFamily: "'JetBrains Mono', monospace" }}
