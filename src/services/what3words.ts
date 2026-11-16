@@ -745,8 +745,10 @@ export function getGoogleSatelliteMapSrcDoc(
       var toggleGridBtn = document.getElementById('toggleGridBtn');
       var toggleGridLabel = document.getElementById('toggleGridLabel');
       var showGrid = true;
+      var anchorLat = target[0];
+      var anchorLng = target[1];
       var dLat3m = 3 / 111319.49079;
-      var cosLat = Math.cos((target[0] * Math.PI) / 180);
+      var cosLat = Math.cos((anchorLat * Math.PI) / 180);
       var dLng3m = 3 / (111319.49079 * Math.max(0.01, cosLat));
 
       function drawW3wGrid() {
@@ -773,10 +775,10 @@ export function getGoogleSatelliteMapSrcDoc(
         var west = bounds.getWest();
         var east = bounds.getEast();
 
-        var startLatIdx = Math.floor(south / dLat3m);
-        var endLatIdx = Math.ceil(north / dLat3m);
-        var startLngIdx = Math.floor(west / dLng3m);
-        var endLngIdx = Math.ceil(east / dLng3m);
+        var startLatIdx = Math.floor((south - anchorLat) / dLat3m + 0.5);
+        var endLatIdx = Math.ceil((north - anchorLat) / dLat3m + 0.5);
+        var startLngIdx = Math.floor((west - anchorLng) / dLng3m + 0.5);
+        var endLngIdx = Math.ceil((east - anchorLng) / dLng3m + 0.5);
 
         if (endLatIdx - startLatIdx > 250 || endLngIdx - startLngIdx > 250) return;
 
@@ -785,14 +787,14 @@ export function getGoogleSatelliteMapSrcDoc(
         ctx.lineWidth = 1;
 
         for (var i = startLatIdx; i <= endLatIdx; i++) {
-          var lat = i * dLat3m;
+          var lat = anchorLat + (i - 0.5) * dLat3m;
           var y = Math.round(map.latLngToContainerPoint([lat, west]).y) + 0.5;
           ctx.moveTo(0, y);
           ctx.lineTo(size.x, y);
         }
 
         for (var j = startLngIdx; j <= endLngIdx; j++) {
-          var lng = j * dLng3m;
+          var lng = anchorLng + (j - 0.5) * dLng3m;
           var x = Math.round(map.latLngToContainerPoint([south, lng]).x) + 0.5;
           ctx.moveTo(x, 0);
           ctx.lineTo(x, size.y);
@@ -800,10 +802,10 @@ export function getGoogleSatelliteMapSrcDoc(
 
         ctx.stroke();
 
-        var cellLat0 = Math.floor(target[0] / dLat3m) * dLat3m;
-        var cellLat1 = cellLat0 + dLat3m;
-        var cellLng0 = Math.floor(target[1] / dLng3m) * dLng3m;
-        var cellLng1 = cellLng0 + dLng3m;
+        var cellLat0 = anchorLat - 0.5 * dLat3m;
+        var cellLat1 = anchorLat + 0.5 * dLat3m;
+        var cellLng0 = anchorLng - 0.5 * dLng3m;
+        var cellLng1 = anchorLng + 0.5 * dLng3m;
         var nwPt = map.latLngToContainerPoint([cellLat1, cellLng0]);
         var sePt = map.latLngToContainerPoint([cellLat0, cellLng1]);
         ctx.fillStyle = 'rgba(236, 114, 30, 0.22)';
@@ -1294,9 +1296,20 @@ export function getPdaRelocateMapSrcDoc(
       var toggleGridBtn = document.getElementById('toggleGridBtn');
       var toggleGridLabel = document.getElementById('toggleGridLabel');
       var showGrid = true;
+      var anchorLat = target[0];
+      var anchorLng = target[1];
       var dLat3m = 3 / 111319.49079;
       var cosLat = Math.cos((target[0] * Math.PI) / 180);
       var dLng3m = 3 / (111319.49079 * Math.max(0.01, cosLat));
+
+      function snapToGridCell(lat, lng) {
+        var i = Math.round((lat - anchorLat) / dLat3m);
+        var j = Math.round((lng - anchorLng) / dLng3m);
+        return {
+          lat: anchorLat + i * dLat3m,
+          lng: anchorLng + j * dLng3m
+        };
+      }
 
       function drawW3wGrid() {
         if (!gridCanvas) return;
@@ -1323,10 +1336,10 @@ export function getPdaRelocateMapSrcDoc(
         var west = bounds.getWest();
         var east = bounds.getEast();
 
-        var startLatIdx = Math.floor(south / dLat3m);
-        var endLatIdx = Math.ceil(north / dLat3m);
-        var startLngIdx = Math.floor(west / dLng3m);
-        var endLngIdx = Math.ceil(east / dLng3m);
+        var startLatIdx = Math.floor((south - anchorLat) / dLat3m + 0.5);
+        var endLatIdx = Math.ceil((north - anchorLat) / dLat3m + 0.5);
+        var startLngIdx = Math.floor((west - anchorLng) / dLng3m + 0.5);
+        var endLngIdx = Math.ceil((east - anchorLng) / dLng3m + 0.5);
 
         if (endLatIdx - startLatIdx > 250 || endLngIdx - startLngIdx > 250) return;
 
@@ -1335,14 +1348,14 @@ export function getPdaRelocateMapSrcDoc(
         ctx.lineWidth = 1;
 
         for (var i = startLatIdx; i <= endLatIdx; i++) {
-          var lat = i * dLat3m;
+          var lat = anchorLat + (i - 0.5) * dLat3m;
           var y = Math.round(map.latLngToContainerPoint([lat, west]).y) + 0.5;
           ctx.moveTo(0, y);
           ctx.lineTo(size.x, y);
         }
 
         for (var j = startLngIdx; j <= endLngIdx; j++) {
-          var lng = j * dLng3m;
+          var lng = anchorLng + (j - 0.5) * dLng3m;
           var x = Math.round(map.latLngToContainerPoint([south, lng]).x) + 0.5;
           ctx.moveTo(x, 0);
           ctx.lineTo(x, size.y);
@@ -1350,13 +1363,14 @@ export function getPdaRelocateMapSrcDoc(
 
         ctx.stroke();
 
-        // Highlight the 3m x 3m what3words cell containing the active equipment pin
+        // Highlight the 3m x 3m what3words cell centered on the active equipment pin
         var activeLl = candidateMarker ? candidateMarker.getLatLng() : L.latLng(target[0], target[1]);
         if (activeLl) {
-          var cellLat0 = Math.floor(activeLl.lat / dLat3m) * dLat3m;
-          var cellLat1 = cellLat0 + dLat3m;
-          var cellLng0 = Math.floor(activeLl.lng / dLng3m) * dLng3m;
-          var cellLng1 = cellLng0 + dLng3m;
+          var snapped = snapToGridCell(activeLl.lat, activeLl.lng);
+          var cellLat0 = snapped.lat - 0.5 * dLat3m;
+          var cellLat1 = snapped.lat + 0.5 * dLat3m;
+          var cellLng0 = snapped.lng - 0.5 * dLng3m;
+          var cellLng1 = snapped.lng + 0.5 * dLng3m;
           var nwPt = map.latLngToContainerPoint([cellLat1, cellLng0]);
           var sePt = map.latLngToContainerPoint([cellLat0, cellLng1]);
           var cellW = sePt.x - nwPt.x;
@@ -1411,12 +1425,13 @@ export function getPdaRelocateMapSrcDoc(
           candidateMarker.on('dragend', function(ev) {
             var ll = ev.target.getLatLng();
             if (ll) {
-              pickLocation(ll.lat, ll.lng, 'Resolving...');
+              var snapped = snapToGridCell(ll.lat, ll.lng);
+              pickLocation(snapped.lat, snapped.lng, 'Resolving...');
               try {
                 window.parent.postMessage({
                   type: 'TTD_PDA_RELOCATE_PICK',
-                  lat: ll.lat,
-                  lng: ll.lng
+                  lat: snapped.lat,
+                  lng: snapped.lng
                 }, '*');
               } catch (e) {}
             }
@@ -1446,14 +1461,13 @@ export function getPdaRelocateMapSrcDoc(
 
       function handleMapSelect(ev) {
         if (!ev || !ev.latlng) return;
-        var lat = ev.latlng.lat;
-        var lng = ev.latlng.lng;
-        pickLocation(lat, lng, 'Resolving...');
+        var snapped = snapToGridCell(ev.latlng.lat, ev.latlng.lng);
+        pickLocation(snapped.lat, snapped.lng, 'Resolving...');
         try {
           window.parent.postMessage({
             type: 'TTD_PDA_RELOCATE_PICK',
-            lat: lat,
-            lng: lng
+            lat: snapped.lat,
+            lng: snapped.lng
           }, '*');
         } catch (e) {}
       }
@@ -1589,8 +1603,12 @@ export function getPdaRelocateMapSrcDoc(
         if (data.type === 'TTD_PDA_LOCATION_UPDATE') {
           updateDeviceMarker(data.lat, data.lng);
         } else if (data.type === 'TTD_PDA_RELOCATE_RESOLVED') {
+          anchorLat = data.lat;
+          anchorLng = data.lng;
           pickLocation(data.lat, data.lng, 'New: ' + data.formattedWords);
         } else if (data.type === 'TTD_PDA_RELOCATE_RESET') {
+          anchorLat = target[0];
+          anchorLng = target[1];
           if (candidateMarker) {
             map.removeLayer(candidateMarker);
             candidateMarker = null;
@@ -2204,9 +2222,20 @@ function getMoveEquipmentMapSrcDoc(
       var toggleGridBtn = document.getElementById('toggleGridBtn');
       var toggleGridText = document.getElementById('toggleGridText');
       var showGrid = true;
+      var anchorLat = target[0];
+      var anchorLng = target[1];
       var dLat3m = 3 / 111319.49079;
       var cosLat = Math.cos((target[0] * Math.PI) / 180);
       var dLng3m = 3 / (111319.49079 * Math.max(0.01, cosLat));
+
+      function snapToGridCell(lat, lng) {
+        var i = Math.round((lat - anchorLat) / dLat3m);
+        var j = Math.round((lng - anchorLng) / dLng3m);
+        return {
+          lat: anchorLat + i * dLat3m,
+          lng: anchorLng + j * dLng3m
+        };
+      }
 
       function drawW3wGrid() {
         if (!gridCanvas) return;
@@ -2232,10 +2261,10 @@ function getMoveEquipmentMapSrcDoc(
         var west = bounds.getWest();
         var east = bounds.getEast();
 
-        var startLatIdx = Math.floor(south / dLat3m);
-        var endLatIdx = Math.ceil(north / dLat3m);
-        var startLngIdx = Math.floor(west / dLng3m);
-        var endLngIdx = Math.ceil(east / dLng3m);
+        var startLatIdx = Math.floor((south - anchorLat) / dLat3m + 0.5);
+        var endLatIdx = Math.ceil((north - anchorLat) / dLat3m + 0.5);
+        var startLngIdx = Math.floor((west - anchorLng) / dLng3m + 0.5);
+        var endLngIdx = Math.ceil((east - anchorLng) / dLng3m + 0.5);
 
         if (endLatIdx - startLatIdx > 320 || endLngIdx - startLngIdx > 320) return;
 
@@ -2244,14 +2273,14 @@ function getMoveEquipmentMapSrcDoc(
         ctx.lineWidth = 1;
 
         for (var i = startLatIdx; i <= endLatIdx; i++) {
-          var lat = i * dLat3m;
+          var lat = anchorLat + (i - 0.5) * dLat3m;
           var y = Math.round(map.latLngToContainerPoint([lat, west]).y) + 0.5;
           ctx.moveTo(0, y);
           ctx.lineTo(size.x, y);
         }
 
         for (var j = startLngIdx; j <= endLngIdx; j++) {
-          var lng = j * dLng3m;
+          var lng = anchorLng + (j - 0.5) * dLng3m;
           var x = Math.round(map.latLngToContainerPoint([south, lng]).x) + 0.5;
           ctx.moveTo(x, 0);
           ctx.lineTo(x, size.y);
@@ -2261,10 +2290,11 @@ function getMoveEquipmentMapSrcDoc(
 
         var activeLl = candidateMarker ? candidateMarker.getLatLng() : L.latLng(target[0], target[1]);
         if (activeLl) {
-          var cellLat0 = Math.floor(activeLl.lat / dLat3m) * dLat3m;
-          var cellLat1 = cellLat0 + dLat3m;
-          var cellLng0 = Math.floor(activeLl.lng / dLng3m) * dLng3m;
-          var cellLng1 = cellLng0 + dLng3m;
+          var snapped = snapToGridCell(activeLl.lat, activeLl.lng);
+          var cellLat0 = snapped.lat - 0.5 * dLat3m;
+          var cellLat1 = snapped.lat + 0.5 * dLat3m;
+          var cellLng0 = snapped.lng - 0.5 * dLng3m;
+          var cellLng1 = snapped.lng + 0.5 * dLng3m;
           var nwPt = map.latLngToContainerPoint([cellLat1, cellLng0]);
           var sePt = map.latLngToContainerPoint([cellLat0, cellLng1]);
           ctx.fillStyle = candidateMarker ? 'rgba(37, 99, 235, 0.22)' : 'rgba(236, 114, 30, 0.22)';
@@ -2429,13 +2459,15 @@ function getMoveEquipmentMapSrcDoc(
 
       map.on('mousemove', function(ev) {
         if (isMovePlaced || !ev || !ev.latlng) return;
-        setCandidateLocation(ev.latlng.lat, ev.latlng.lng, eqId + ' (Double-click to place)', false);
+        var snapped = snapToGridCell(ev.latlng.lat, ev.latlng.lng);
+        setCandidateLocation(snapped.lat, snapped.lng, eqId + ' (Double-click to place)', false);
       });
 
       map.on('dblclick', function(ev) {
         if (!ev || !ev.latlng) return;
-        var lat = ev.latlng.lat;
-        var lng = ev.latlng.lng;
+        var snapped = snapToGridCell(ev.latlng.lat, ev.latlng.lng);
+        var lat = snapped.lat;
+        var lng = snapped.lng;
         isMovePlaced = true;
         isMoveSaving = false;
         setCandidateLocation(lat, lng, 'New Location: Resolving...', true);
@@ -2453,6 +2485,8 @@ function getMoveEquipmentMapSrcDoc(
         var data = ev && ev.data;
         if (!data || typeof data !== 'object') return;
         if (data.type === 'TTD_MOVE_MAP_RESOLVED') {
+          anchorLat = data.lat;
+          anchorLng = data.lng;
           isMovePlaced = true;
           setCandidateLocation(data.lat, data.lng, 'New: ' + data.formattedWords, true);
           if (data.panTo) {
@@ -4115,6 +4149,20 @@ export function getFleetSatelliteMapSrcDoc(
       var toggleGridBtn = document.getElementById('toggleGridBtn');
       var gridStatusText = document.getElementById('gridStatusText');
       var showGrid = true;
+      var gridAnchorLat = (items && items.length > 0 && typeof items[0].lat === 'number') ? items[0].lat : initialCenter[0];
+      var gridAnchorLng = (items && items.length > 0 && typeof items[0].lng === 'number') ? items[0].lng : initialCenter[1];
+
+      function snapToFleetGridCell(lat, lng) {
+        var dLat3m = 3 / 111319.49079;
+        var cosLat = Math.cos((gridAnchorLat * Math.PI) / 180);
+        var dLng3m = 3 / (111319.49079 * Math.max(0.01, cosLat));
+        var i = Math.round((lat - gridAnchorLat) / dLat3m);
+        var j = Math.round((lng - gridAnchorLng) / dLng3m);
+        return {
+          lat: gridAnchorLat + i * dLat3m,
+          lng: gridAnchorLng + j * dLng3m
+        };
+      }
 
       function drawFleetW3wGrid() {
         if (!gridCanvas) return;
@@ -4134,12 +4182,11 @@ export function getFleetSatelliteMapSrcDoc(
 
         if (!showGrid) return;
 
-        var center = map.getCenter();
         var dLat3m = 3 / 111319.49079;
-        var cosLat = Math.cos((center.lat * Math.PI) / 180);
+        var cosLat = Math.cos((gridAnchorLat * Math.PI) / 180);
         var dLng3m = 3 / (111319.49079 * Math.max(0.01, cosLat));
 
-        // Draw full viewport 3m x 3m grid lines when zoomed in (zoom >= 17.5)
+        // Draw full viewport 3m x 3m grid lines phase-aligned to gridAnchorLat/gridAnchorLng when zoomed in (zoom >= 17.5)
         if (map.getZoom() >= 17.5) {
           var bounds = map.getBounds();
           var south = bounds.getSouth();
@@ -4147,10 +4194,10 @@ export function getFleetSatelliteMapSrcDoc(
           var west = bounds.getWest();
           var east = bounds.getEast();
 
-          var startLatIdx = Math.floor(south / dLat3m);
-          var endLatIdx = Math.ceil(north / dLat3m);
-          var startLngIdx = Math.floor(west / dLng3m);
-          var endLngIdx = Math.ceil(east / dLng3m);
+          var startLatIdx = Math.floor((south - gridAnchorLat) / dLat3m + 0.5);
+          var endLatIdx = Math.ceil((north - gridAnchorLat) / dLat3m + 0.5);
+          var startLngIdx = Math.floor((west - gridAnchorLng) / dLng3m + 0.5);
+          var endLngIdx = Math.ceil((east - gridAnchorLng) / dLng3m + 0.5);
 
           if (endLatIdx - startLatIdx <= 400 && endLngIdx - startLngIdx <= 400) {
             ctx.beginPath();
@@ -4158,14 +4205,14 @@ export function getFleetSatelliteMapSrcDoc(
             ctx.lineWidth = 1;
 
             for (var i = startLatIdx; i <= endLatIdx; i++) {
-              var lat = i * dLat3m;
+              var lat = gridAnchorLat + (i - 0.5) * dLat3m;
               var y = Math.round(map.latLngToContainerPoint([lat, west]).y) + 0.5;
               ctx.moveTo(0, y);
               ctx.lineTo(size.x, y);
             }
 
             for (var j = startLngIdx; j <= endLngIdx; j++) {
-              var lng = j * dLng3m;
+              var lng = gridAnchorLng + (j - 0.5) * dLng3m;
               var x = Math.round(map.latLngToContainerPoint([south, lng]).x) + 0.5;
               ctx.moveTo(x, 0);
               ctx.lineTo(x, size.y);
@@ -4175,16 +4222,18 @@ export function getFleetSatelliteMapSrcDoc(
           }
         }
 
-        // Highlight the 3m x 3m what3words square for each equipment marker when zoom >= 16
+        // Highlight the 3m x 3m what3words square centered on each equipment marker when zoom >= 16
         if (map.getZoom() >= 16 && typeof itemsById === 'object' && itemsById) {
           var eqIds = Object.keys(itemsById);
           for (var k = 0; k < eqIds.length; k++) {
             var it = itemsById[eqIds[k]];
             if (!it || it.type === 'PDA' || typeof it.lat !== 'number' || typeof it.lng !== 'number') continue;
-            var cellLat0 = Math.floor(it.lat / dLat3m) * dLat3m;
-            var cellLat1 = cellLat0 + dLat3m;
-            var cellLng0 = Math.floor(it.lng / dLng3m) * dLng3m;
-            var cellLng1 = cellLng0 + dLng3m;
+            var cLat = typeof it.origLat === 'number' ? it.origLat : it.lat;
+            var cLng = typeof it.origLng === 'number' ? it.origLng : it.lng;
+            var cellLat0 = cLat - 0.5 * dLat3m;
+            var cellLat1 = cLat + 0.5 * dLat3m;
+            var cellLng0 = cLng - 0.5 * dLng3m;
+            var cellLng1 = cLng + 0.5 * dLng3m;
             var nwPt = map.latLngToContainerPoint([cellLat1, cellLng0]);
             var sePt = map.latLngToContainerPoint([cellLat0, cellLng1]);
             var w = Math.max(3, sePt.x - nwPt.x);
@@ -4194,6 +4243,24 @@ export function getFleetSatelliteMapSrcDoc(
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.72)';
             ctx.lineWidth = 1.25;
             ctx.strokeRect(nwPt.x, nwPt.y, w, h);
+          }
+        }
+
+        // If moving an equipment item, also highlight its candidate 3m x 3m cell in blue
+        if (movingEquipmentId && moveCandidateMarker && map.getZoom() >= 16) {
+          var candLl = moveCandidateMarker.getLatLng();
+          if (candLl) {
+            var candLat0 = candLl.lat - 0.5 * dLat3m;
+            var candLat1 = candLl.lat + 0.5 * dLat3m;
+            var candLng0 = candLl.lng - 0.5 * dLng3m;
+            var candLng1 = candLl.lng + 0.5 * dLng3m;
+            var candNw = map.latLngToContainerPoint([candLat1, candLng0]);
+            var candSe = map.latLngToContainerPoint([candLat0, candLng1]);
+            ctx.fillStyle = 'rgba(37, 99, 235, 0.24)';
+            ctx.fillRect(candNw.x, candNw.y, candSe.x - candNw.x, candSe.y - candNw.y);
+            ctx.strokeStyle = 'rgba(147, 197, 253, 0.92)';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(candNw.x, candNw.y, candSe.x - candNw.x, candSe.y - candNw.y);
           }
         }
       }
@@ -4484,19 +4551,21 @@ export function getFleetSatelliteMapSrcDoc(
             interactive: false
           }).addTo(map);
         }
+        drawFleetW3wGrid();
       }
 
       function handleMoveMapPick(lat, lng) {
         if (!movingEquipmentId) return;
+        var snapped = snapToFleetGridCell(lat, lng);
         isMovePlaced = true;
         isMoveSaving = false;
-        setMoveCandidateLocation(lat, lng, 'Resolving...', true);
+        setMoveCandidateLocation(snapped.lat, snapped.lng, 'Resolving...', true);
         try {
           window.parent.postMessage({
             type: 'TTD_MAP_MOVE_PICK_LOCATION',
             equipmentId: movingEquipmentId,
-            lat: lat,
-            lng: lng
+            lat: snapped.lat,
+            lng: snapped.lng
           }, '*');
         } catch (e) {}
       }
@@ -4519,6 +4588,8 @@ export function getFleetSatelliteMapSrcDoc(
         if (currentItem) {
           var startLat = typeof currentItem.origLat === 'number' ? currentItem.origLat : currentItem.lat;
           var startLng = typeof currentItem.origLng === 'number' ? currentItem.origLng : currentItem.lng;
+          gridAnchorLat = startLat;
+          gridAnchorLng = startLng;
           setMoveCandidateLocation(startLat, startLng, '', false);
         }
         try {
@@ -4544,7 +4615,8 @@ export function getFleetSatelliteMapSrcDoc(
 
       map.on('mousemove', function(ev) {
         if (movingEquipmentId && !isMovePlaced && ev && ev.latlng) {
-          setMoveCandidateLocation(ev.latlng.lat, ev.latlng.lng, '', false);
+          var snapped = snapToFleetGridCell(ev.latlng.lat, ev.latlng.lng);
+          setMoveCandidateLocation(snapped.lat, snapped.lng, '', false);
         }
       });
 
@@ -5115,6 +5187,8 @@ export function getFleetSatelliteMapSrcDoc(
         if (e.data.type === 'TTD_MAP_UPDATE_MARKERS' && Array.isArray(e.data.markers)) {
           renderOrUpdateMarkers(e.data.markers);
         } else if (e.data.type === 'TTD_MAP_MOVE_RESOLVED' && typeof e.data.lat === 'number' && typeof e.data.lng === 'number') {
+          gridAnchorLat = e.data.lat;
+          gridAnchorLng = e.data.lng;
           isMovePlaced = true;
           setMoveCandidateLocation(e.data.lat, e.data.lng, e.data.w3wDisplay || '', true);
         } else if (e.data.type === 'TTD_MAP_MOVE_SAVE_ERROR') {
