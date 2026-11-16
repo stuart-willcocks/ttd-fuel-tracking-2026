@@ -23,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   syncState,
   hasUpdate = false,
   availableVersion,
+  onToggleSimulatedOffline,
   onTriggerSync,
   onOpenOutbox,
   onOpenSettings,
@@ -142,33 +143,75 @@ export const Header: React.FC<HeaderProps> = ({
           />
         </button>
 
-        {/* Connection Status: Wifi icon only (read-only indicator) */}
-        <span
-          className={`status-pill ${syncState.isOnline ? 'online' : 'offline'}`}
-          title={syncState.isOnline ? 'Online' : 'Offline'}
-          aria-label={syncState.isOnline ? 'Online' : 'Offline'}
-        >
-          {syncState.isOnline ? (
-            <Wifi size={16} color="#FFFFFF" strokeWidth={2.2} />
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 20h.01" stroke="#94A3B8" strokeWidth="2.2" />
-              <path d="M2 8.82a15 15 0 0 1 20 0" stroke="#94A3B8" strokeWidth="2.2" />
-              <path d="M5 12.859a10 10 0 0 1 14 0" stroke="#94A3B8" strokeWidth="2.2" />
-              <path d="M8.5 16.429a5 5 0 0 1 7 0" stroke="#94A3B8" strokeWidth="2.2" />
-              <path d="M5 5l14 14" stroke="#EF4444" strokeWidth="2.8" />
-              <path d="M19 5L5 19" stroke="#EF4444" strokeWidth="2.8" />
-            </svg>
-          )}
-        </span>
+        {/* Connection Status: Clickable on staging deployments to simulate offline mode; read-only on production */}
+        {isStaging && onToggleSimulatedOffline ? (
+          <button
+            type="button"
+            className={`status-pill ${syncState.isOnline ? 'online' : 'offline'}`}
+            style={{ cursor: 'pointer' }}
+            onClick={onToggleSimulatedOffline}
+            title={
+              syncState.isOnline
+                ? 'Online (click to simulate offline)'
+                : syncState.isSimulatedOffline
+                  ? 'Simulated Offline (click to go online)'
+                  : 'Offline'
+            }
+            aria-label={
+              syncState.isOnline
+                ? 'Online (click to simulate offline)'
+                : 'Offline (click to go online)'
+            }
+          >
+            {syncState.isOnline ? (
+              <Wifi size={16} color="#FFFFFF" strokeWidth={2.2} />
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 20h.01" stroke="#94A3B8" strokeWidth="2.2" />
+                <path d="M2 8.82a15 15 0 0 1 20 0" stroke="#94A3B8" strokeWidth="2.2" />
+                <path d="M5 12.859a10 10 0 0 1 14 0" stroke="#94A3B8" strokeWidth="2.2" />
+                <path d="M8.5 16.429a5 5 0 0 1 7 0" stroke="#94A3B8" strokeWidth="2.2" />
+                <path d="M5 5l14 14" stroke="#EF4444" strokeWidth="2.8" />
+                <path d="M19 5L5 19" stroke="#EF4444" strokeWidth="2.8" />
+              </svg>
+            )}
+          </button>
+        ) : (
+          <span
+            className={`status-pill ${syncState.isOnline ? 'online' : 'offline'}`}
+            title={syncState.isOnline ? 'Online' : 'Offline'}
+            aria-label={syncState.isOnline ? 'Online' : 'Offline'}
+          >
+            {syncState.isOnline ? (
+              <Wifi size={16} color="#FFFFFF" strokeWidth={2.2} />
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 20h.01" stroke="#94A3B8" strokeWidth="2.2" />
+                <path d="M2 8.82a15 15 0 0 1 20 0" stroke="#94A3B8" strokeWidth="2.2" />
+                <path d="M5 12.859a10 10 0 0 1 14 0" stroke="#94A3B8" strokeWidth="2.2" />
+                <path d="M8.5 16.429a5 5 0 0 1 7 0" stroke="#94A3B8" strokeWidth="2.2" />
+                <path d="M5 5l14 14" stroke="#EF4444" strokeWidth="2.8" />
+                <path d="M19 5L5 19" stroke="#EF4444" strokeWidth="2.8" />
+              </svg>
+            )}
+          </span>
+        )}
       </div>
     </header>
   );

@@ -1027,10 +1027,19 @@ export function getPdaRelocateMapSrcDoc(
       border: 1px solid #93C5FD;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
     }
+    #w3wGridCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 400;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <canvas id="w3wGridCanvas"></canvas>
   <div class="map-top-hint" id="mapHint">Tap map to relocate equipment</div>
   <div class="map-bottom-controls" id="mapBottomControls">
     <button type="button" class="recenter-btn" id="deviceLocBtn" title="Zoom to current device location">
@@ -1119,6 +1128,84 @@ export function getPdaRelocateMapSrcDoc(
       var candidateMarker = null;
       var moveLine = null;
       var mapHint = document.getElementById('mapHint');
+      var gridCanvas = document.getElementById('w3wGridCanvas');
+      var dLat3m = 3 / 111319.49079;
+      var cosLat = Math.cos((target[0] * Math.PI) / 180);
+      var dLng3m = 3 / (111319.49079 * Math.max(0.01, cosLat));
+
+      function drawW3wGrid() {
+        if (!gridCanvas) return;
+        var size = map.getSize();
+        if (!size || size.x <= 0 || size.y <= 0) return;
+        var dpr = window.devicePixelRatio || 1;
+        var reqW = Math.round(size.x * dpr);
+        var reqH = Math.round(size.y * dpr);
+        if (gridCanvas.width !== reqW || gridCanvas.height !== reqH) {
+          gridCanvas.width = reqW;
+          gridCanvas.height = reqH;
+        }
+        var ctx = gridCanvas.getContext('2d');
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, size.x, size.y);
+
+        // Render 3m x 3m what3words grid at zoom >= 17.5 where cells are clearly distinguishable
+        if (map.getZoom() < 17.5) return;
+
+        var bounds = map.getBounds();
+        var south = bounds.getSouth();
+        var north = bounds.getNorth();
+        var west = bounds.getWest();
+        var east = bounds.getEast();
+
+        var startLatIdx = Math.floor(south / dLat3m);
+        var endLatIdx = Math.ceil(north / dLat3m);
+        var startLngIdx = Math.floor(west / dLng3m);
+        var endLngIdx = Math.ceil(east / dLng3m);
+
+        if (endLatIdx - startLatIdx > 250 || endLngIdx - startLngIdx > 250) return;
+
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1;
+
+        for (var i = startLatIdx; i <= endLatIdx; i++) {
+          var lat = i * dLat3m;
+          var y = Math.round(map.latLngToContainerPoint([lat, west]).y) + 0.5;
+          ctx.moveTo(0, y);
+          ctx.lineTo(size.x, y);
+        }
+
+        for (var j = startLngIdx; j <= endLngIdx; j++) {
+          var lng = j * dLng3m;
+          var x = Math.round(map.latLngToContainerPoint([south, lng]).x) + 0.5;
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, size.y);
+        }
+
+        ctx.stroke();
+
+        // Highlight the 3m x 3m what3words cell containing the active equipment pin
+        var activeLl = candidateMarker ? candidateMarker.getLatLng() : L.latLng(target[0], target[1]);
+        if (activeLl) {
+          var cellLat0 = Math.floor(activeLl.lat / dLat3m) * dLat3m;
+          var cellLat1 = cellLat0 + dLat3m;
+          var cellLng0 = Math.floor(activeLl.lng / dLng3m) * dLng3m;
+          var cellLng1 = cellLng0 + dLng3m;
+          var nwPt = map.latLngToContainerPoint([cellLat1, cellLng0]);
+          var sePt = map.latLngToContainerPoint([cellLat0, cellLng1]);
+          var cellW = sePt.x - nwPt.x;
+          var cellH = sePt.y - nwPt.y;
+          ctx.fillStyle = candidateMarker ? 'rgba(37, 99, 235, 0.22)' : 'rgba(236, 114, 30, 0.22)';
+          ctx.fillRect(nwPt.x, nwPt.y, cellW, cellH);
+          ctx.strokeStyle = candidateMarker ? 'rgba(147, 197, 253, 0.9)' : 'rgba(255, 255, 255, 0.75)';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(nwPt.x, nwPt.y, cellW, cellH);
+        }
+      }
+
+      map.on('move zoom viewreset resize', drawW3wGrid);
+      setTimeout(drawW3wGrid, 50);
 
       function buildNewIcon(labelText) {
         var html = '<div class="eq-relocate-marker">' +
@@ -1174,6 +1261,7 @@ export function getPdaRelocateMapSrcDoc(
         if (mapHint) {
           mapHint.textContent = 'Tap map or drag blue pin to adjust';
         }
+        drawW3wGrid();
       }
 
       function handleMapSelect(ev) {
@@ -1336,6 +1424,7 @@ export function getPdaRelocateMapSrcDoc(
           }
           setActiveZoomButton('equipment');
           map.setView(target, 19, { animate: true });
+          drawW3wGrid();
         }
       });
     })();
