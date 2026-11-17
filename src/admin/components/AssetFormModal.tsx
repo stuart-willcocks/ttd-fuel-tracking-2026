@@ -653,7 +653,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               style={{ width: '90%', height: '38px' }}
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="Location if known"
+              placeholder="Enter location if known"
               required={!isEditMode}
             />
           </div>
@@ -699,7 +699,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 className="admin-input admin-mono"
                 value={what3words}
                 onChange={(e) => setWhat3words(stripW3wPrefix(e.target.value))}
-                placeholder="what3words reference if known"
+                placeholder="Enter what3words reference if known"
                 style={{ paddingLeft: '32px', width: '100%', height: '38px' }}
                 required={!isEditMode}
               />
