@@ -2667,6 +2667,11 @@ iframe[src*="vercel.live"],
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
 }
 
+.edit-asset-text-input::placeholder {
+  color: #9CA3AF;
+  font-weight: 500;
+}
+
 .edit-asset-input-unit {
   position: absolute;
   right: 8px;
@@ -2714,6 +2719,11 @@ iframe[src*="vercel.live"],
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.edit-asset-w3w-text.is-empty {
+  color: #9CA3AF;
+  font-weight: 500;
 }
 
 .edit-asset-w3w-resolving {

@@ -435,7 +435,7 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
                   type="text"
                   inputMode="numeric"
                   className="edit-asset-text-input"
-                  placeholder={isGenerator ? '100' : isTank ? '3000' : 'Optional'}
+                  placeholder="(NONE)"
                   value={capacity}
                   onChange={(e) => setCapacity(e.target.value.replace(/[^\d]/g, ''))}
                 />
@@ -452,7 +452,7 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
               id="pda-edit-serial"
               type="text"
               className="edit-asset-text-input"
-              placeholder="RSN-12345"
+              placeholder="(NONE)"
               value={serial}
               onChange={(e) => setSerial(e.target.value)}
             />
@@ -467,12 +467,12 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
               {isResolvingW3w ? (
                 <span className="edit-asset-w3w-resolving">Resolving what3words...</span>
               ) : (
-                <span className="edit-asset-w3w-text">
+                <span className={`edit-asset-w3w-text ${!effectiveCleanW3w ? 'is-empty' : ''}`}>
                   {effectiveCleanW3w
                     ? isEffectiveW3wWords
                       ? `///${effectiveCleanW3w}`
                       : effectiveCleanW3w
-                    : 'unassigned'}
+                    : '(NONE)'}
                 </span>
               )}
               {isLocationChanged && !isResolvingW3w && (
