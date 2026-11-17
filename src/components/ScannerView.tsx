@@ -152,6 +152,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     }, 60);
   };
 
+  const handleClearScanBox = () => {
+    setBarcodeInput('');
+    setErrorMessage(null);
+    focusInput();
+  };
+
   const handleOpenModal = () => {
     setSearchQuery('');
     setIsAssetModalOpen(true);
@@ -209,6 +215,16 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
             data-form-type="other"
           />
         </div>
+
+        <button
+          type="button"
+          className="old-btn-clear-scan"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={handleClearScanBox}
+        >
+          <X size={18} />
+          <span>Clear scan box</span>
+        </button>
 
         {errorMessage && (
           <div className="old-error-message">
