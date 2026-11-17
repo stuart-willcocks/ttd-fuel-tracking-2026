@@ -216,15 +216,17 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
           />
         </div>
 
-        <button
-          type="button"
-          className="old-btn-clear-scan"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={handleClearScanBox}
-        >
-          <X size={18} />
-          <span>Clear scan box</span>
-        </button>
+        {barcodeInput.length > 0 && (
+          <button
+            type="button"
+            className="old-btn-clear-scan"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleClearScanBox}
+          >
+            <X size={18} />
+            <span>Clear scan box</span>
+          </button>
+        )}
 
         {errorMessage && (
           <div className="old-error-message">
