@@ -566,7 +566,9 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
         <form onSubmit={handleSubmit} noValidate>
           {/* Row 1: Equipment ID (25% width) */}
           <div className="admin-input-group" style={{ marginBottom: '16px' }}>
-            <label className="admin-label">Equipment ID *</label>
+            <label className="admin-label">
+              {isEditMode && hasTransactions ? 'EQUIPMENT ID* (LOCKED)' : 'Equipment ID *'}
+            </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="text"
