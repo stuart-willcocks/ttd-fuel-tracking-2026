@@ -303,6 +303,8 @@ CREATE POLICY "Allow delete authorized_devices for authenticated admins"
 -- ==============================================================================
 -- 3. Lock down `public.equipment_list` (Enrolled Active PDAs & Authenticated Admins)
 -- ==============================================================================
+ALTER TABLE public.equipment_list DROP CONSTRAINT IF EXISTS equipment_list_type_check;
+ALTER TABLE public.equipment_list ADD CONSTRAINT equipment_list_type_check CHECK (type IN ('GENERATOR', 'TANK', 'PLANT', 'BATTERY'));
 ALTER TABLE public.equipment_list ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow read equipment for anon" ON public.equipment_list;

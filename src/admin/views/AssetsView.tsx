@@ -49,7 +49,7 @@ interface AssetsViewProps {
   onMoveAsset?: (updatedAsset: Equipment) => Promise<void>;
 }
 
-type TypeFilter = 'ALL' | 'GENERATOR' | 'TANK' | 'PLANT';
+type TypeFilter = 'ALL' | 'GENERATOR' | 'TANK' | 'PLANT' | 'BATTERY';
 type CheckInFilter = 'ALL' | 'NONE' | 'CHECKED_IN' | 'CHECKED_OUT';
 type PowerFilter = 'ALL' | 'POWERED_UP' | 'POWERED_DOWN';
 
@@ -188,11 +188,14 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       // 1. Equipment Type filter
       if (typeFilter !== 'ALL' && asset.type !== typeFilter) return false;
 
-      // 2. Check-in / Check-out status filter
-      const chkStatus = checkInStatusByAsset[asset.equipmentId] || 'none';
-      if (checkInFilter === 'NONE' && chkStatus !== 'none') return false;
-      if (checkInFilter === 'CHECKED_IN' && chkStatus !== 'checked_in') return false;
-      if (checkInFilter === 'CHECKED_OUT' && chkStatus !== 'checked_out') return false;
+      // 2. Check-in / Check-out status filter (batteries do not record transactions)
+      if (checkInFilter !== 'ALL') {
+        if (asset.type === 'BATTERY') return false;
+        const chkStatus = checkInStatusByAsset[asset.equipmentId] || 'none';
+        if (checkInFilter === 'NONE' && chkStatus !== 'none') return false;
+        if (checkInFilter === 'CHECKED_IN' && chkStatus !== 'checked_in') return false;
+        if (checkInFilter === 'CHECKED_OUT' && chkStatus !== 'checked_out') return false;
+      }
 
       // 3. Generator Power status filter (generators only)
       if (powerFilter !== 'ALL') {
@@ -213,9 +216,10 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       generator: assets.filter((a) => a.type === 'GENERATOR').length,
       tank: assets.filter((a) => a.type === 'TANK').length,
       plant: assets.filter((a) => a.type === 'PLANT').length,
-      noCheckInOut: assets.filter((a) => (checkInStatusByAsset[a.equipmentId] || 'none') === 'none').length,
-      checkedIn: assets.filter((a) => checkInStatusByAsset[a.equipmentId] === 'checked_in').length,
-      checkedOut: assets.filter((a) => checkInStatusByAsset[a.equipmentId] === 'checked_out').length,
+      battery: assets.filter((a) => a.type === 'BATTERY').length,
+      noCheckInOut: assets.filter((a) => a.type !== 'BATTERY' && (checkInStatusByAsset[a.equipmentId] || 'none') === 'none').length,
+      checkedIn: assets.filter((a) => a.type !== 'BATTERY' && checkInStatusByAsset[a.equipmentId] === 'checked_in').length,
+      checkedOut: assets.filter((a) => a.type !== 'BATTERY' && checkInStatusByAsset[a.equipmentId] === 'checked_out').length,
       poweredUp: assets.filter((a) => a.type === 'GENERATOR' && Boolean(powerStateByAsset[a.equipmentId])).length,
       poweredDown: assets.filter((a) => a.type === 'GENERATOR' && !powerStateByAsset[a.equipmentId]).length,
       pdaWithGps: devices.filter(
@@ -1010,12 +1014,13 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           flexShrink: 0,
         }}
       >
-        {/* Group 1: Equipment Type (All equipment, Generators, Tanks, Plant) */}
+        {/* Group 1: Equipment Type (All equipment, Generators, Tanks, Plant, Batteries) */}
         {[
           { key: 'ALL' as TypeFilter, label: 'All equipment', count: counts.all },
           { key: 'GENERATOR' as TypeFilter, label: 'Generators', icon: <EquipmentTypeIcon type="GENERATOR" size={13} />, count: counts.generator },
           { key: 'TANK' as TypeFilter, label: 'Tanks', icon: <EquipmentTypeIcon type="TANK" size={13} />, count: counts.tank },
           { key: 'PLANT' as TypeFilter, label: 'Plant', icon: <EquipmentTypeIcon type="PLANT" size={13} />, count: counts.plant },
+          { key: 'BATTERY' as TypeFilter, label: 'Batteries', icon: <EquipmentTypeIcon type="BATTERY" size={13} />, count: counts.battery },
         ].map((tab) => {
           const isSelected =
             tab.key === 'ALL'
@@ -1397,8 +1402,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     <td style={{ fontWeight: 600 }}>
                       {asset.type === 'GENERATOR' && asset.capacity ? `${asset.capacity} kVA` : null}
                       {asset.type === 'TANK' && asset.capacity ? `${asset.capacity.toLocaleString()} L` : null}
-                      {asset.type === 'PLANT' ? <span style={{ color: 'var(--adm-text-muted)' }}>Unrated</span> : null}
-                      {asset.type !== 'PLANT' && !asset.capacity ? <span style={{ color: 'var(--adm-text-muted)' }}>—</span> : null}
+                      {asset.type === 'PLANT' || asset.type === 'BATTERY' ? <span style={{ color: 'var(--adm-text-muted)' }}>Unrated</span> : null}
+                      {asset.type !== 'PLANT' && asset.type !== 'BATTERY' && !asset.capacity ? <span style={{ color: 'var(--adm-text-muted)' }}>—</span> : null}
                     </td>
 
                     {/* Location */}
@@ -1514,27 +1519,31 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
                     {/* Transactions */}
                     <td>
-                      <button
-                        type="button"
-                        onClick={() => onSelectAsset(asset.equipmentId)}
-                        className="admin-mono"
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          fontFamily: 'var(--adm-font-mono)',
-                          fontWeight: 700,
-                          color: (txCounts[asset.equipmentId] || 0) > 0 ? 'var(--adm-accent-yellow)' : 'var(--adm-text-muted)',
-                          cursor: 'pointer',
-                          fontSize: '0.88rem',
-                          padding: '2px 4px',
-                          textDecoration: (txCounts[asset.equipmentId] || 0) > 0 ? 'underline' : 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                        }}
-                        title={`View ${txCounts[asset.equipmentId] || 0} transactions for ${asset.equipmentId}`}
-                      >
-                        {txCounts[asset.equipmentId] || 0}
-                      </button>
+                      {asset.type === 'BATTERY' ? (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--adm-text-muted)' }}>—</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onSelectAsset(asset.equipmentId)}
+                          className="admin-mono"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            fontFamily: 'var(--adm-font-mono)',
+                            fontWeight: 700,
+                            color: (txCounts[asset.equipmentId] || 0) > 0 ? 'var(--adm-accent-yellow)' : 'var(--adm-text-muted)',
+                            cursor: 'pointer',
+                            fontSize: '0.88rem',
+                            padding: '2px 4px',
+                            textDecoration: (txCounts[asset.equipmentId] || 0) > 0 ? 'underline' : 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                          }}
+                          title={`View ${txCounts[asset.equipmentId] || 0} transactions for ${asset.equipmentId}`}
+                        >
+                          {txCounts[asset.equipmentId] || 0}
+                        </button>
+                      )}
                     </td>
 
                     {/* Action buttons */}

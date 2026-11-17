@@ -1,5 +1,5 @@
 import React from 'react';
-import { IconGenerator, IconTank, IconPlant } from './icons/AppIcons';
+import { IconGenerator, IconTank, IconPlant, IconBattery } from './icons/AppIcons';
 
 interface EquipmentTypeIconProps {
   type: string;
@@ -28,6 +28,14 @@ export const EquipmentTypeIcon: React.FC<EquipmentTypeIconProps> = ({
     return (
       <span className={`eq-icon-wrap eq-tank ${className}`} title="Fuel Tank" style={{ color }}>
         <IconTank size={size} color={color} />
+      </span>
+    );
+  }
+
+  if (normalized === 'BATTERY' || normalized.includes('BAT')) {
+    return (
+      <span className={`eq-icon-wrap eq-battery ${className}`} title="Battery" style={{ color }}>
+        <IconBattery size={size} color={color} />
       </span>
     );
   }

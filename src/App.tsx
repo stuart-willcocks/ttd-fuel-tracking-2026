@@ -318,7 +318,8 @@ export const App: React.FC = () => {
     if (!asset) {
       const isTank = equipmentId.includes('TNK') || equipmentId.includes('TANK');
       const isPlant = equipmentId.includes('PLT') || equipmentId.includes('PLANT');
-      const inferredType = isTank ? 'TANK' : isPlant ? 'PLANT' : 'GENERATOR';
+      const isBattery = equipmentId.includes('BAT') || equipmentId.includes('BATTERY');
+      const inferredType = isBattery ? 'BATTERY' : isTank ? 'TANK' : isPlant ? 'PLANT' : 'GENERATOR';
 
       asset = {
         equipmentId,

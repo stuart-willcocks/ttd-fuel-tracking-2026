@@ -255,7 +255,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
 
   // Database options for Capacity combo box based on current equipment type
   const capacityOptions = useMemo(() => {
-    if (type === 'PLANT') return [];
+    if (type === 'PLANT' || type === 'BATTERY') return [];
     const dbCapacities = existingAssets
       .filter((a) => a.type === type && typeof a.capacity === 'number' && a.capacity > 0)
       .map((a) => a.capacity as number);
@@ -327,7 +327,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   const isDirty = useMemo(() => {
     if (!initialFormState) return false;
 
-    const normCap = (t: AssetType, c: string) => (t === 'PLANT' ? '' : c.trim());
+    const normCap = (t: AssetType, c: string) => (t === 'PLANT' || t === 'BATTERY' ? '' : c.trim());
     const normW3w = (w: string) => stripW3wPrefix(w.trim());
 
     return (
@@ -349,14 +349,14 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       return false;
     }
     if (isEditMode) {
-      if (type !== 'PLANT' && capacity.trim() !== '') {
+      if (type !== 'PLANT' && type !== 'BATTERY' && capacity.trim() !== '') {
         const capNum = parseInt(capacity, 10);
         if (isNaN(capNum) || capNum <= 0) return false;
       }
       return true;
     }
     if (!type) return false;
-    if (type !== 'PLANT') {
+    if (type !== 'PLANT' && type !== 'BATTERY') {
       const capNum = parseInt(capacity, 10);
       if (isNaN(capNum) || capNum <= 0) return false;
     }
@@ -404,7 +404,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     const finalW3w = cleanW3w && cleanW3w.toLowerCase() !== 'what.three.words' ? `///${cleanW3w}` : '';
 
     const parsedCap =
-      type === 'PLANT' || !capacity.trim() ? undefined : parseInt(capacity, 10) || undefined;
+      type === 'PLANT' || type === 'BATTERY' || !capacity.trim() ? undefined : parseInt(capacity, 10) || undefined;
 
     const updatedEquipment: Equipment = {
       equipmentId: cleanId,
@@ -528,13 +528,14 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 <option value="GENERATOR">Generator</option>
                 <option value="TANK">Tank</option>
                 <option value="PLANT">Plant</option>
+                <option value="BATTERY">Battery</option>
               </select>
             </div>
 
             {/* Capacity Combo Box (Select from DB or create new) */}
             <div className="admin-input-group" style={{ width: '130px', flexShrink: 0, marginBottom: 0 }}>
               <label className="admin-label">Capacity *</label>
-              {type !== 'PLANT' ? (
+              {type !== 'PLANT' && type !== 'BATTERY' ? (
                 <ComboBox
                   type="number"
                   min="1"

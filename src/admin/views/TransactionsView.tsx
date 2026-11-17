@@ -508,8 +508,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
               <p style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--adm-text-primary)', margin: '3px 0 0' }}>
                 {currentAsset.type === 'GENERATOR' && currentAsset.capacity ? `${currentAsset.capacity} kVA` : null}
                 {currentAsset.type === 'TANK' && currentAsset.capacity ? `${currentAsset.capacity.toLocaleString()} Litres` : null}
-                {currentAsset.type === 'PLANT' ? 'Unrated' : null}
-                {currentAsset.type !== 'PLANT' && !currentAsset.capacity ? '—' : null}
+                {currentAsset.type === 'PLANT' || currentAsset.type === 'BATTERY' ? 'Unrated' : null}
+                {currentAsset.type !== 'PLANT' && currentAsset.type !== 'BATTERY' && !currentAsset.capacity ? '—' : null}
               </p>
             </div>
 

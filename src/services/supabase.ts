@@ -152,7 +152,8 @@ function encodeEquipmentDeviceMeta(eq: Equipment): string | null {
   const cleanW3w = normalizeWhat3Words(eq.what3words);
   const hasCoords = typeof eq.latitude === 'number' && typeof eq.longitude === 'number';
   const isBlankType = !eq.type;
-  if (!hasCoords && !isBlankType) return null;
+  const isBatteryType = eq.type === 'BATTERY';
+  if (!hasCoords && !isBlankType && !isBatteryType) return null;
   const meta: Record<string, unknown> = {};
   if (hasCoords) {
     meta.lat = eq.latitude;
@@ -161,6 +162,9 @@ function encodeEquipmentDeviceMeta(eq: Equipment): string | null {
   }
   if (isBlankType) {
     meta.blankType = true;
+  }
+  if (isBatteryType) {
+    meta.actualType = 'BATTERY';
   }
   return JSON.stringify(meta);
 }
@@ -174,6 +178,7 @@ export function mapSupabaseRowToEquipment(row: any): Equipment {
   let longitude: number | undefined =
     typeof row.longitude === 'number' && !Number.isNaN(row.longitude) ? row.longitude : undefined;
   let blankType = false;
+  let actualType: Equipment['type'] | undefined = undefined;
 
   const rawW3w = typeof row.what3words === 'string' ? row.what3words : '';
 
@@ -182,6 +187,9 @@ export function mapSupabaseRowToEquipment(row: any): Equipment {
       const parsed = JSON.parse(row.device_id);
       if (parsed?.blankType === true) {
         blankType = true;
+      }
+      if (parsed?.actualType === 'BATTERY') {
+        actualType = 'BATTERY';
       }
       if (latitude === undefined || longitude === undefined) {
         const cleanRowW3w = normalizeWhat3Words(rawW3w);
@@ -211,7 +219,9 @@ export function mapSupabaseRowToEquipment(row: any): Equipment {
     primeWhat3WordsCache(rawW3w, latitude, longitude);
   }
 
-  const resolvedType: Equipment['type'] = blankType ? '' : ((row.type as Equipment['type']) || '');
+  const resolvedType: Equipment['type'] = blankType
+    ? ''
+    : actualType || ((row.type as Equipment['type']) || '');
 
   return {
     equipmentId: String(row.equipment_id ?? ''),
@@ -287,7 +297,19 @@ export async function saveEquipmentToSupabase(equipment: Equipment, previousW3wH
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await client.from('equipment_list').upsert(payload, { onConflict: 'equipment_id' });
+  let { error } = await client.from('equipment_list').upsert(payload, { onConflict: 'equipment_id' });
+  if (
+    error &&
+    resolvedEq.type === 'BATTERY' &&
+    ((error as any).code === '23514' ||
+      error.message?.includes('equipment_list_type_check') ||
+      error.message?.includes('check constraint'))
+  ) {
+    const fallbackRetry = await client
+      .from('equipment_list')
+      .upsert({ ...payload, type: 'PLANT' }, { onConflict: 'equipment_id' });
+    error = fallbackRetry.error;
+  }
   if (error) throw error;
 
   try {
@@ -818,7 +840,19 @@ export async function bulkImportEquipmentToSupabase(equipmentList: Equipment[]):
   const chunkSize = 50;
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
-    const { error } = await client.from('equipment_list').upsert(chunk, { onConflict: 'equipment_id' });
+    let { error } = await client.from('equipment_list').upsert(chunk, { onConflict: 'equipment_id' });
+    if (
+      error &&
+      ((error as any).code === '23514' ||
+        error.message?.includes('equipment_list_type_check') ||
+        error.message?.includes('check constraint'))
+    ) {
+      const safeChunk = chunk.map((r) => (r.type === 'BATTERY' ? { ...r, type: 'PLANT' } : r));
+      const fallbackRetry = await client
+        .from('equipment_list')
+        .upsert(safeChunk, { onConflict: 'equipment_id' });
+      error = fallbackRetry.error;
+    }
     if (error) throw error;
   }
 
@@ -2028,6 +2062,8 @@ ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS device_id text;
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS device_id text;
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS latitude double precision;
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS longitude double precision;
+ALTER TABLE public.equipment_list DROP CONSTRAINT IF EXISTS equipment_list_type_check;
+ALTER TABLE public.equipment_list ADD CONSTRAINT equipment_list_type_check CHECK (type IN ('GENERATOR', 'TANK', 'PLANT', 'BATTERY'));
 
 -- Create Authorized Devices Table (PDA Whitelist)
 CREATE TABLE IF NOT EXISTS public.authorized_devices (
@@ -2109,7 +2145,7 @@ create table if not exists public.equipment_list (
   what3words text not null,
   latitude double precision,
   longitude double precision,
-  type text not null check (type in ('GENERATOR', 'TANK', 'PLANT')),
+  type text not null check (type in ('GENERATOR', 'TANK', 'PLANT', 'BATTERY')),
   capacity integer,
   rental_serial_number text not null,
   device_id text,
@@ -2717,6 +2753,8 @@ CREATE POLICY "Allow delete authorized_devices for authenticated admins"
   USING (true);
 
 -- 3. Lock down public.equipment_list (Enrolled Active PDAs & Authenticated Admins)
+ALTER TABLE public.equipment_list DROP CONSTRAINT IF EXISTS equipment_list_type_check;
+ALTER TABLE public.equipment_list ADD CONSTRAINT equipment_list_type_check CHECK (type IN ('GENERATOR', 'TANK', 'PLANT', 'BATTERY'));
 ALTER TABLE public.equipment_list ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow read equipment for anon" ON public.equipment_list;

@@ -693,7 +693,7 @@ export function getGoogleSatelliteMapSrcDoc(
       var eqType = ${eqTypeJson};
 
       function getIconDiscColor(type) {
-        return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : '#16A34A';
+        return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : type === 'BATTERY' ? '#7C3AED' : '#16A34A';
       }
 
       function getEquipmentSvg(type, color) {
@@ -715,6 +715,13 @@ export function getGoogleSatelliteMapSrcDoc(
             '<path d="m 151,16 h 7" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
             '<path d="m 143,16 h -3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
             '</g></svg>';
+        }
+        if (type === 'BATTERY') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<rect x="3" y="7" width="18" height="13" rx="2" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M7 7V4.5h3V7M14 7V4.5h3V7" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M8.5 11.5v4M6.5 13.5h4M13.5 13.5h4" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</svg>';
         }
         // PLANT (Forklift / Plant)
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
@@ -1264,6 +1271,13 @@ export function getPdaRelocateMapSrcDoc(
             '<path d="m 151,16 h 7" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
             '<path d="m 143,16 h -3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
             '</g></svg>';
+        }
+        if (type === 'BATTERY') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none">' +
+            '<rect x="3" y="7" width="18" height="13" rx="2" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M7 7V4.5h3V7M14 7V4.5h3V7" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M8.5 11.5v4M6.5 13.5h4M13.5 13.5h4" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</svg>';
         }
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none">' +
           '<g transform="translate(-170)">' +
@@ -2184,6 +2198,13 @@ function getMoveEquipmentMapSrcDoc(
             '<path d="m 151,16 h 7" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
             '<path d="m 143,16 h -3" stroke="' + color + '" stroke-width="2" stroke-linecap="round" fill="none"/>' +
             '</g></svg>';
+        }
+        if (type === 'BATTERY') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<rect x="3" y="7" width="18" height="13" rx="2" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M7 7V4.5h3V7M14 7V4.5h3V7" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M8.5 11.5v4M6.5 13.5h4M13.5 13.5h4" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</svg>';
         }
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
           '<path d="m 14,9.5 v -4 c 0,-0.6 0.4,-1 1,-1 h 4.5 c 0.6,0 1,0.4 1,1 v 7 h -12 v -3 z" fill="' + color + '"/>' +
@@ -3529,7 +3550,7 @@ export interface FleetMapTransactionItem {
 
 export interface FleetMapMarkerItem {
   equipmentId: string;
-  type: 'GENERATOR' | 'TANK' | 'PLANT' | 'PDA';
+  type: 'GENERATOR' | 'TANK' | 'PLANT' | 'BATTERY' | 'PDA';
   area: string;
   location: string;
   what3words: string;
@@ -4311,6 +4332,13 @@ export function getFleetSatelliteMapSrcDoc(
             '<path d="M12 18h.01"/>' +
             '</svg>';
         }
+        if (type === 'BATTERY') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<rect x="3" y="7" width="18" height="13" rx="2" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M7 7V4.5h3V7M14 7V4.5h3V7" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M8.5 11.5v4M6.5 13.5h4M13.5 13.5h4" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</svg>';
+        }
         // PLANT (Forklift / Plant)
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
           '<g transform="translate(-170)">' +
@@ -4633,7 +4661,7 @@ export function getFleetSatelliteMapSrcDoc(
 
       function getIconDiscColor(type) {
         if (type === 'PDA') return '#64748B';
-        return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : '#16A34A';
+        return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : type === 'BATTERY' ? '#7C3AED' : '#16A34A';
       }
 
       function computeLeaderMetricsForZoom(item, zoomLevel) {
@@ -4863,7 +4891,7 @@ export function getFleetSatelliteMapSrcDoc(
               ? '#DC2626'
               : '#94A3B8';
           var pwrColor = item.isOn ? '#16A34A' : '#DC2626';
-          var statusSqHtml = item.type === 'PDA'
+          var statusSqHtml = (item.type === 'PDA' || item.type === 'BATTERY')
             ? ''
             : item.type === 'GENERATOR'
               ? '<span class="eq-map-status-cluster">' +
@@ -4918,7 +4946,7 @@ export function getFleetSatelliteMapSrcDoc(
             var txRowsHtml = '';
 
             if (visibleTx.length === 0) {
-              txRowsHtml = '<div class="tx-balloon-empty">No transactions recorded</div>';
+              txRowsHtml = item.type === 'BATTERY' ? '' : '<div class="tx-balloon-empty">No transactions recorded</div>';
             } else {
               txRowsHtml = '<div class="tx-balloon-list">';
               visibleTx.forEach(function(tx) {
@@ -4962,12 +4990,14 @@ export function getFleetSatelliteMapSrcDoc(
             var chkSqSymbolSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
             var pwrSqSymbolSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg>';
 
-            var balloonStatusHtml = '<span class="tx-balloon-hdr-status">' +
-              '<span class="tx-balloon-status-sq" style="background:' + chkColor + '">' + chkSqSymbolSvg + '</span>' +
-              (item.type === 'GENERATOR'
-                ? '<span class="tx-balloon-status-sq" style="background:' + pwrColor + '">' + pwrSqSymbolSvg + '</span>'
-                : '') +
-            '</span>';
+            var balloonStatusHtml = item.type === 'BATTERY'
+              ? ''
+              : '<span class="tx-balloon-hdr-status">' +
+                  '<span class="tx-balloon-status-sq" style="background:' + chkColor + '">' + chkSqSymbolSvg + '</span>' +
+                  (item.type === 'GENERATOR'
+                    ? '<span class="tx-balloon-status-sq" style="background:' + pwrColor + '">' + pwrSqSymbolSvg + '</span>'
+                    : '') +
+                '</span>';
 
             balloonHtml = '<div>' +
               '<div class="tx-balloon-hdr">' +
@@ -5133,7 +5163,9 @@ export function getFleetSatelliteMapSrcDoc(
               });
 
               actionsDiv.appendChild(detailsBtn);
-              actionsDiv.appendChild(txBtn);
+              if (!currentItem || currentItem.type !== 'BATTERY') {
+                actionsDiv.appendChild(txBtn);
+              }
               actionsDiv.appendChild(moveBtn);
               popupContainer.appendChild(actionsDiv);
 

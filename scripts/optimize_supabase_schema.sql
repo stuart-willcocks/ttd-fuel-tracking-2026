@@ -18,9 +18,11 @@ UPDATE public.authorized_devices
 SET app_version = split_part(split_part(device_name, '__VER__', 2), '__TEL__', 1)
 WHERE app_version IS NULL AND device_name LIKE '%__VER__%';
 
--- 3. Add native coordinate columns to public.equipment_list
+-- 3. Add native coordinate columns to public.equipment_list & allow BATTERY type
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS latitude double precision;
 ALTER TABLE public.equipment_list ADD COLUMN IF NOT EXISTS longitude double precision;
+ALTER TABLE public.equipment_list DROP CONSTRAINT IF EXISTS equipment_list_type_check;
+ALTER TABLE public.equipment_list ADD CONSTRAINT equipment_list_type_check CHECK (type IN ('GENERATOR', 'TANK', 'PLANT', 'BATTERY'));
 
 -- 4. Add composite index for fast per-equipment transaction lookups & power state reconciliation
 CREATE INDEX IF NOT EXISTS idx_tx_eq_timestamp

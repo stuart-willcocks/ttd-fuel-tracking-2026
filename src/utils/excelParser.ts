@@ -253,6 +253,13 @@ export async function validateAndParseEquipmentFile(
       } else if (upperType === 'TANK' || upperType.includes('TANK') || upperType.includes('BOWSER')) {
         resolvedType = 'TANK';
       } else if (
+        upperType === 'BATTERY' ||
+        upperType === 'BAT' ||
+        upperType.includes('BATTERY') ||
+        upperType.includes('BATT')
+      ) {
+        resolvedType = 'BATTERY';
+      } else if (
         upperType === 'PLANT' ||
         upperType.includes('PLANT') ||
         upperType.includes('LIGHT') ||
@@ -263,17 +270,17 @@ export async function validateAndParseEquipmentFile(
         resolvedType = 'PLANT';
       } else {
         errors.push(
-          `${rowLabel}: Invalid Type "${rawType}" (expected GENERATOR, TANK, PLANT, or blank).`
+          `${rowLabel}: Invalid Type "${rawType}" (expected GENERATOR, TANK, PLANT, BATTERY, or blank).`
         );
       }
 
       // Validate Size / Capacity (permit blank or 0)
       let capacity: number | undefined = undefined;
       if (!sizeStr) {
-        if (resolvedType !== 'PLANT') {
+        if (resolvedType !== 'PLANT' && resolvedType !== 'BATTERY') {
           blankFields.push('Size');
         }
-      } else if (resolvedType !== 'PLANT') {
+      } else if (resolvedType !== 'PLANT' && resolvedType !== 'BATTERY') {
         const parsedNum =
           typeof rawSize === 'number'
             ? rawSize

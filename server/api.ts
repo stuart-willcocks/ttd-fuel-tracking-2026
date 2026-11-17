@@ -160,7 +160,8 @@ export function apiMiddleware(): Connect.NextHandleFunction {
         if (!eq) {
           const isTank = newTx.equipmentId.includes('TNK') || newTx.equipmentId.includes('TANK');
           const isPlant = newTx.equipmentId.includes('PLT') || newTx.equipmentId.includes('PLANT');
-          const type = isTank ? 'TANK' : isPlant ? 'PLANT' : 'GENERATOR';
+          const isBattery = newTx.equipmentId.includes('BAT') || newTx.equipmentId.includes('BATTERY');
+          const type = isBattery ? 'BATTERY' : isTank ? 'TANK' : isPlant ? 'PLANT' : 'GENERATOR';
           eq = {
             equipmentId: newTx.equipmentId,
             area: 'Site Area',

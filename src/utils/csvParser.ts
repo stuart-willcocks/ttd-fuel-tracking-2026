@@ -90,8 +90,10 @@ export function mapRowToEquipment(row: Record<string, string>, index: number): E
     'GENERATOR'
   ).toUpperCase();
 
-  let type: 'GENERATOR' | 'TANK' | 'PLANT' = 'GENERATOR';
-  if (rawType.includes('TANK') || rawType.includes('BOWSER') || rawType.includes('FUEL')) {
+  let type: 'GENERATOR' | 'TANK' | 'PLANT' | 'BATTERY' = 'GENERATOR';
+  if (rawType.includes('BAT') || rawType.includes('BATTERY')) {
+    type = 'BATTERY';
+  } else if (rawType.includes('TANK') || rawType.includes('BOWSER') || rawType.includes('FUEL')) {
     type = 'TANK';
   } else if (
     rawType.includes('PLANT') ||
@@ -169,6 +171,9 @@ export function mapRowToTransactions(
   index: number,
   equipment: Equipment
 ): Transaction[] {
+  if (equipment.type === 'BATTERY') {
+    return [];
+  }
   const txs: Transaction[] = [];
   const baseCheckInTime = new Date('2026-07-02T08:00:00Z').getTime();
   const baseFuelTime = new Date('2026-07-04T12:00:00Z').getTime();

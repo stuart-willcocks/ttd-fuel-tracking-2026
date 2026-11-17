@@ -39,6 +39,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
   onDeleteTransaction,
 }) => {
   const isGenerator = asset.type === 'GENERATOR';
+  const isBattery = asset.type === 'BATTERY';
 
   // Edit / Delete transaction modal state & long-press detection
   const [pendingTxToModify, setPendingTxToModify] = useState<Transaction | null>(null);
@@ -359,10 +360,10 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
         ) : null}
 
         {/* Asset Capacity & Serial Number */}
-        {(asset.capacity || asset.rentalSerialNumber) && (
+        {((!isBattery && asset.capacity) || asset.rentalSerialNumber) && (
           <div className="asset-detail-spec">
-            {asset.capacity ? `${asset.capacity} ${isGenerator ? 'kVA' : 'L'}` : ''}
-            {asset.capacity && asset.rentalSerialNumber ? ' • ' : ''}
+            {!isBattery && asset.capacity ? `${asset.capacity} ${isGenerator ? 'kVA' : 'L'}` : ''}
+            {!isBattery && asset.capacity && asset.rentalSerialNumber ? ' • ' : ''}
             {asset.rentalSerialNumber ? `SN: ${asset.rentalSerialNumber}` : ''}
           </div>
         )}
@@ -377,7 +378,11 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       {/* 3. TRANSACTIONS LIST: Vertically scrollable pane, reverse timestamp order */}
       <div className="asset-detail-tx-pane">
         {sortedTransactions.length === 0 ? (
-          <div className="tx-empty-state">No transactions recorded yet for this asset.</div>
+          <div className="tx-empty-state">
+            {isBattery
+              ? 'No transactions applicable for batteries.'
+              : 'No transactions recorded yet for this asset.'}
+          </div>
         ) : (
           <div className="tx-list-stack">
             {sortedTransactions.map((tx) => {
@@ -433,23 +438,27 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 
       {/* 4. TRANSACTION BUTTONS: 2-column grid, full width */}
       <div className="asset-detail-btn-stack">
-        <button
-          type="button"
-          className="btn-pda-rect btn-pda-green"
-          onClick={() => onSelectAction('check-in')}
-        >
-          <IconCheckIn size={20} />
-          <span>Check In</span>
-        </button>
+        {!isBattery && (
+          <button
+            type="button"
+            className="btn-pda-rect btn-pda-green"
+            onClick={() => onSelectAction('check-in')}
+          >
+            <IconCheckIn size={20} />
+            <span>Check In</span>
+          </button>
+        )}
 
-        <button
-          type="button"
-          className="btn-pda-rect btn-pda-green"
-          onClick={() => onSelectAction('check-out')}
-        >
-          <IconCheckOut size={20} />
-          <span>Check Out</span>
-        </button>
+        {!isBattery && (
+          <button
+            type="button"
+            className="btn-pda-rect btn-pda-green"
+            onClick={() => onSelectAction('check-out')}
+          >
+            <IconCheckOut size={20} />
+            <span>Check Out</span>
+          </button>
+        )}
 
         {isGenerator && (
           <button
@@ -473,18 +482,21 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
           </button>
         )}
 
-        <button
-          type="button"
-          className="btn-pda-rect btn-pda-blue"
-          onClick={() => onSelectAction('record-fuel')}
-        >
-          <IconFuel size={20} />
-          <span>Record Fuel Transfer</span>
-        </button>
+        {!isBattery && (
+          <button
+            type="button"
+            className="btn-pda-rect btn-pda-blue"
+            onClick={() => onSelectAction('record-fuel')}
+          >
+            <IconFuel size={20} />
+            <span>Record Fuel Transfer</span>
+          </button>
+        )}
 
         <button
           type="button"
           className="btn-pda-rect btn-pda-blue"
+          style={isBattery ? { gridColumn: '1 / -1' } : undefined}
           onClick={onEditDetails}
         >
           <Pencil size={18} />

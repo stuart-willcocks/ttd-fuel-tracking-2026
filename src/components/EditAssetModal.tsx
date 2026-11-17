@@ -33,6 +33,7 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
 }) => {
   const isGenerator = asset.type === 'GENERATOR';
   const isTank = asset.type === 'TANK';
+  const isBattery = asset.type === 'BATTERY';
   const capacityUnit = isGenerator ? 'kVA' : isTank ? 'L' : '';
 
   const initialCleanW3w = useMemo(() => {
@@ -326,16 +327,17 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
   }, [isOpen, relocatedW3w]);
 
   const parsedCapacity = useMemo(() => {
+    if (isBattery) return undefined;
     const trimmed = capacity.trim();
     if (!trimmed) return undefined;
     const num = Number(trimmed);
     if (!Number.isInteger(num) || num <= 0) return NaN;
     return num;
-  }, [capacity]);
+  }, [capacity, isBattery]);
 
-  const isCapacityValid = !Number.isNaN(parsedCapacity);
+  const isCapacityValid = isBattery || !Number.isNaN(parsedCapacity);
 
-  const isCapacityChanged = parsedCapacity !== asset.capacity;
+  const isCapacityChanged = !isBattery && parsedCapacity !== asset.capacity;
   const isSerialChanged = serial.trim() !== (asset.rentalSerialNumber || '').trim();
   const isLocationChanged = Boolean(
     relocatedW3w && normalizeWhat3Words(relocatedW3w.words) !== initialCleanW3w
@@ -422,23 +424,25 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
       <form onSubmit={handleOpenConfirm} className="edit-asset-view-body" noValidate>
         {/* Capacity / Size & Serial Number Row */}
         <div className="edit-asset-fields-row">
-          <div className="edit-asset-field-col">
-            <label htmlFor="pda-edit-capacity" className="edit-asset-field-label">
-              Capacity / Size {capacityUnit ? `(${capacityUnit})` : ''}
-            </label>
-            <div className="edit-asset-input-wrap">
-              <input
-                id="pda-edit-capacity"
-                type="text"
-                inputMode="numeric"
-                className="edit-asset-text-input"
-                placeholder={isGenerator ? '100' : isTank ? '3000' : 'Optional'}
-                value={capacity}
-                onChange={(e) => setCapacity(e.target.value.replace(/[^\d]/g, ''))}
-              />
-              {capacityUnit && <span className="edit-asset-input-unit">{capacityUnit}</span>}
+          {!isBattery && (
+            <div className="edit-asset-field-col">
+              <label htmlFor="pda-edit-capacity" className="edit-asset-field-label">
+                Capacity / Size {capacityUnit ? `(${capacityUnit})` : ''}
+              </label>
+              <div className="edit-asset-input-wrap">
+                <input
+                  id="pda-edit-capacity"
+                  type="text"
+                  inputMode="numeric"
+                  className="edit-asset-text-input"
+                  placeholder={isGenerator ? '100' : isTank ? '3000' : 'Optional'}
+                  value={capacity}
+                  onChange={(e) => setCapacity(e.target.value.replace(/[^\d]/g, ''))}
+                />
+                {capacityUnit && <span className="edit-asset-input-unit">{capacityUnit}</span>}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="edit-asset-field-col">
             <label htmlFor="pda-edit-serial" className="edit-asset-field-label">
@@ -552,22 +556,24 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
                       <EquipmentTypeIcon type={asset.type} size={22} />
                     </td>
                   </tr>
-                  <tr>
-                    <td className="lbl">Capacity / Size</td>
-                    <td className="val">
-                      {parsedCapacity !== undefined
-                        ? `${parsedCapacity}${capacityUnit ? ` ${capacityUnit}` : ''}`
-                        : 'Unrated'}
-                      {isCapacityChanged && (
-                        <div style={{ fontSize: '11px', color: '#6B7280', fontWeight: 500 }}>
-                          Previously:{' '}
-                          {asset.capacity !== undefined
-                            ? `${asset.capacity}${capacityUnit ? ` ${capacityUnit}` : ''}`
-                            : 'Unrated'}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
+                  {!isBattery && (
+                    <tr>
+                      <td className="lbl">Capacity / Size</td>
+                      <td className="val">
+                        {parsedCapacity !== undefined
+                          ? `${parsedCapacity}${capacityUnit ? ` ${capacityUnit}` : ''}`
+                          : 'Unrated'}
+                        {isCapacityChanged && (
+                          <div style={{ fontSize: '11px', color: '#6B7280', fontWeight: 500 }}>
+                            Previously:{' '}
+                            {asset.capacity !== undefined
+                              ? `${asset.capacity}${capacityUnit ? ` ${capacityUnit}` : ''}`
+                              : 'Unrated'}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
                   <tr>
                     <td className="lbl">Serial Number</td>
                     <td className="val">

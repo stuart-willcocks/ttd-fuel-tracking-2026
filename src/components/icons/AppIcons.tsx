@@ -558,3 +558,48 @@ export const IconPoweredOff: React.FC<IconProps> = ({
     <circle cx="12" cy="12" r="5" fill="none" stroke="#FFFFFF" strokeWidth="2" />
   </svg>
 );
+
+// 12) Battery (Industrial Battery Unit with terminals and +/- symbols)
+export const IconBattery: React.FC<IconProps> = ({
+  size = 24,
+  className = '',
+  strokeWidth = 2,
+  color = 'currentColor',
+  ...props
+}) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="none"
+    className={className}
+    {...props}
+  >
+    <rect
+      x="3"
+      y="7"
+      width="18"
+      height="13"
+      rx="2"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M7 7V4.5h3V7M14 7V4.5h3V7"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M8.5 11.5v4M6.5 13.5h4M13.5 13.5h4"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);

@@ -751,6 +751,12 @@ iframe[src*="vercel.live"],
   border: 1px solid #CBD5E1;
 }
 
+.admin-badge-battery {
+  background: rgba(124, 58, 237, 0.08);
+  color: #7C3AED;
+  border: 1px solid rgba(124, 58, 237, 0.25);
+}
+
 .admin-badge-running {
   background: rgba(22, 163, 74, 0.08);
   color: #16A34A;

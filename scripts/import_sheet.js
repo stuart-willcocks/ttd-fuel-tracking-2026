@@ -139,8 +139,9 @@ export async function runWipeAndImport(csvContent) {
     if (!w3w.startsWith('///')) w3w = `///${w3w.replace(/^[/]+/, '')}`;
 
     let type = (row.Type || 'GENERATOR').toUpperCase();
-    if (!['GENERATOR', 'TANK', 'PLANT'].includes(type)) {
-      if (type.includes('TANK')) type = 'TANK';
+    if (!['GENERATOR', 'TANK', 'PLANT', 'BATTERY'].includes(type)) {
+      if (type.includes('BAT')) type = 'BATTERY';
+      else if (type.includes('TANK')) type = 'TANK';
       else if (type.includes('PLANT')) type = 'PLANT';
       else type = 'GENERATOR';
     }
