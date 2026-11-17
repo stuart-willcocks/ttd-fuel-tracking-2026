@@ -494,7 +494,7 @@ export function getGoogleSatelliteMapSrcDoc(
 
   const targetLat = cached ? cached.lat : 52.0733;
   const targetLng = cached ? cached.lng : -1.0147;
-  const eqTypeJson = JSON.stringify(equipmentType || 'GENERATOR').replace(/</g, '\\u003c');
+  const eqTypeJson = JSON.stringify(equipmentType || '').replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -661,7 +661,7 @@ export function getGoogleSatelliteMapSrcDoc(
       var eqType = ${eqTypeJson};
 
       function getIconDiscColor(type) {
-        return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : type === 'BATTERY' ? '#7C3AED' : '#16A34A';
+        return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : type === 'BATTERY' ? '#7C3AED' : type === 'PLANT' ? '#16A34A' : '#64748B';
       }
 
       function getEquipmentSvg(type, color) {
@@ -691,15 +691,22 @@ export function getGoogleSatelliteMapSrcDoc(
             '<path d="M8.5 11.5v4M6.5 13.5h4M13.5 13.5h4" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
             '</svg>';
         }
-        // PLANT (Forklift / Plant)
+        if (type === 'PLANT') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<g transform="translate(-170)">' +
+            '<circle cx="175.82" cy="20.11" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+            '<circle cx="184.72" cy="20.16" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+            '<path d="M 172.72,19.70 172.5,11.5 176,11 176.5,5.5 182,5 l 1,0.5 1.5,8.5 h 3.5" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="m 172.72,19.20 1.5,-2 h 3.5 l 1,2 h 3 l 2,-2" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="m 192,21.5 h -4 V 2" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</g></svg>';
+        }
+        // Unknown / Unspecified (Question Mark)
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
-          '<g transform="translate(-170)">' +
-          '<circle cx="175.82" cy="20.11" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
-          '<circle cx="184.72" cy="20.16" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
-          '<path d="M 172.72,19.70 172.5,11.5 176,11 176.5,5.5 182,5 l 1,0.5 1.5,8.5 h 3.5" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<path d="m 172.72,19.20 1.5,-2 h 3.5 l 1,2 h 3 l 2,-2" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<path d="m 192,21.5 h -4 V 2" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '</g></svg>';
+          '<circle cx="12" cy="12" r="9.5" stroke="' + color + '" stroke-width="2"/>' +
+          '<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="' + color + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="M12 17h.01" stroke="' + color + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '</svg>';
       }
 
       var discColor = getIconDiscColor(eqType);
@@ -974,7 +981,7 @@ export function getPdaRelocateMapSrcDoc(
 
   const targetLat = cached ? cached.lat : 52.0733;
   const targetLng = cached ? cached.lng : -1.0147;
-  const eqTypeJson = JSON.stringify(equipmentType || 'GENERATOR').replace(/</g, '\\u003c');
+  const eqTypeJson = JSON.stringify(equipmentType || '').replace(/</g, '\\u003c');
   const displayLabel = clean
     ? isValidWhat3WordsFormat(clean)
       ? `///${clean}`
@@ -1247,14 +1254,21 @@ export function getPdaRelocateMapSrcDoc(
             '<path d="M8.5 11.5v4M6.5 13.5h4M13.5 13.5h4" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
             '</svg>';
         }
+        if (type === 'PLANT') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none">' +
+            '<g transform="translate(-170)">' +
+            '<circle cx="175.82" cy="20.11" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+            '<circle cx="184.72" cy="20.16" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+            '<path d="M 172.72,19.70 172.5,11.5 176,11 176.5,5.5 182,5 l 1,0.5 1.5,8.5 h 3.5" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="m 172.72,19.20 1.5,-2 h 3.5 l 1,2 h 3 l 2,-2" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="m 192,21.5 h -4 V 2" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</g></svg>';
+        }
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none">' +
-          '<g transform="translate(-170)">' +
-          '<circle cx="175.82" cy="20.11" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
-          '<circle cx="184.72" cy="20.16" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
-          '<path d="M 172.72,19.70 172.5,11.5 176,11 176.5,5.5 182,5 l 1,0.5 1.5,8.5 h 3.5" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<path d="m 172.72,19.20 1.5,-2 h 3.5 l 1,2 h 3 l 2,-2" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<path d="m 192,21.5 h -4 V 2" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '</g></svg>';
+          '<circle cx="12" cy="12" r="9.5" stroke="' + color + '" stroke-width="2"/>' +
+          '<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="' + color + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="M12 17h.01" stroke="' + color + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '</svg>';
       }
 
       var currentHtml = '<div class="eq-relocate-marker">' +
@@ -2177,14 +2191,21 @@ function getMoveEquipmentMapSrcDoc(
             '<path d="M8.5 11.5v4M6.5 13.5h4M13.5 13.5h4" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
             '</svg>';
         }
+        if (type === 'PLANT') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<path d="m 14,9.5 v -4 c 0,-0.6 0.4,-1 1,-1 h 4.5 c 0.6,0 1,0.4 1,1 v 7 h -12 v -3 z" fill="' + color + '"/>' +
+            '<path d="m 12.5,5 h -2 v 4.5" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
+            '<path d="M 8,9.5 4.5,6 2,8.5 3.5,11" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
+            '<rect x="6.5" y="15" width="14" height="4" rx="2" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<circle cx="9" cy="17" r="1" fill="' + color + '"/>' +
+            '<circle cx="13.5" cy="17" r="1" fill="' + color + '"/>' +
+            '<circle cx="18" cy="17" r="1" fill="' + color + '"/>' +
+            '</svg>';
+        }
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
-          '<path d="m 14,9.5 v -4 c 0,-0.6 0.4,-1 1,-1 h 4.5 c 0.6,0 1,0.4 1,1 v 7 h -12 v -3 z" fill="' + color + '"/>' +
-          '<path d="m 12.5,5 h -2 v 4.5" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
-          '<path d="M 8,9.5 4.5,6 2,8.5 3.5,11" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>' +
-          '<rect x="6.5" y="15" width="14" height="4" rx="2" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<circle cx="9" cy="17" r="1" fill="' + color + '"/>' +
-          '<circle cx="13.5" cy="17" r="1" fill="' + color + '"/>' +
-          '<circle cx="18" cy="17" r="1" fill="' + color + '"/>' +
+          '<circle cx="12" cy="12" r="9.5" stroke="' + color + '" stroke-width="2"/>' +
+          '<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="' + color + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="M12 17h.01" stroke="' + color + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' +
           '</svg>';
       }
 
@@ -3526,7 +3547,7 @@ export interface FleetMapTransactionItem {
 
 export interface FleetMapMarkerItem {
   equipmentId: string;
-  type: 'GENERATOR' | 'TANK' | 'PLANT' | 'BATTERY' | 'PDA';
+  type: 'GENERATOR' | 'TANK' | 'PLANT' | 'BATTERY' | 'PDA' | '';
   area: string;
   location: string;
   what3words: string;
@@ -4315,15 +4336,22 @@ export function getFleetSatelliteMapSrcDoc(
             '<path d="M8.5 11.5v4M6.5 13.5h4M13.5 13.5h4" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
             '</svg>';
         }
-        // PLANT (Forklift / Plant)
+        if (type === 'PLANT') {
+          return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
+            '<g transform="translate(-170)">' +
+            '<circle cx="175.82" cy="20.11" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+            '<circle cx="184.72" cy="20.16" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+            '<path d="M 172.72,19.70 172.5,11.5 176,11 176.5,5.5 182,5 l 1,0.5 1.5,8.5 h 3.5" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="m 172.72,19.20 1.5,-2 h 3.5 l 1,2 h 3 l 2,-2" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="m 192,21.5 h -4 V 2" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</g></svg>';
+        }
+        // Unknown / Unspecified (Question Mark)
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">' +
-          '<g transform="translate(-170)">' +
-          '<circle cx="175.82" cy="20.11" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
-          '<circle cx="184.72" cy="20.16" r="1.6" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
-          '<path d="M 172.72,19.70 172.5,11.5 176,11 176.5,5.5 182,5 l 1,0.5 1.5,8.5 h 3.5" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<path d="m 172.72,19.20 1.5,-2 h 3.5 l 1,2 h 3 l 2,-2" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<path d="m 192,21.5 h -4 V 2" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '</g></svg>';
+          '<circle cx="12" cy="12" r="9.5" stroke="' + color + '" stroke-width="2"/>' +
+          '<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="' + color + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="M12 17h.01" stroke="' + color + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '</svg>';
       }
 
       function getTxTypeSvg(type) {
@@ -4504,7 +4532,7 @@ export function getFleetSatelliteMapSrcDoc(
 
         var newHtml = '<div class="eq-map-marker">' +
           '<div class="eq-map-icon-box" style="background:' + discColor + ';border:2px solid #FFFFFF;box-shadow:0 0 0 4px rgba(37,99,235,0.5),0 3px 10px rgba(0,0,0,0.55);">' +
-            getEquipmentSvg(currentItem ? currentItem.type : 'PLANT', '#FFFFFF') +
+            getEquipmentSvg(currentItem ? currentItem.type : '', '#FFFFFF') +
           '</div>' +
           '<div class="eq-map-label" style="background:#1E40AF;color:#FFFFFF;border-color:#93C5FD;">' +
             labelHtml +
@@ -4637,7 +4665,7 @@ export function getFleetSatelliteMapSrcDoc(
 
       function getIconDiscColor(type) {
         if (type === 'PDA') return '#64748B';
-        return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : type === 'BATTERY' ? '#7C3AED' : '#16A34A';
+        return type === 'GENERATOR' ? '#EC721E' : type === 'TANK' ? '#2563EB' : type === 'BATTERY' ? '#7C3AED' : type === 'PLANT' ? '#16A34A' : '#64748B';
       }
 
       function computeLeaderMetricsForZoom(item, zoomLevel) {

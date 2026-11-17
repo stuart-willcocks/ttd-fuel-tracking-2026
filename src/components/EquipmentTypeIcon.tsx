@@ -1,5 +1,5 @@
 import React from 'react';
-import { IconGenerator, IconTank, IconPlant, IconBattery } from './icons/AppIcons';
+import { IconGenerator, IconTank, IconPlant, IconBattery, IconUnknownEquipment } from './icons/AppIcons';
 
 interface EquipmentTypeIconProps {
   type: string;
@@ -14,7 +14,7 @@ export const EquipmentTypeIcon: React.FC<EquipmentTypeIconProps> = ({
   className = '',
   color = '#EC721E',
 }) => {
-  const normalized = (type || '').toUpperCase();
+  const normalized = (type || '').trim().toUpperCase();
 
   if (normalized === 'GENERATOR' || normalized.includes('GEN')) {
     return (
@@ -40,10 +40,18 @@ export const EquipmentTypeIcon: React.FC<EquipmentTypeIconProps> = ({
     );
   }
 
-  // Plant machinery / vehicles (forklift, telehandler, etc.)
+  if (normalized === 'PLANT' || normalized.includes('PLT')) {
+    return (
+      <span className={`eq-icon-wrap eq-plant ${className}`} title="Plant Equipment" style={{ color }}>
+        <IconPlant size={size} color={color} />
+      </span>
+    );
+  }
+
+  // Unknown or unspecified equipment type
   return (
-    <span className={`eq-icon-wrap eq-plant ${className}`} title="Plant Equipment" style={{ color }}>
-      <IconPlant size={size} color={color} />
+    <span className={`eq-icon-wrap eq-unknown ${className}`} title="Unknown Equipment Type" style={{ color }}>
+      <IconUnknownEquipment size={size} color={color} />
     </span>
   );
 };

@@ -808,7 +808,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
       items.push({
         equipmentId: asset.equipmentId,
-        type: asset.type || 'PLANT',
+        type: asset.type || '',
         area: asset.area,
         location: asset.location,
         what3words: asset.what3words,
@@ -1394,7 +1394,10 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                           <span>{asset.type}</span>
                         </span>
                       ) : (
-                        <span style={{ color: 'var(--adm-text-muted)' }}>—</span>
+                        <span className="admin-badge admin-badge-unknown" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                          <EquipmentTypeIcon type="" size={13} />
+                          <span>—</span>
+                        </span>
                       )}
                     </td>
 

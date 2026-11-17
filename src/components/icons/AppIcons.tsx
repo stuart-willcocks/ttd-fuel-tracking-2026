@@ -603,3 +603,44 @@ export const IconBattery: React.FC<IconProps> = ({
     />
   </svg>
 );
+
+// 13) Unknown / Unspecified Equipment Type (Question Mark in Circle)
+export const IconUnknownEquipment: React.FC<IconProps> = ({
+  size = 24,
+  className = '',
+  strokeWidth = 2,
+  color = 'currentColor',
+  ...props
+}) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="none"
+    className={className}
+    {...props}
+  >
+    <circle
+      cx="12"
+      cy="12"
+      r="9.5"
+      stroke={color}
+      strokeWidth={strokeWidth}
+    />
+    <path
+      d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M12 17h.01"
+      stroke={color}
+      strokeWidth={Number(strokeWidth) + 0.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
