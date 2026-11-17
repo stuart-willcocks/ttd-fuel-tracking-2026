@@ -333,8 +333,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
                       <span className="row-id">{asset.equipmentId}</span>
                     </div>
                     <div className="row-right">
-                      <span className="row-location">{asset.location}</span>
-                      <span className="row-area">{asset.area}</span>
+                      {asset.location ? <span className="row-location">{asset.location}</span> : null}
+                      {asset.area ? <span className="row-area">{asset.area}</span> : null}
                     </div>
                   </div>
                 ))

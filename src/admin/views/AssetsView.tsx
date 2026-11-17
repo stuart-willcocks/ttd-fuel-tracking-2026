@@ -178,10 +178,10 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       const matchesSearch =
         !q ||
         asset.equipmentId.toLowerCase().includes(q) ||
-        asset.area.toLowerCase().includes(q) ||
-        asset.location.toLowerCase().includes(q) ||
-        asset.what3words.toLowerCase().includes(q) ||
-        asset.rentalSerialNumber.toLowerCase().includes(q);
+        (asset.area || '').toLowerCase().includes(q) ||
+        (asset.location || '').toLowerCase().includes(q) ||
+        (asset.what3words || '').toLowerCase().includes(q) ||
+        (asset.rentalSerialNumber || '').toLowerCase().includes(q);
 
       if (!matchesSearch) return false;
 
@@ -264,8 +264,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           comparison = (a.capacity || 0) - (b.capacity || 0);
           break;
         case 'location': {
-          const locA = `${a.area} ${a.location}`;
-          const locB = `${b.area} ${b.location}`;
+          const locA = `${a.area || ''} ${a.location || ''}`.trim();
+          const locB = `${b.area || ''} ${b.location || ''}`.trim();
           comparison = locA.localeCompare(locB);
           break;
         }

@@ -316,7 +316,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             </div>
             {asset && (
               <div style={{ fontSize: '0.8rem', color: 'var(--adm-text-secondary)' }}>
-                {asset.type} • {asset.area} ({asset.location})
+                {[
+                  asset.type,
+                  asset.area && asset.location
+                    ? `${asset.area} (${asset.location})`
+                    : asset.area || asset.location,
+                ]
+                  .filter(Boolean)
+                  .join(' • ')}
               </div>
             )}
           </div>

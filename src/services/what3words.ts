@@ -377,19 +377,7 @@ export async function convertCoordinatesToWhat3Words(
  * needs reverse-geocoding to a what3words 3-word address when the service is available.
  */
 export function needsWhat3WordsReverseResolution(equipment: Equipment): W3WCoordinates | null {
-  const parsed = parseGpsCoordinatesString(equipment.what3words);
-  if (parsed) return parsed;
-  const clean = normalizeWhat3Words(equipment.what3words);
-  if (
-    !isValidWhat3WordsFormat(clean) &&
-    typeof equipment.latitude === 'number' &&
-    !Number.isNaN(equipment.latitude) &&
-    typeof equipment.longitude === 'number' &&
-    !Number.isNaN(equipment.longitude)
-  ) {
-    return { lat: equipment.latitude, lng: equipment.longitude };
-  }
-  return null;
+  return parseGpsCoordinatesString(equipment.what3words);
 }
 
 /**
@@ -430,29 +418,9 @@ export async function resolveEquipmentCoordinates(
 
   const currentClean = normalizeWhat3Words(equipment.what3words);
   if (!currentClean || currentClean === 'what.three.words') {
-    if (hasExistingCoords) {
-      if (allowReverseGeocode) {
-        const reverseRes = await convertCoordinatesToWhat3Words(
-          equipment.latitude!,
-          equipment.longitude!
-        );
-        if (reverseRes) {
-          return {
-            ...equipment,
-            what3words: reverseRes.formattedWords,
-            latitude: reverseRes.lat,
-            longitude: reverseRes.lng,
-          };
-        }
-      }
-      return {
-        ...equipment,
-        what3words: formatGpsCoordinates(equipment.latitude!, equipment.longitude!),
-      };
-    }
     return {
       ...equipment,
-      what3words: currentClean === 'what.three.words' ? '' : equipment.what3words,
+      what3words: '',
       latitude: undefined,
       longitude: undefined,
     };
@@ -1800,6 +1768,9 @@ function openCleanGoogleMapsModal(
 
   if (initialCoords) {
     renderIframe(initialCoords);
+  } else if (!clean) {
+    const savedView = getSavedFleetMapView();
+    renderIframe(savedView ? { lat: savedView.lat, lng: savedView.lng } : null);
   } else {
     const loadingEl = document.createElement('div');
     loadingEl.textContent = `Loading satellite map for ///${clean}...`;
@@ -1879,7 +1850,7 @@ function getMoveEquipmentMapSrcDoc(
   const targetLng = cached ? cached.lng : -1.0147;
   const eqIdJson = JSON.stringify(equipment.equipmentId).replace(/</g, '\\u003c');
   const eqTypeJson = JSON.stringify(equipment.type).replace(/</g, '\\u003c');
-  const eqW3wJson = JSON.stringify(`///${clean}`).replace(/</g, '\\u003c');
+  const eqW3wJson = JSON.stringify(clean ? `///${clean}` : 'unassigned').replace(/</g, '\\u003c');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -2663,7 +2634,9 @@ export function openMoveEquipmentModal(
 
   coordsBadge.textContent = initialCoords
     ? `(${initialCoords.lat.toFixed(5)}, ${initialCoords.lng.toFixed(5)})`
-    : 'Resolving current coordinates...';
+    : clean
+      ? 'Resolving current coordinates...'
+      : '(No location assigned)';
 
   titleWrap.appendChild(titleText);
   titleWrap.appendChild(currentW3wBadge);
@@ -3513,6 +3486,9 @@ export function openMoveEquipmentModal(
 
   if (initialCoords) {
     renderIframe(initialCoords);
+  } else if (!clean) {
+    const savedView = getSavedFleetMapView();
+    renderIframe(savedView ? { lat: savedView.lat, lng: savedView.lng } : null);
   } else {
     const loadingEl = document.createElement('div');
     loadingEl.textContent = `Loading satellite map for ${asset.equipmentId} (${currentFormatted})...`;

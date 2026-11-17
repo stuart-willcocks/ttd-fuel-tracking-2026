@@ -345,35 +345,37 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
       </div>
 
       {/* 2. METADATA SECTION: Non-monospace what3words, light grey asset data, no equipment type text */}
-      <div className="asset-detail-meta-box">
-        {/* what3words: Clickable to launch in-app map */}
-        {cleanW3w ? (
-          <button
-            type="button"
-            className="asset-detail-w3w asset-detail-w3w-btn"
-            onClick={() => setIsMapModalOpen(true)}
-            title="Open location map"
-          >
-            <MapPin size={14} style={{ flexShrink: 0 }} />
-            <span>{cleanW3w}</span>
-          </button>
-        ) : null}
+      {(cleanW3w || (!isBattery && asset.capacity) || asset.rentalSerialNumber || asset.area || asset.location) ? (
+        <div className="asset-detail-meta-box">
+          {/* what3words: Clickable to launch in-app map */}
+          {cleanW3w ? (
+            <button
+              type="button"
+              className="asset-detail-w3w asset-detail-w3w-btn"
+              onClick={() => setIsMapModalOpen(true)}
+              title="Open location map"
+            >
+              <MapPin size={14} style={{ flexShrink: 0 }} />
+              <span>{cleanW3w}</span>
+            </button>
+          ) : null}
 
-        {/* Asset Capacity & Serial Number */}
-        {((!isBattery && asset.capacity) || asset.rentalSerialNumber) && (
-          <div className="asset-detail-spec">
-            {!isBattery && asset.capacity ? `${asset.capacity} ${isGenerator ? 'kVA' : 'L'}` : ''}
-            {!isBattery && asset.capacity && asset.rentalSerialNumber ? ' • ' : ''}
-            {asset.rentalSerialNumber ? `SN: ${asset.rentalSerialNumber}` : ''}
-          </div>
-        )}
+          {/* Asset Capacity & Serial Number */}
+          {((!isBattery && asset.capacity) || asset.rentalSerialNumber) && (
+            <div className="asset-detail-spec">
+              {!isBattery && asset.capacity ? `${asset.capacity} ${isGenerator ? 'kVA' : 'L'}` : ''}
+              {!isBattery && asset.capacity && asset.rentalSerialNumber ? ' • ' : ''}
+              {asset.rentalSerialNumber ? `SN: ${asset.rentalSerialNumber}` : ''}
+            </div>
+          )}
 
-        {/* Area */}
-        {asset.area ? <div className="asset-detail-area">{asset.area.toUpperCase()}</div> : null}
+          {/* Area */}
+          {asset.area ? <div className="asset-detail-area">{asset.area.toUpperCase()}</div> : null}
 
-        {/* Location */}
-        {asset.location ? <div className="asset-detail-location">{asset.location.toUpperCase()}</div> : null}
-      </div>
+          {/* Location */}
+          {asset.location ? <div className="asset-detail-location">{asset.location.toUpperCase()}</div> : null}
+        </div>
+      ) : null}
 
       {/* 3. TRANSACTIONS LIST: Vertically scrollable pane, reverse timestamp order */}
       <div className="asset-detail-tx-pane">

@@ -62,12 +62,14 @@ const ComboBox: React.FC<ComboBoxProps> = ({
   required = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
+        setIsFiltering(false);
       }
     };
     if (isOpen) {
@@ -79,11 +81,21 @@ const ComboBox: React.FC<ComboBoxProps> = ({
   }, [isOpen]);
 
   const filteredOptions = useMemo(() => {
+    if (!isFiltering) return options;
     const trimmed = value.trim().toLowerCase();
     if (!trimmed) return options;
-    const matching = options.filter((opt) => String(opt).toLowerCase().includes(trimmed));
-    return matching.length > 0 ? matching : options;
-  }, [options, value]);
+    return options.filter((opt) => String(opt).toLowerCase().includes(trimmed));
+  }, [options, value, isFiltering]);
+
+  const trimmedValue = value.trim();
+  const hasExactMatch = useMemo(() => {
+    if (!trimmedValue) return true;
+    const lower = trimmedValue.toLowerCase();
+    return options.some((opt) => String(opt).trim().toLowerCase() === lower);
+  }, [options, trimmedValue]);
+
+  const showCreateNewOption = type === 'text' && isFiltering && Boolean(trimmedValue) && !hasExactMatch;
+  const hasDropdownItems = filteredOptions.length > 0 || showCreateNewOption;
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%', ...style }}>
@@ -93,12 +105,26 @@ const ComboBox: React.FC<ComboBoxProps> = ({
           min={min}
           className="admin-input"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setIsFiltering(true);
+            if (!disabled) setIsOpen(true);
+          }}
           placeholder={placeholder}
           disabled={disabled}
           required={required}
           onFocus={() => {
-            if (!disabled && options.length > 0) setIsOpen(true);
+            if (!disabled && options.length > 0) {
+              setIsFiltering(false);
+              setIsOpen(true);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' && isOpen) {
+              e.stopPropagation();
+              setIsOpen(false);
+              setIsFiltering(false);
+            }
           }}
           style={{
             width: '100%',
@@ -128,7 +154,10 @@ const ComboBox: React.FC<ComboBoxProps> = ({
           <button
             type="button"
             tabIndex={-1}
-            onClick={() => setIsOpen((prev) => !prev)}
+            onClick={() => {
+              setIsFiltering(false);
+              setIsOpen((prev) => !prev);
+            }}
             style={{
               position: 'absolute',
               right: '4px',
@@ -150,7 +179,7 @@ const ComboBox: React.FC<ComboBoxProps> = ({
         )}
       </div>
 
-      {isOpen && !disabled && options.length > 0 && (
+      {isOpen && !disabled && hasDropdownItems && (
         <div
           style={{
             position: 'absolute',
@@ -165,11 +194,38 @@ const ComboBox: React.FC<ComboBoxProps> = ({
             zIndex: 1000,
           }}
         >
+          {showCreateNewOption && (
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange(trimmedValue);
+                setIsFiltering(false);
+                setIsOpen(false);
+              }}
+              style={{
+                padding: '8px 12px',
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                background: 'rgba(37, 99, 235, 0.06)',
+                color: '#2563EB',
+                fontWeight: 700,
+                borderBottom: filteredOptions.length > 0 ? '1px solid var(--adm-border-subtle)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Plus size={13} />
+              <span>Use new zone/area: &ldquo;{trimmedValue}&rdquo;</span>
+            </div>
+          )}
           {filteredOptions.map((opt) => (
             <div
               key={String(opt)}
-              onClick={() => {
+              onMouseDown={(e) => {
+                e.preventDefault();
                 onChange(String(opt));
+                setIsFiltering(false);
                 setIsOpen(false);
               }}
               style={{
@@ -270,8 +326,11 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     const dbAreas = existingAssets
       .map((a) => a.area?.trim())
       .filter((a): a is string => Boolean(a));
-    const combined = Array.from(new Set([...dbAreas, ...COMMON_AREAS]));
-    return combined.sort((a, b) => a.localeCompare(b));
+    const uniqueDbAreas = Array.from(new Set(dbAreas));
+    if (uniqueDbAreas.length > 0) {
+      return uniqueDbAreas.sort((a, b) => a.localeCompare(b));
+    }
+    return [...COMMON_AREAS].sort((a, b) => a.localeCompare(b));
   }, [existingAssets]);
 
   // Synchronize state when initialAsset changes or modal opens
@@ -401,7 +460,15 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     }
 
     const cleanW3w = stripW3wPrefix(what3words.trim());
-    const finalW3w = cleanW3w && cleanW3w.toLowerCase() !== 'what.three.words' ? `///${cleanW3w}` : '';
+    const finalW3w =
+      cleanW3w && cleanW3w.toLowerCase() !== 'what.three.words'
+        ? cleanW3w.includes(',')
+          ? cleanW3w
+          : `///${cleanW3w}`
+        : '';
+
+    const initialCleanW3w = stripW3wPrefix((initialAsset?.what3words ?? '').trim());
+    const preserveInitialCoords = Boolean(finalW3w && cleanW3w === initialCleanW3w);
 
     const parsedCap =
       type === 'PLANT' || type === 'BATTERY' || !capacity.trim() ? undefined : parseInt(capacity, 10) || undefined;
@@ -413,8 +480,8 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       area: area.trim(),
       location: location.trim(),
       what3words: finalW3w,
-      latitude: initialAsset?.latitude,
-      longitude: initialAsset?.longitude,
+      latitude: preserveInitialCoords ? initialAsset?.latitude : undefined,
+      longitude: preserveInitialCoords ? initialAsset?.longitude : undefined,
       rentalSerialNumber: rentalSerialNumber.trim(),
       poweredUpTimestamp: initialAsset?.poweredUpTimestamp,
       poweredDownTimestamp: initialAsset?.poweredDownTimestamp,
@@ -479,7 +546,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           {/* Row 1: Equipment ID (25% width) */}
           <div className="admin-input-group" style={{ marginBottom: '16px' }}>
             <label className="admin-label">Equipment ID *</label>
@@ -512,7 +579,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
           <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', marginBottom: '16px' }}>
             {/* Equipment Type Dropdown (1/3 width) */}
             <div className="admin-input-group" style={{ width: '140px', flexShrink: 0, marginBottom: 0 }}>
-              <label className="admin-label">Equipment type *</label>
+              <label className="admin-label">Equipment type{!isEditMode ? ' *' : ''}</label>
               <select
                 className="admin-select"
                 style={{ width: '100%', height: '38px' }}
@@ -534,7 +601,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
 
             {/* Capacity Combo Box (Select from DB or create new) */}
             <div className="admin-input-group" style={{ width: '130px', flexShrink: 0, marginBottom: 0 }}>
-              <label className="admin-label">Capacity *</label>
+              <label className="admin-label">Capacity{!isEditMode ? ' *' : ''}</label>
               {type !== 'PLANT' && type !== 'BATTERY' ? (
                 <ComboBox
                   type="number"
@@ -544,7 +611,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                   options={capacityOptions}
                   placeholder={type === 'GENERATOR' ? '100' : '3000'}
                   unit={type === 'GENERATOR' ? 'kVA' : 'L'}
-                  required
+                  required={!isEditMode}
                 />
               ) : (
                 <input
@@ -565,21 +632,21 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
 
           {/* Row 3: Zone/area combo box on its own line, 90% width (Select from DB or create new) */}
           <div className="admin-input-group" style={{ marginBottom: '16px' }}>
-            <label className="admin-label">Zone/area *</label>
+            <label className="admin-label">Zone/area{!isEditMode ? ' *' : ''}</label>
             <ComboBox
               type="text"
               value={area}
               onChange={(val) => setArea(val)}
               options={areaOptions}
-              placeholder="e.g. North Zone"
+              placeholder="Select existing or type new zone/area"
               style={{ width: '90%' }}
-              required
+              required={!isEditMode}
             />
           </div>
 
           {/* Row 4: Location on its own line, 90% width */}
           <div className="admin-input-group" style={{ marginBottom: '16px' }}>
-            <label className="admin-label">Location *</label>
+            <label className="admin-label">Location{!isEditMode ? ' *' : ''}</label>
             <input
               type="text"
               className="admin-input"
@@ -587,14 +654,14 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="e.g. Stage Alpha Power Compound"
-              required
+              required={!isEditMode}
             />
           </div>
 
           {/* Row 5: What3Words on its own line, 90% width, no prefix /// characters */}
           <div className="admin-input-group" style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', width: '90%' }}>
-              <label className="admin-label">What3Words Reference *</label>
+              <label className="admin-label">What3Words Reference{!isEditMode ? ' *' : ''}</label>
               {what3words && (
                 <a
                   href={getGoogleMapsExternalUrl(
@@ -634,7 +701,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 onChange={(e) => setWhat3words(stripW3wPrefix(e.target.value))}
                 placeholder="puzzle.stages.daring"
                 style={{ paddingLeft: '32px', width: '100%', height: '38px' }}
-                required
+                required={!isEditMode}
               />
               <MapPin
                 size={15}
@@ -651,7 +718,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
 
           {/* Row 6: Rental Serial Number on its own line, 90% width */}
           <div className="admin-input-group" style={{ marginBottom: '20px' }}>
-            <label className="admin-label">Rental Serial Number *</label>
+            <label className="admin-label">Rental Serial Number{!isEditMode ? ' *' : ''}</label>
             <input
               type="text"
               className="admin-input admin-mono"
@@ -659,7 +726,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               value={rentalSerialNumber}
               onChange={(e) => setRentalSerialNumber(e.target.value.toUpperCase())}
               placeholder="RSN-40291"
-              required
+              required={!isEditMode}
             />
           </div>
 
