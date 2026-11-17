@@ -298,10 +298,10 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   // Form input states
   const [equipmentId, setEquipmentId] = useState<string>('');
   const [type, setType] = useState<AssetType>('GENERATOR');
-  const [capacity, setCapacity] = useState<string>('100');
-  const [area, setArea] = useState<string>('North Zone');
+  const [capacity, setCapacity] = useState<string>('');
+  const [area, setArea] = useState<string>('');
   const [location, setLocation] = useState<string>('');
-  const [what3words, setWhat3words] = useState<string>('field.power.setup');
+  const [what3words, setWhat3words] = useState<string>('');
   const [rentalSerialNumber, setRentalSerialNumber] = useState<string>('');
 
   const [initialFormState, setInitialFormState] = useState<FormState | null>(null);
@@ -337,10 +337,10 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   useEffect(() => {
     let initId = '';
     let initType: AssetType = 'GENERATOR';
-    let initCap = '100';
-    let initArea = 'North Zone';
+    let initCap = '';
+    let initArea = '';
     let initLoc = '';
-    let initW3w = 'field.power.setup';
+    let initW3w = '';
     let initRsn = '';
 
     if (initialAsset) {
@@ -354,11 +354,11 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     } else {
       initId = suggestNextId();
       initType = 'GENERATOR';
-      initCap = '100';
-      initArea = 'North Zone';
+      initCap = '';
+      initArea = '';
       initLoc = '';
-      initW3w = 'field.power.setup';
-      initRsn = `RSN-${Math.floor(10000 + Math.random() * 90000)}`;
+      initW3w = '';
+      initRsn = '';
     }
 
     setEquipmentId(initId);
@@ -400,33 +400,21 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     );
   }, [initialFormState, equipmentId, type, capacity, area, location, what3words, rentalSerialNumber]);
 
-  // Mandatory fields validation (Equipment ID required; other fields optional in edit mode)
+  // Mandatory fields validation (Equipment ID required; capacity and other metadata fields optional)
   const isValid = useMemo(() => {
     const cleanId = equipmentId.trim().toUpperCase();
     if (!cleanId) return false;
     if (!isEditMode && existingAssets.some((a) => a.equipmentId.toUpperCase() === cleanId)) {
       return false;
     }
-    if (isEditMode) {
-      if (type !== 'PLANT' && type !== 'BATTERY' && capacity.trim() !== '') {
-        const capNum = parseInt(capacity, 10);
-        if (isNaN(capNum) || capNum <= 0) return false;
-      }
-      return true;
-    }
-    if (!type) return false;
-    if (type !== 'PLANT' && type !== 'BATTERY') {
+    if (type !== 'PLANT' && type !== 'BATTERY' && capacity.trim() !== '') {
       const capNum = parseInt(capacity, 10);
       if (isNaN(capNum) || capNum <= 0) return false;
     }
-    if (!area.trim()) return false;
-    if (!location.trim()) return false;
-    if (!stripW3wPrefix(what3words.trim())) return false;
-    if (!rentalSerialNumber.trim()) return false;
     return true;
-  }, [equipmentId, isEditMode, existingAssets, type, capacity, area, location, what3words, rentalSerialNumber]);
+  }, [equipmentId, isEditMode, existingAssets, type, capacity]);
 
-  const canSubmit = isDirty && isValid && !isSubmitting;
+  const canSubmit = (!isEditMode || isDirty) && isValid && !isSubmitting;
 
   if (!isOpen) return null;
 
@@ -579,7 +567,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
           <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', marginBottom: '16px' }}>
             {/* Equipment Type Dropdown (1/3 width) */}
             <div className="admin-input-group" style={{ width: '140px', flexShrink: 0, marginBottom: 0 }}>
-              <label className="admin-label">Equipment type{!isEditMode ? ' *' : ''}</label>
+              <label className="admin-label">Equipment type</label>
               <select
                 className="admin-select"
                 style={{ width: '100%', height: '38px' }}
@@ -587,11 +575,12 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 onChange={(e) => {
                   const newType = e.target.value as AssetType;
                   setType(newType);
-                  if (newType === 'GENERATOR' && !capacity && !isEditMode) setCapacity('100');
-                  if (newType === 'TANK' && !capacity && !isEditMode) setCapacity('3000');
+                  if (newType === 'PLANT' || newType === 'BATTERY') {
+                    setCapacity('');
+                  }
                 }}
               >
-                {isEditMode && <option value="">Unspecified</option>}
+                <option value="">Unspecified</option>
                 <option value="GENERATOR">Generator</option>
                 <option value="TANK">Tank</option>
                 <option value="PLANT">Plant</option>
@@ -601,7 +590,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
 
             {/* Capacity Combo Box (Select from DB or create new) */}
             <div className="admin-input-group" style={{ width: '130px', flexShrink: 0, marginBottom: 0 }}>
-              <label className="admin-label">Capacity{!isEditMode ? ' *' : ''}</label>
+              <label className="admin-label">Capacity</label>
               {type !== 'PLANT' && type !== 'BATTERY' ? (
                 <ComboBox
                   type="number"
@@ -609,15 +598,15 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                   value={capacity}
                   onChange={(val) => setCapacity(val)}
                   options={capacityOptions}
-                  placeholder={type === 'GENERATOR' ? '100' : '3000'}
-                  unit={type === 'GENERATOR' ? 'kVA' : 'L'}
-                  required={!isEditMode}
+                  placeholder="(NONE)"
+                  unit={type === 'GENERATOR' ? 'kVA' : type === 'TANK' ? 'L' : undefined}
                 />
               ) : (
                 <input
                   type="text"
                   className="admin-input"
-                  value="Unrated"
+                  value=""
+                  placeholder="(NONE)"
                   disabled
                   style={{
                     color: 'var(--adm-text-muted)',
@@ -632,7 +621,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
 
           {/* Row 3: Zone/area combo box on its own line, 90% width (Select from DB or create new) */}
           <div className="admin-input-group" style={{ marginBottom: '16px' }}>
-            <label className="admin-label">Zone/area{!isEditMode ? ' *' : ''}</label>
+            <label className="admin-label">Zone/area</label>
             <ComboBox
               type="text"
               value={area}
@@ -640,13 +629,12 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               options={areaOptions}
               placeholder="Select or enter zone/area if known"
               style={{ width: '90%' }}
-              required={!isEditMode}
             />
           </div>
 
           {/* Row 4: Location on its own line, 90% width */}
           <div className="admin-input-group" style={{ marginBottom: '16px' }}>
-            <label className="admin-label">Location{!isEditMode ? ' *' : ''}</label>
+            <label className="admin-label">Location</label>
             <input
               type="text"
               className="admin-input"
@@ -654,14 +642,13 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Enter location if known"
-              required={!isEditMode}
             />
           </div>
 
           {/* Row 5: What3Words on its own line, 90% width, no prefix /// characters */}
           <div className="admin-input-group" style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', width: '90%' }}>
-              <label className="admin-label">What3Words Reference{!isEditMode ? ' *' : ''}</label>
+              <label className="admin-label">What3Words Reference</label>
               {what3words && (
                 <a
                   href={getGoogleMapsExternalUrl(
@@ -701,7 +688,6 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 onChange={(e) => setWhat3words(stripW3wPrefix(e.target.value))}
                 placeholder="Enter what3words reference if known"
                 style={{ paddingLeft: '32px', width: '100%', height: '38px' }}
-                required={!isEditMode}
               />
               <MapPin
                 size={15}
@@ -718,7 +704,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
 
           {/* Row 6: Rental Serial Number on its own line, 90% width */}
           <div className="admin-input-group" style={{ marginBottom: '20px' }}>
-            <label className="admin-label">Rental Serial Number{!isEditMode ? ' *' : ''}</label>
+            <label className="admin-label">Rental Serial Number</label>
             <input
               type="text"
               className="admin-input admin-mono"
@@ -726,7 +712,6 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               value={rentalSerialNumber}
               onChange={(e) => setRentalSerialNumber(e.target.value.toUpperCase())}
               placeholder="Enter serial number if known"
-              required={!isEditMode}
             />
           </div>
 

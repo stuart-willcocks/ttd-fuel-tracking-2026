@@ -444,7 +444,10 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
             </div>
           )}
 
-          <div className="edit-asset-field-col">
+          <div
+            className="edit-asset-field-col"
+            style={isBattery ? { gridColumn: '1 / -1' } : undefined}
+          >
             <label htmlFor="pda-edit-serial" className="edit-asset-field-label">
               Serial Number
             </label>
@@ -562,13 +565,13 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
                       <td className="val">
                         {parsedCapacity !== undefined
                           ? `${parsedCapacity}${capacityUnit ? ` ${capacityUnit}` : ''}`
-                          : 'Unrated'}
+                          : '(NONE)'}
                         {isCapacityChanged && (
                           <div style={{ fontSize: '11px', color: '#6B7280', fontWeight: 500 }}>
                             Previously:{' '}
                             {asset.capacity !== undefined
                               ? `${asset.capacity}${capacityUnit ? ` ${capacityUnit}` : ''}`
-                              : 'Unrated'}
+                              : '(NONE)'}
                           </div>
                         )}
                       </td>
@@ -577,10 +580,10 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
                   <tr>
                     <td className="lbl">Serial Number</td>
                     <td className="val">
-                      {serial.trim() || '—'}
+                      {serial.trim() || '(NONE)'}
                       {isSerialChanged && (
                         <div style={{ fontSize: '11px', color: '#6B7280', fontWeight: 500 }}>
-                          Previously: {asset.rentalSerialNumber || '—'}
+                          Previously: {asset.rentalSerialNumber || '(NONE)'}
                         </div>
                       )}
                     </td>
@@ -593,10 +596,10 @@ export const EditAssetModal: React.FC<EditAssetModalProps> = ({
                       className="val confirm-w3w-cell"
                       style={{ fontFamily: "'JetBrains Mono', monospace" }}
                     >
-                      <div className="confirm-w3w-value">{effectiveCleanW3w || '—'}</div>
+                      <div className="confirm-w3w-value">{effectiveCleanW3w || '(NONE)'}</div>
                       {isLocationChanged && (
                         <div className="confirm-w3w-prev">
-                          Previously: {initialCleanW3w || '—'}
+                          Previously: {initialCleanW3w || '(NONE)'}
                         </div>
                       )}
                     </td>
