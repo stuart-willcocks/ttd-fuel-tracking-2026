@@ -11,9 +11,10 @@ import {
 interface AssetFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (asset: Equipment) => Promise<void>;
+  onSave: (asset: Equipment, previousEquipmentId?: string) => Promise<void>;
   initialAsset?: Equipment | null;
   existingAssets: Equipment[];
+  hasTransactions?: boolean;
   onTogglePower?: (asset: Equipment) => void;
   onDelete?: (asset: Equipment) => void;
   isPowerOn?: boolean;
@@ -272,6 +273,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   onSave,
   initialAsset,
   existingAssets,
+  hasTransactions = false,
   onTogglePower,
   onDelete,
   isPowerOn = false,
@@ -307,6 +309,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   const [initialFormState, setInitialFormState] = useState<FormState | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isConfirmIdChangeOpen, setIsConfirmIdChangeOpen] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Database options for Capacity combo box based on current equipment type
@@ -379,6 +382,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       rentalSerialNumber: initRsn,
     });
 
+    setIsConfirmIdChangeOpen(false);
     setErrorMsg(null);
   }, [initialAsset, isOpen]);
 
@@ -404,7 +408,12 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   const isValid = useMemo(() => {
     const cleanId = equipmentId.trim().toUpperCase();
     if (!cleanId) return false;
-    if (!isEditMode && existingAssets.some((a) => a.equipmentId.toUpperCase() === cleanId)) {
+    const initialCleanId = initialAsset?.equipmentId.trim().toUpperCase() ?? '';
+    const isIdChanged = isEditMode && cleanId !== initialCleanId;
+    if (isEditMode && hasTransactions && isIdChanged) {
+      return false;
+    }
+    if ((!isEditMode || isIdChanged) && existingAssets.some((a) => a.equipmentId.toUpperCase() === cleanId)) {
       return false;
     }
     if (type !== 'PLANT' && type !== 'BATTERY' && capacity.trim() !== '') {
@@ -412,7 +421,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       if (isNaN(capNum) || capNum <= 0) return false;
     }
     return true;
-  }, [equipmentId, isEditMode, existingAssets, type, capacity]);
+  }, [equipmentId, isEditMode, initialAsset, hasTransactions, existingAssets, type, capacity]);
 
   const canSubmit = (!isEditMode || isDirty) && isValid && !isSubmitting;
 
@@ -431,22 +440,8 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
     isMouseDownOnBackdrop.current = false;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit) return;
-    setErrorMsg(null);
-
+  const commitSave = async () => {
     const cleanId = equipmentId.trim().toUpperCase();
-    if (!cleanId) {
-      setErrorMsg('Equipment ID is required.');
-      return;
-    }
-
-    if (!isEditMode && existingAssets.some((a) => a.equipmentId.toUpperCase() === cleanId)) {
-      setErrorMsg(`An asset with Equipment ID "${cleanId}" already exists.`);
-      return;
-    }
-
     const cleanW3w = stripW3wPrefix(what3words.trim());
     const finalW3w =
       cleanW3w && cleanW3w.toLowerCase() !== 'what.three.words'
@@ -482,14 +477,48 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
         updatedEquipment,
         initialAsset?.what3words
       );
-      await onSave(resolvedEquipment);
+      await onSave(resolvedEquipment, initialAsset?.equipmentId);
+      setIsConfirmIdChangeOpen(false);
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMsg(`Failed to save asset: ${msg}`);
+      setIsConfirmIdChangeOpen(false);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setErrorMsg(null);
+
+    const cleanId = equipmentId.trim().toUpperCase();
+    if (!cleanId) {
+      setErrorMsg('Equipment ID is required.');
+      return;
+    }
+
+    const initialCleanId = initialAsset?.equipmentId.trim().toUpperCase() ?? '';
+    const isIdChanged = isEditMode && cleanId !== initialCleanId;
+
+    if (isEditMode && hasTransactions && isIdChanged) {
+      setErrorMsg('Cannot change Equipment ID because transactions are recorded against the current ID.');
+      return;
+    }
+
+    if ((!isEditMode || isIdChanged) && existingAssets.some((a) => a.equipmentId.toUpperCase() === cleanId)) {
+      setErrorMsg(`An asset with Equipment ID "${cleanId}" already exists.`);
+      return;
+    }
+
+    if (isEditMode && initialAsset && isIdChanged) {
+      setIsConfirmIdChangeOpen(true);
+      return;
+    }
+
+    await commitSave();
   };
 
   return (
@@ -545,7 +574,12 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
                 value={equipmentId}
                 onChange={(e) => setEquipmentId(e.target.value.toUpperCase())}
                 placeholder="TTD-MAT-0001"
-                disabled={isEditMode}
+                disabled={isEditMode && hasTransactions}
+                title={
+                  isEditMode && hasTransactions
+                    ? 'Equipment ID cannot be changed because transactions are recorded against this ID'
+                    : undefined
+                }
                 style={{ width: '25%', minWidth: '130px', height: '38px' }}
                 required
               />
@@ -589,7 +623,7 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
             </div>
 
             {/* Capacity Combo Box (Select from DB or create new) */}
-            <div className="admin-input-group" style={{ width: '130px', flexShrink: 0, marginBottom: 0 }}>
+            <div className="admin-input-group" style={{ width: '195px', flexShrink: 0, marginBottom: 0 }}>
               <label className="admin-label">Capacity</label>
               {type !== 'PLANT' && type !== 'BATTERY' ? (
                 <ComboBox
@@ -803,6 +837,76 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
             </div>
           </div>
         </form>
+
+        {/* Confirmation Dialog when Equipment ID is changed in Edit Mode */}
+        {isConfirmIdChangeOpen && initialAsset && (
+          <div
+            className="admin-modal-backdrop"
+            style={{ zIndex: 1200 }}
+            onClick={() => {
+              if (!isSubmitting) setIsConfirmIdChangeOpen(false);
+            }}
+          >
+            <div
+              className="admin-modal-panel"
+              style={{ maxWidth: '460px' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <h3
+                  style={{
+                    fontFamily: 'var(--adm-font-display)',
+                    fontSize: '1.15rem',
+                    fontWeight: 700,
+                    color: 'var(--adm-text-primary)',
+                  }}
+                >
+                  Confirm Equipment ID Change
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmIdChangeOpen(false)}
+                  className="admin-btn admin-btn-outline admin-btn-sm"
+                  style={{ padding: '6px' }}
+                  disabled={isSubmitting}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <p
+                style={{
+                  fontSize: '0.95rem',
+                  color: 'var(--adm-text-primary)',
+                  lineHeight: 1.5,
+                  marginBottom: '22px',
+                }}
+              >
+                Are you sure you want to change the equipment ID {initialAsset.equipmentId} to {equipmentId.trim().toUpperCase()}?
+              </p>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmIdChangeOpen(false)}
+                  className="admin-btn admin-btn-outline"
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={commitSave}
+                  className="admin-btn admin-btn-primary"
+                  disabled={isSubmitting}
+                >
+                  <Check size={16} />
+                  <span>{isSubmitting ? 'Saving...' : 'Confirm'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -333,6 +333,12 @@ export async function deleteEquipmentFromSupabase(equipmentId: string): Promise<
   const { error } = await client.from('equipment_list').delete().eq('equipment_id', equipmentId);
   if (error) throw error;
 
+  try {
+    await db.equipments.delete(equipmentId);
+  } catch {
+    // Ignore local db delete error
+  }
+
   broadcastEquipmentDelete(equipmentId);
 }
 

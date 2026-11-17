@@ -437,11 +437,25 @@ export const AdminApp: React.FC = () => {
   };
 
   // Create / Update Asset Handler
-  const handleSaveAsset = async (savedAsset: Equipment) => {
+  const handleSaveAsset = async (savedAsset: Equipment, previousEquipmentId?: string) => {
     try {
       await postRemoteEquipment(savedAsset);
+      const isIdRenamed =
+        Boolean(previousEquipmentId) &&
+        previousEquipmentId!.trim().toUpperCase() !== savedAsset.equipmentId.trim().toUpperCase();
+      if (isIdRenamed && previousEquipmentId) {
+        await deleteRemoteEquipment(previousEquipmentId);
+        if (selectedAssetId === previousEquipmentId) {
+          setSelectedAssetId(savedAsset.equipmentId);
+        }
+      }
       await loadFleetData(true, { equipment: true, transactions: false, devices: false });
-      showToast(`Asset "${savedAsset.equipmentId}" saved successfully!`, 'success');
+      showToast(
+        isIdRenamed
+          ? `Equipment ID changed from "${previousEquipmentId}" to "${savedAsset.equipmentId}"!`
+          : `Asset "${savedAsset.equipmentId}" saved successfully!`,
+        'success'
+      );
       setEditingAsset(null);
       setIsCreateModalOpen(false);
     } catch (err: unknown) {
@@ -860,6 +874,15 @@ export const AdminApp: React.FC = () => {
             isOpen={isCreateModalOpen || Boolean(editingAsset)}
             initialAsset={editingAsset}
             existingAssets={assets}
+            hasTransactions={
+              editingAsset
+                ? transactions.some(
+                    (tx) =>
+                      tx.equipmentId.trim().toUpperCase() ===
+                      editingAsset.equipmentId.trim().toUpperCase()
+                  )
+                : false
+            }
             onClose={() => {
               setIsCreateModalOpen(false);
               setEditingAsset(null);
